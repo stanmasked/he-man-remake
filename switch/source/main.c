@@ -121,7 +121,7 @@ int main(void) {
             printf("ground %u wall %u ceiling %u | respawns %lu\n",
                    state.grounded, state.wall_hit, state.ceiling_hit,
                    (unsigned long)state.respawns);
-            printf("HP %u | enemy HP %u | sword hits %lu | taken %lu\\n",
+            printf("HP %u | enemy HP %u | sword hits %lu | taken %lu\n",
                    enemy.player_hp, enemy.enemy_hp,
                    (unsigned long)enemy.sword_hits,
                    (unsigned long)enemy.player_hits);
