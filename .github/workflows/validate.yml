@@ -29,3 +29,5 @@ jobs:
         run: PYTHONPATH=src python -m heman_tools.host_demo --headless --ticks 180
       - name: Synthetic event interactions smoke test
         run: PYTHONPATH=src python -m heman_tools.events_demo --ticks 180
+      - name: Event HUD host CLI smoke test (synthetic only)
+        run: PYTHONPATH=src python -m heman_tools.host_demo --headless --interactions --ticks 180

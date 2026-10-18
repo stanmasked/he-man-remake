@@ -16,7 +16,8 @@
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
 - [x] Add independent synthetic pickup/checkpoint/hazard/exit event state and deterministic headless replay.
-- [ ] Display event markers in the keyboard demo and investigate authentic iOS script behavior.
+- [x] Display synthetic event markers and a camera-aware HUD in the desktop demo, with headless CLI parity.
+- [ ] Investigate authentic iOS event scripts; never assume synthetic rules match original behavior.
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.

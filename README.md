@@ -78,3 +78,7 @@ With your own IPA and local Pillow install you can optionally view an approximat
 ## Stage 012: pickups, checkpoints and hazard triggers
 
 Independent synthetic event logic supports one-shot pickups, checkpoint respawns, hazards, triggers and exit flags. Source game scripts remain off GitHub. Test without a graphical window: `PYTHONPATH=src python -m heman_tools.events_demo --ticks 240`. See `docs/scene-interactions.md`. This adds 19 synthetic tests (175 cumulative, pending GitHub CI).
+
+## Stage 013: visible event markers and HUD
+
+Enable the asset-free desktop event course with `PYTHONPATH=src python -m heman_tools.host_demo --interactions`. It displays pickups, checkpoints, hazards, triggers and exit icons plus a basic status HUD. For headless CI use `--interactions --headless --ticks 180`. It runs **only with the synthetic scene**; combining `--interactions` and `--ipa` is rejected. See `docs/event-hud.md`. This adds 15 synthetic tests; staged total 190 tests pending CI.
