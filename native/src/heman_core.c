@@ -101,8 +101,20 @@ hm_result hm_init(const hm_world *world, hm_state *state) {
     return HM_OK;
 }
 
+/* hm_step validates borrowed masks once at frame entry. Arrays must not be
+   mutated concurrently while the step is running. This avoids a full-grid
+   validation for each pixel-accurate collision sample. */
+static int step_overlap(const hm_world *w, float x, float feet) {
+    if (w->mask_grid) {
+        const int result = hm_mask_body_overlap_prevalidated(
+            w->mask_grid, x, feet, w->actor_half_width, w->actor_height);
+        return result != 0; /* invalid numeric coordinates fail closed */
+    }
+    return hm_overlaps(w, x, feet);
+}
+
 static int supported(const hm_world *w, float x, float feet) {
-    return hm_overlaps(w, x, feet + 0.25f);
+    return step_overlap(w, x, feet + 0.25f);
 }
 
 /* Returns last safe coordinate and collision flag. Rigid rectangular tiles. */
@@ -118,12 +130,12 @@ static float sweep(const hm_world *w, float x, float feet, float delta,
         const float candidate = start + delta * (float)i / (float)n;
         const float cx = horizontal ? candidate : x;
         const float cy = horizontal ? feet : candidate;
-        if (hm_overlaps(w, cx, cy)) {
+        if (step_overlap(w, cx, cy)) {
             float safe = previous, blocked = candidate;
             int k;
             for (k = 0; k < 14; ++k) {
                 const float mid = (safe + blocked) * 0.5f;
-                if (hm_overlaps(w, horizontal ? mid : x,
+                if (step_overlap(w, horizontal ? mid : x,
                                 horizontal ? feet : mid)) blocked = mid;
                 else safe = mid;
             }
@@ -231,7 +243,7 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
         w->mask_grid->columns != w->columns ||
         w->mask_grid->rows != w->rows ||
         w->mask_grid->tile_size != w->tile_size)) return HM_INVALID;
-    if (hm_overlaps(w, state->x, state->feet_y)) return HM_COLLISION;
+    if (step_overlap(w, state->x, state->feet_y)) return HM_COLLISION;
     s = *state;
     old_x = state->x; old_feet = state->feet_y;
     s.frame++;
