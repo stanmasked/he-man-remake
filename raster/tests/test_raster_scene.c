@@ -1,5 +1,6 @@
 #include "raster_scene.h"
 #include <assert.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -95,6 +96,20 @@ int main(void) {
     assert(hm_raster_render(guarded.image,W-1u,H,STRIDE,&view)==0);
     assert(checksum(guarded.image)==qa);
     assert(hm_raster_render(NULL,W,H,STRIDE,&view)==0);
+    game.player.camera_x = -1.0f;
+    assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==0);
+    assert(checksum(guarded.image)==qa);
+    game.player.camera_x = 0.0f;
+    /* Malformed borrowed events must reject without touching pixels. */
+    {
+        hm_event invalid[] = {{ HM_PICKUP, NAN, 251.0f, 8.0f }};
+        world.events = invalid;
+        world.event_count = 1u;
+        assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==0);
+        assert(checksum(guarded.image)==qa);
+        world.events = events;
+        world.event_count = 2u;
+    }
     assert(guarded.prefix==UINT32_C(0x01234567));
     assert(guarded.suffix==UINT32_C(0x89abcdef));
     printf("Asset-free raster PASS: initial=%08lx moved=%08lx qa=%08lx\n",
