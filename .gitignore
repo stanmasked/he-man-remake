@@ -1,0 +1,21 @@
+# Never commit purchased game binaries or extracted proprietary assets
+*.ipa
+*.apk
+*.obb
+*.lvl
+*.caf
+*.pvr
+*.pvr.ccz
+private_assets/
+original_assets/
+local_reports/
+reports/private/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.DS_Store
