@@ -104,3 +104,7 @@ The optional borrowed mask grid now drives actual `hm_step` actor collisions and
 C99 gameplay now validates borrowed pixel masks at each frame boundary rather than for every overlap sample, keeping full validation for external callers and preserving error rollback on corrupted data. A synthetic 300x19, 900-frame local experiment improved from 0.074808s to 0.017046s CPU time (one run, **not a Switch benchmark**). See `docs/native-mask-performance.md`; run `sh native/bench_mask_step.sh gcc` for an asset-free local measurement.
 
 `switch/` now includes an **unverified devkitA64/libnx text-console build target** using the C99 core on a synthetic course, with no original iOS game content. The devkitPro SDK is not installed in the present environment; no NRO has been produced or emulator-tested. Details: `switch/README.md`.
+
+## Stage 019: first verified Switch NRO cross-compilation
+
+The synthetic C99 console probe now builds with the official devkitPro Switch toolchain in GitHub Actions. **The first successful build is [Actions #39157351301](https://github.com/stanmasked/he-man-remake/actions/runs/39157351301)**: devkitA64 15.2.0 generated AArch64 ELF and a valid 196,608-byte NRO. The artifact is retained seven days and contains no original He-Man game content. The GitHub workflow also checks the `NRO0` header, SHA-256 and guards against tracked source assets. See `switch/README.md`. **No successful emulator or console run has yet been reported.**
