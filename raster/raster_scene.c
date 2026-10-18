@@ -179,6 +179,20 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
     rect(pixels,stride,sx+13,sy-46,4,35,UINT32_C(0xffcddae4));
     rect(pixels,stride,sx+8,sy-17,16,4,UINT32_C(0xfff0d486));
 
+    /* Immovable HUD track and unique magenta marker: deliberately tied
+       only to world-space player x, never to a moving enemy or camera.
+       Emulator screenshots can therefore assert controller-caused motion
+       separately from the autonomous synthetic patrol and scenery. */
+    rect(pixels,stride,10,44,454,23,UINT32_C(0xff24344a));
+    {
+        float px = s->player.x * 2.0f;
+        int marker_x;
+        if (px < 0.0f) px = 0.0f;
+        if (px > 420.0f) px = 420.0f;
+        marker_x = 20 + (int)floorf(px + 0.5f);
+        rect(pixels,stride,marker_x,47,12,16,UINT32_C(0xffff00ff));
+    }
+
     /* Readable top HUD. Health ticks are clamped to the configured maximum. */
     rect(pixels,stride,0,0,HM_RASTER_WIDTH,38,UINT32_C(0xff1b2c46));
     for (col=0u;col<view->combat->player_initial_hp && col<20u;++col)

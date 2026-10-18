@@ -65,6 +65,10 @@ int main(void) {
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
     first=checksum(guarded.image);
     assert(first!=0u);
+    /* A dedicated magenta tracker is fixed to the player's world x,
+       not the independently patrolling enemy or camera. */
+    assert(guarded.image[53u*STRIDE+120u]==UINT32_C(0xffff00ff));
+    assert(guarded.image[53u*STRIDE+445u]!=UINT32_C(0xffff00ff));
     assert(guarded.image[0]==UINT32_C(0xff1b2c46));
     assert(guarded.image[(H-1u)*STRIDE+W/2u]!=UINT32_C(0x5a5a5a5a));
     for(row=0u;row<H;++row)
@@ -81,6 +85,8 @@ int main(void) {
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
     moved=checksum(guarded.image);
     assert(moved!=first);
+    assert(guarded.image[53u*STRIDE+120u]!=UINT32_C(0xffff00ff));
+    assert(guarded.image[53u*STRIDE+445u]==UINT32_C(0xffff00ff));
     view.qa_state=1u;view.qa_fingerprint=UINT32_C(0x1234abcd);
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
     qa=checksum(guarded.image);
