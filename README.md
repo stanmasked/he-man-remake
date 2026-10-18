@@ -50,3 +50,7 @@ No tile shape-to-physics mapping or Switch build is claimed yet. Total synthetic
 ## Stage 008: host-side mask physics experiment
 
 Experimental fixed-step gravity, landing, jump and bounded slope adhesion over **locally decoded alpha masks** (not confirmed original iOS physics). The user-owned IPA and atlas remain outside GitHub. Run `PYTHONPATH=src python -m heman_tools.collision_probe --ipa /private/He-Man-v2.0.0.ipa --map MUMap1-1.map --out local_reports/level1_probe.json` after installing Pillow locally. All CI tests use synthetic masks. See `docs/physics-prototype.md`. Host test suite: **100 tests**. No playable Switch binary is available yet.
+
+## Stage 010: bounded slope adhesion
+
+Adds optional experimental full-body uphill/downhill support following with ceiling clearance, tall-wall rejection and safe step limits. The original physics constants remain unknown. See `docs/slope-adherence.md`. All **135 synthetic tests** passed locally. The game is still not playable on Switch.
