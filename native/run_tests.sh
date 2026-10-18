@@ -23,3 +23,12 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_mask.c" \
   -lm -o "$TMP/test_mask"
 "$TMP/test_mask"
+
+
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_mask_motion.c" \
+  "$ROOT/native/tests/test_mask_motion.c" \
+  -lm -o "$TMP/test_mask_motion"
+"$TMP/test_mask_motion"

@@ -90,3 +90,7 @@ An independently authored C99 simulation now exists under `native/`, with no GUI
 ## Stage 015: compare portable C with host Python
 
 Added four entirely synthetic movement fixtures comparing 180 C99/Python frames each (720 frame comparisons) and a packed C99 pixel-mask reader checked against 32 Python mask columns. These tests cover a shared rectangular-collision subset and read-only slope-mask geometry; **the C game loop does not yet walk on slopes**. Run `sh native/run_tests.sh gcc` and `PYTHONPATH=src python -m unittest discover -s tests -v`. See `docs/native-parity.md`. No iOS assets or Switch NRO are included.
+
+## Stage 016: C99 pixel-mask actor movement
+
+A separate native actor-step experiment now handles static packed-mask slopes, grounded walking and jumping over synthetic bitset tiles. The **existing C99 `hm_step` has not yet been switched to this interface**. See `docs/native-mask-motion.md`; run `sh native/run_tests.sh gcc` or `clang`. Original IPA and assets are not committed.
