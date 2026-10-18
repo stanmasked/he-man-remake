@@ -9,6 +9,7 @@
 #include "probe_view.h"
 #include "probe_selfcheck.h"
 #include "session_selftest.h"
+#include "runtime_replay.h"
 
 #define W 48u
 #define H 24u
@@ -78,6 +79,9 @@ int main(void) {
     PadState pad;
     char view[HM_PROBE_BYTES];
     uint32_t row;
+    hm_replay_report replay_report = {0};
+    hm_replay_status replay_status = HM_REPLAY_OK;
+    uint8_t replay_tested = 0u;
     consoleInit(NULL);
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
@@ -96,6 +100,12 @@ int main(void) {
         down = padGetButtonsDown(&pad);
         held = padGetButtons(&pad);
         if (down & HidNpadButton_Plus) break;
+        if (down & HidNpadButton_Y) {
+            /* Side-effect-free, scripted 180-frame QA session. Never
+               change the live player/encounter state when Y is pressed. */
+            replay_status = hm_replay_verify(&replay_report);
+            replay_tested = 1u;
+        }
         if (held & HidNpadButton_Left) movement.axis -= 1.0f;
         if (held & HidNpadButton_Right) movement.axis += 1.0f;
         movement.jump = (uint8_t)((down & HidNpadButton_A) != 0);
@@ -117,8 +127,12 @@ int main(void) {
             }
             printf("\x1b[2J\x1b[H");
             printf("He-Man independent C99 Switch core probe\n");
-            printf("Startup: PASS (physics 180f + combined session)\n");
-            printf("Left/Right: move | A: jump | X: attack | B: reset | +: quit\n");
+            printf("Boot PASS | Y QA %s(%d) hash %08lx\n",
+                   !replay_tested ? "READY" :
+                   (replay_status == HM_REPLAY_OK ? "PASS" : "FAIL"),
+                   (int)replay_status,
+                   (unsigned long)replay_report.fingerprint);
+            printf("Left/Right move | A jump | X sword | Y replay | B reset | + exit\n");
             printf("@ player  # platform  * heals 1 HP  C checkpoint\n");
             printf("! hazard  > exit  E: enemy (synthetic only)\n");
             for (row = 0; row < HM_PROBE_ROWS; ++row)

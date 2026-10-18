@@ -36,6 +36,7 @@
 - [x] Cross-compile the synthetic text-console Switch probe to a structurally valid NRO with devkitPro in GitHub Actions.
 - [x] Add an identical GCC/Clang + libnx source-level 180-frame synthetic startup self-check with console PASS/error reporting.
 - [x] Add a second source-identical host/Switch boot self-check covering combined movement, hazard respawn, combat defeat and atomic rollback.
+- [x] Add controller-triggered deterministic 180-frame runtime replay with a shared GCC/Clang/Switch fingerprint and nonmutating live-state contract.
 - [ ] Boot the synthetic NRO in a Switch emulator or homebrew-enabled console and confirm controller input/console lifecycle.
 - [ ] Document differences from iOS v2.0.0.
 

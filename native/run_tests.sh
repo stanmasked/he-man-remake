@@ -117,3 +117,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_session_pickup.c" \
   -lm -o "$TMP/test_session_pickup"
 "$TMP/test_session_pickup"
+
+# Standalone 180-frame deterministic input replay shared with the NRO.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/switch/source" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/switch/source/runtime_replay.c" \
+  "$ROOT/switch/tests/test_runtime_replay.c" \
+  -lm -o "$TMP/test_runtime_replay"
+"$TMP/test_runtime_replay"
