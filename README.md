@@ -90,3 +90,7 @@ An independently authored C99 simulation now exists under `native/`, with no GUI
 ## Stage 015: compare portable C with host Python
 
 Added four entirely synthetic movement fixtures comparing 180 C99/Python frames each (720 frame comparisons) and a packed C99 pixel-mask reader checked against 32 Python mask columns. These tests cover a shared rectangular-collision subset and read-only slope-mask geometry; **the C game loop does not yet walk on slopes**. Run `sh native/run_tests.sh gcc` and `PYTHONPATH=src python -m unittest discover -s tests -v`. See `docs/native-parity.md`. No iOS assets or Switch NRO are included.
+
+## Stage 016: mask-enabled native C99 gameplay
+
+The portable `hm_step` loop now accepts an optional `hm_mask_grid` and bounded uphill/downhill stepping, while retaining the older rectangular-cell path when masks are absent. New native regression tests exercise slopes, walls, ceiling clearance, jump and corrupted masks; a new **26-frame** native-vs-Python slope trace matches on all contact flags and within 0.001 for position and speed. See `docs/native-mask-gameplay.md`. This does **not** add a Switch `.nro`, authentic iOS physics, or an OS/controller backend.
