@@ -28,3 +28,7 @@ PYTHONPATH=src python -m heman_tools.waypoints_cli --ipa /secure/local/path/He-M
 The original IPA is never uploaded by any CLI. Local reports are excluded by `.gitignore`, and GitHub Actions uses synthetic tests only.
 
 See `docs/roadmap.md` for the next tasks.
+
+## Stage 005: schematic level viewer
+
+Generate an asset-free SVG coordinate map from a **local** IPA with `PYTHONPATH=src python -m heman_tools.viewer_cli --ipa /private/He-Man-v2.0.0.ipa --out local_reports/level1.svg`. To zoom the first part add `--min-x 0 --max-x 2200`. No textures, collision geometry, gameplay engine or Switch binary are generated; see `docs/level-viewer.md`. The local Stage 005 regression suite has 46 tests.
