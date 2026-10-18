@@ -1,4 +1,4 @@
-name: Header parser CI
+name: Game format parsers CI
 on:
   push:
   pull_request:
@@ -19,7 +19,7 @@ jobs:
       - name: Block original game assets in tracked files
         shell: bash
         run: |
-          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|caf|pvr)$'; then
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$'; then
             echo 'Prohibited source asset detected in repository' >&2
             exit 1
           fi

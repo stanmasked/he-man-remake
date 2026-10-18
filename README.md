@@ -28,3 +28,21 @@ PYTHONPATH=src python -m heman_tools.waypoints_cli --ipa /secure/local/path/He-M
 The original IPA is never uploaded by any CLI. Local reports are excluded by `.gitignore`, and GitHub Actions uses synthetic tests only.
 
 See `docs/roadmap.md` for the next tasks.
+
+## Stages 005–006: schematics and geometric shape data
+
+The asset-free SVG viewer renders decoded object and point coordinates with `PYTHONPATH=src python -m heman_tools.viewer_cli --ipa /private/He-Man-v2.0.0.ipa --out local_reports/level1.svg`. See `docs/level-viewer.md`.
+
+The new `.shape` parser reads local-space polygons, circles and reference names. Run `PYTHONPATH=src python -m heman_tools.shape_scan --ipa /private/He-Man-v2.0.0.ipa --out local_reports/shapes.json`. See `docs/shape-format.md`. No collision map or playable Switch build has yet been completed.
+
+## Stage 007: multilayer tilemaps
+
+The new source-only reader reconstructs v1–v3 `.map` layers (independent UTF-16 names, tile IDs and atlas-index arrays). In private local validation it parsed all **213** normally structured map files, including the real `collision` layer of `MUMap1-1.map`. The exceptional `gs_background_sky.map` has a different format and is deliberately excluded. See `docs/tilemap-format.md`.
+
+Try it on your local IPA only:
+
+```sh
+PYTHONPATH=src python -m heman_tools.tilemap_cli --ipa /secure/local/He-Man-v2.0.0.ipa --map MUMap1-1.map --out local_reports/level1_tilemap.json
+```
+
+No tile shape-to-physics mapping or Switch build is claimed yet. Total synthetic test suite: **82 tests**.

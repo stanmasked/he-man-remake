@@ -19,3 +19,12 @@ build/
 dist/
 *.egg-info/
 .DS_Store
+*.map
+*.shape
+*.ps2d
+*.png
+*.jpg
+*.jpeg
+*.wav
+*.mp3
+*.ogg
