@@ -41,3 +41,6 @@
 - [ ] Document differences from iOS v2.0.0.
 
 No original IPA or extracted copyrighted resource may be committed, uploaded as Actions artifact, or placed in a public GitHub issue.
+
+- [x] Add a separate synthetic 640x360 libnx software-framebuffer NRO with a portable host-tested parallax/tile/player/enemy scene (not original game assets).
+- [ ] Confirm raster NRO execution, correct RGBA colors and controller-driven updates in a Nintendo Switch homebrew emulator or on hardware.
