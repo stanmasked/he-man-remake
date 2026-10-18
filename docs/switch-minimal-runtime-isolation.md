@@ -38,3 +38,35 @@ this requirement.
 
 Passing the minimalist test would NOT by itself establish that the
 actual He-Man raster NRO boots or functions correctly.
+
+## Exact loader incompatibility diagnosed
+
+The original NeXium smoke captured only its **terminal stderr** (mostly ALSA
+messages). Capturing its real `NEXIUM_DATA_ROOT/logs/nexium-*.log` revealed:
+
+```text
+Auto-loaded NRO: .../heman_minimal_guest_probe.nro
+Booting NRO: .../heman_minimal_guest_probe.nro
+Detected homebrew wrapper, NRO body starts at offset 16
+NRO: text=[0x80, 0x14080), ro=[0x14000, 0x18000), data=[0x18000, 0x1a000)
+Boot failed: Data segment out of bounds
+```
+
+The genuine devkitPro artifact has exactly `0x1a000` bytes. Its NRO header
+magic is at offset 16; the data segment ends at `0x1a000` in the full
+file. Current upstream NeXium `nexium-loader/src/nro.rs` subtracts the
+16-byte wrapper by passing `mmap[16..]` to its segment validator,
+creating a `0x19ff0`-byte limit. The declared end appears out of bounds
+by exactly **16 bytes**, before any guest instruction can execute.
+There is also a separate suspicious 128-byte adjustment to small text
+offsets in that same loader.
+
+`python3 tools/nro_layout_diagnostic.py path/to/file.nro` now reports
+both full-file layout bounds and the current NeXium loader interpretation
+without altering a single original NRO byte. The same diagnosis has
+asset-free unit tests and runs automatically at CI build time.
+
+**Do not fix by padding published NRO files or deleting the original
+homebrew wrapper.** Such transformations can change code addresses and
+create incorrect success claims. Resolve the loader incompatibility
+upstream or use an emulator that correctly supports normal devkitPro NRO.
