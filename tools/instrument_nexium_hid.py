@@ -26,18 +26,14 @@ def instrument_input(source: str) -> str:
             raise ValueError("Pinned upstream frame loop changed")
         events = [
             "if matches!(frames, 45 | 105) {",
-            '    let path = std::env::var("NEXIUM_HID_INJECT")?',
-            '        ;',
+            '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             '    let text = if frames == 45 { "buttons=DRIGHT" } else { "buttons=" };',
             '    std::fs::write(&path, text)?;',
             '    writeln!(log, "HEMAN_HID_SCHEDULE frame={} buttons={}", frames, text)?;',
             '    log.flush()?;',
             "}",
         ]
-        # No mismatched type annotations or emulator API; the ordinary
-        # pinned NeXium HID input-file parser reads the literal text.
-        events = [v for v in events if v != '        ;']
-        events[1] = '    let path = std::env::var("NEXIUM_HID_INJECT")?;'
+        # NeXium's original HID parser reads the file on a ~25ms cadence.
         injection = "\n".join(indent + line for line in events)
         source = source.replace(anchor,
             indent + "frames += 1;\n" + injection + "\n" +
