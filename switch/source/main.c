@@ -5,6 +5,7 @@
 #include <string.h>
 #include "heman_core.h"
 #include "probe_view.h"
+#include "probe_selfcheck.h"
 
 #define W 48u
 #define H 24u
@@ -40,13 +41,15 @@ int main(void) {
     hm_state state;
     PadState pad;
     hm_result result = hm_init(&world, &state);
+    hm_probe_check_result boot_check = hm_probe_boot_selfcheck();
     char view[HM_PROBE_BYTES];
     uint32_t row;
     consoleInit(NULL);
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
-    if (result != HM_OK) {
-        printf("Core setup error: %d\n", (int)result);
+    if (result != HM_OK || boot_check != HM_PROBE_CHECK_OK) {
+        printf("Core setup error: %d; boot self-check: %d\n",
+               (int)result, (int)boot_check);
         consoleUpdate(NULL);
         consoleExit(NULL);
         return 1;
@@ -71,6 +74,7 @@ int main(void) {
             }
             printf("\x1b[2J\x1b[H");
             printf("He-Man independent C99 Switch core probe\n");
+            printf("Synthetic boot self-check: PASS (180 scripted frames)\n");
             printf("Left/Right: move | A: jump | B: reset | +: quit\n");
             printf("@ player  # platform  * pickup  C checkpoint\n");
             printf("! hazard  > exit  (all level content synthetic)\n");
