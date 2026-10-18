@@ -49,6 +49,24 @@ static hm_combat_config make_combat(void) {
     return c;
 }
 
+/* Keep fatal diagnostics visible until Plus/app termination.
+   This allows collecting boot evidence in a homebrew emulator. */
+static void show_failure_screen(PadState *pad, const char *stage,
+                                int core, int boot, int combat) {
+    printf("\x1b[2J\x1b[H");
+    printf("He-Man Switch C99 synthetic probe: FAILED\n\n");
+    printf("Stage: %s\n", stage);
+    printf("core result %d | boot self-check %d | combat %d\n",
+           core, boot, combat);
+    printf("Press + to quit. Record these codes for diagnosis.\n");
+    consoleUpdate(NULL);
+    while (appletMainLoop()) {
+        padUpdate(pad);
+        if (padGetButtonsDown(pad) & HidNpadButton_Plus) break;
+        svcSleepThread(16000000LL);
+    }
+}
+
 int main(void) {
     hm_world world = make_world();
     hm_state state;
@@ -64,10 +82,10 @@ int main(void) {
     consoleInit(NULL);
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
-    if (result != HM_OK || boot_check != HM_PROBE_CHECK_OK || combat_result != HM_COMBAT_OK) {
-        printf("Core setup error: %d; boot self-check: %d\n",
-               (int)result, (int)boot_check);
-        consoleUpdate(NULL);
+    if (result != HM_OK || boot_check != HM_PROBE_CHECK_OK ||
+        combat_result != HM_COMBAT_OK) {
+        show_failure_screen(&pad, "startup", (int)result,
+                            (int)boot_check, (int)combat_result);
         consoleExit(NULL);
         return 1;
     }
@@ -134,10 +152,9 @@ int main(void) {
         /* Approximate fixed-step pacing; no runtime timing proof yet. */
         svcSleepThread(16000000LL);
     }
-    if (result != HM_OK) {
-        printf("Core runtime error: %d\n", (int)result);
-        consoleUpdate(NULL);
-    }
+    if (result != HM_OK)
+        show_failure_screen(&pad, "simulation/viewport", (int)result,
+                            (int)boot_check, (int)combat_result);
     consoleExit(NULL);
     return result == HM_OK ? 0 : 2;
 }
