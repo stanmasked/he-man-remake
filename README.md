@@ -54,3 +54,19 @@ Experimental fixed-step gravity, landing, jump and bounded slope adhesion over *
 ## Stage 010: bounded slope adhesion
 
 Adds optional experimental full-body uphill/downhill support following with ceiling clearance, tall-wall rejection and safe step limits. The original physics constants remain unknown. See `docs/slope-adherence.md`. All **135 synthetic tests** passed locally. The game is still not playable on Switch.
+
+## Stage 011: keyboard-playable host test scene
+
+**Desktop prototype, not a Switch binary.** Run an independently created exercise course with camera, simple placeholder artwork, static collision masks, walking, jumping and respawn:
+
+```sh
+PYTHONPATH=src python -m heman_tools.host_demo
+```
+
+Keys: **A/D or arrows** to move, **Space/W/Up** to jump, **R** to reset, **Escape** to close. The reproducible headless alternative, supported in CI, is:
+
+```sh
+PYTHONPATH=src python -m heman_tools.host_demo --headless --ticks 240
+```
+
+With your own IPA and local Pillow install you can optionally view an approximate collision-map test scene via `--ipa /private/He-Man-v2.0.0.ipa`. **No original textures or sprites are included.** Full notes and limitations in `docs/host-demo.md`. Total unit tests: **156 synthetic cases**.
