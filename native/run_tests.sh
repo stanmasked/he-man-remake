@@ -73,3 +73,11 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/switch/tests/test_probe_selfcheck.c" \
   -lm -o "$TMP/test_probe_selfcheck"
 "$TMP/test_probe_selfcheck"
+
+# Synthetic one-enemy combat subsystem, independent of original game assets.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/tests/test_combat.c" \
+  -lm -o "$TMP/test_combat"
+"$TMP/test_combat"
