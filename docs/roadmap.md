@@ -27,7 +27,8 @@
 - [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
 - [ ] Introduce a platform input/render adapter for future Switch builds.
 - [x] Add first opt-in libnx/devkitA64 **console probe** build recipe (unverified cross-compilation).
-- [ ] Actually compile the homebrew NRO with devkitPro and run an emulator smoke test.
+- [x] Cross-compile the synthetic text-console Switch probe to a structurally valid NRO with devkitPro in GitHub Actions.
+- [ ] Boot the synthetic NRO in a Switch emulator or homebrew-enabled console and confirm controller input/console lifecycle.
 - [ ] Document differences from iOS v2.0.0.
 
 No original IPA or extracted copyrighted resource may be committed, uploaded as Actions artifact, or placed in a public GitHub issue.

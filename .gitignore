@@ -28,3 +28,10 @@ dist/
 *.wav
 *.mp3
 *.ogg
+
+# Never track platform build products; publish only via short-lived CI artifacts
+*.elf
+*.nro
+*.nacp
+*.nso
+*.nsp

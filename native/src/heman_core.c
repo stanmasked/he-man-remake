@@ -13,14 +13,14 @@ static float clampf(float x, float a, float b) {
     return fminf(fmaxf(x, a), b);
 }
 
-static int finitef(float x) {
+static int hm_internal_finite_float(float x) {
     return isfinite(x) != 0;
 }
 
 int hm_overlaps(const hm_world *w, float x, float feet_y) {
     int32_t x0, x1, y0, y1, gx, gy;
-    if (!w || (!w->solid && !w->mask_grid) || !finitef(x) || !finitef(feet_y) ||
-        !finitef(w->actor_half_width) || !finitef(w->actor_height) ||
+    if (!w || (!w->solid && !w->mask_grid) || !hm_internal_finite_float(x) || !hm_internal_finite_float(feet_y) ||
+        !hm_internal_finite_float(w->actor_half_width) || !hm_internal_finite_float(w->actor_height) ||
         !w->columns || !w->rows || !w->tile_size ||
         w->actor_half_width <= 0.0f || w->actor_height <= 0.0f ||
         w->actor_half_width > HM_MAX_BODY / 2.0f ||
@@ -67,7 +67,7 @@ static int valid_world(const hm_world *w) {
         w->columns > 4096u || w->rows > 4096u || w->tile_size > 64u ||
         w->event_count > HM_MAX_EVENTS || w->max_rise > 32u || w->max_drop > 32u ||
         (w->event_count && !w->events)) return 0;
-    for (i = 0; i < sizeof(p) / sizeof(p[0]); ++i) if (!finitef(p[i])) return 0;
+    for (i = 0; i < sizeof(p) / sizeof(p[0]); ++i) if (!hm_internal_finite_float(p[i])) return 0;
     if (w->actor_half_width <= 0 || w->actor_half_width > HM_MAX_BODY / 2 ||
         w->actor_height <= 0 || w->actor_height > HM_MAX_BODY ||
         w->speed <= 0 || w->gravity <= 0 || w->jump_speed <= 0 ||
@@ -85,7 +85,7 @@ static int valid_world(const hm_world *w) {
     for (i = 0; i < w->event_count; ++i) {
         const hm_event *e = &w->events[i];
         if (e->kind < HM_PICKUP || e->kind > HM_EXIT ||
-            !finitef(e->x) || !finitef(e->y) || !finitef(e->radius) ||
+            !hm_internal_finite_float(e->x) || !hm_internal_finite_float(e->y) || !hm_internal_finite_float(e->radius) ||
             e->radius < 1 || e->radius > 128) return 0;
         if (e->kind == HM_CHECKPOINT && hm_overlaps(w, e->x, e->y)) return 0;
     }
@@ -228,16 +228,16 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
     float old_x, old_feet, dx, dy, target, max_scroll_x, max_scroll_y, factor;
     uint32_t i;
     int hit, teleported = 0, hazard = 0;
-    if (!w || !state || (!w->solid && !w->mask_grid) || !finitef(dt) || dt <= 0.0f || dt > 1.0f / 30.0f ||
-        !finitef(input.axis) || fabsf(input.axis) > 1.0f ||
-        !finitef(state->x) || !finitef(state->feet_y) || !finitef(state->vy) ||
-        !finitef(state->camera_x) || !finitef(state->camera_y) ||
+    if (!w || !state || (!w->solid && !w->mask_grid) || !hm_internal_finite_float(dt) || dt <= 0.0f || dt > 1.0f / 30.0f ||
+        !hm_internal_finite_float(input.axis) || fabsf(input.axis) > 1.0f ||
+        !hm_internal_finite_float(state->x) || !hm_internal_finite_float(state->feet_y) || !hm_internal_finite_float(state->vy) ||
+        !hm_internal_finite_float(state->camera_x) || !hm_internal_finite_float(state->camera_y) ||
         state->checkpoint < -1 || state->checkpoint >= (int32_t)w->event_count ||
         state->frame == UINT32_MAX || state->respawns == UINT32_MAX ||
         state->landings == UINT32_MAX || state->hazards == UINT32_MAX) return HM_INVALID;
     dx = input.axis * w->speed * dt;
     dy = (fminf(state->vy + w->gravity * dt, w->terminal_speed)) * dt;
-    if (!finitef(dx) || !finitef(dy) || fabsf(dx) > HM_MAX_SWEEP ||
+    if (!hm_internal_finite_float(dx) || !hm_internal_finite_float(dy) || fabsf(dx) > HM_MAX_SWEEP ||
         fabsf(dy) > HM_MAX_SWEEP || w->event_count > HM_MAX_EVENTS) return HM_LIMIT;
     if (w->mask_grid && (!hm_mask_valid(w->mask_grid) ||
         w->mask_grid->columns != w->columns ||

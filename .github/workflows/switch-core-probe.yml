@@ -1,0 +1,75 @@
+name: Nintendo Switch synthetic core probe (devkitPro)
+
+on:
+  push:
+    paths:
+      - 'switch/**'
+      - 'native/include/**'
+      - 'native/src/**'
+      - '.github/workflows/switch-core-probe.yml'
+  pull_request:
+    paths:
+      - 'switch/**'
+      - 'native/include/**'
+      - 'native/src/**'
+      - '.github/workflows/switch-core-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile-nro:
+    name: Cross-compile synthetic C99 probe to NRO
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original game assets in Git tracking
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files > /tmp/heman-tracked-paths.txt
+          if grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$' /tmp/heman-tracked-paths.txt; then
+            echo 'Original game assets are forbidden in this repository' >&2
+            exit 1
+          fi
+      - name: Verify devkitPro compiler and libnx availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$DEVKITA64/bin/aarch64-none-elf-gcc"
+          test -x "$DEVKITPRO/tools/bin/elf2nro"
+          test -f "$DEVKITPRO/libnx/switch.specs"
+          "$DEVKITA64/bin/aarch64-none-elf-gcc" --version | head -n 1
+      - name: Build NRO using only original synthetic test code
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch clean
+          make -C switch -j2
+      - name: Inspect generated ELF and NRO headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s switch/heman_core_probe.elf
+          test -s switch/heman_core_probe.nro
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch/heman_core_probe.elf |
+            grep -F 'AArch64'
+          magic=$(dd if=switch/heman_core_probe.nro bs=1 skip=16 count=4 2>/dev/null)
+          test "$magic" = 'NRO0'
+          sha256sum switch/heman_core_probe.nro
+          wc -c switch/heman_core_probe.nro
+      - name: Upload compiled synthetic NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-synthetic-switch-core-probe
+          path: switch/heman_core_probe.nro
+          if-no-files-found: error
+          retention-days: 7
