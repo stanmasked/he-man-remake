@@ -12,6 +12,7 @@ from pathlib import Path
 from time import perf_counter
 import zipfile
 
+from .event_view import draw_event_overlay, event_overlay
 from .body_physics import BodyConfig
 from .mask_atlas import extract_masks_from_alpha
 from .mask_physics import EMPTY, MaskedGrid
@@ -100,7 +101,7 @@ def _mask_rects(mask):
     return tuple(rects)
 
 
-def run_gui(world: SceneWorld, *, title: str) -> None:
+def run_gui(world: SceneWorld, *, title: str, interactive_world=None) -> None:
     """Draw temporary art, drive movement at fixed 60Hz, follow character."""
     try:
         import tkinter as tk
@@ -116,6 +117,11 @@ def run_gui(world: SceneWorld, *, title: str) -> None:
     jump_requested = False
     reset_requested = False
     state = new_scene(world)
+    interactive_state = None
+    if interactive_world is not None:
+        from .scene_interactions import new_interactive_scene
+        interactive_state = new_interactive_scene(interactive_world)
+        state = interactive_state.scene
     mesh = {tile: _mask_rects(mask) for tile, mask in world.grid.masks.items()}
     last = perf_counter()
     accumulator = 0.0
@@ -164,6 +170,9 @@ def run_gui(world: SceneWorld, *, title: str) -> None:
                                 fill='#fcd76c', outline='#101f38', width=2)
         canvas.create_oval(ax-4.4, ay-tall-6, ax+4.4, ay-tall+2,
                            fill='#f8bd70', outline='#101f38')
+        if interactive_state is not None:
+            draw_event_overlay(canvas, event_overlay(interactive_world, interactive_state),
+                               width=vw, height=vh)
         canvas.create_text(12, 12, anchor='nw', fill='#f8fafc',
                            font=('Arial', 15, 'bold'),
                            text='HE-MAN REMAKE  ·  HOST PHYSICS PROTOTYPE')
@@ -175,7 +184,7 @@ def run_gui(world: SceneWorld, *, title: str) -> None:
                                 f'grounded {actor.grounded}   respawns {state.respawns}')
 
     def frame():
-        nonlocal last, accumulator, state, jump_requested, reset_requested
+        nonlocal last, accumulator, state, interactive_state, jump_requested, reset_requested
         if not root.winfo_exists():
             return
         now = perf_counter()
@@ -184,8 +193,14 @@ def run_gui(world: SceneWorld, *, title: str) -> None:
         steps = 0
         while accumulator >= TICK and steps < 6:
             axis = int('right' in active or 'd' in active) - int('left' in active or 'a' in active)
-            state = advance_scene(state, world,
-                                  SceneControls(axis, jump_requested, reset_requested), TICK)
+            controls = SceneControls(axis, jump_requested, reset_requested)
+            if interactive_world is not None:
+                from .scene_interactions import advance_interactive
+                interactive_state = advance_interactive(interactive_state, interactive_world,
+                                                          controls, TICK)
+                state = interactive_state.scene
+            else:
+                state = advance_scene(state, world, controls, TICK)
             jump_requested = False
             reset_requested = False
             accumulator -= TICK
@@ -205,12 +220,27 @@ def main(argv=None) -> int:
     parser.add_argument('--ipa', type=Path, help='optional local purchased IPA')
     parser.add_argument('--map', default='MUMap1-1.map')
     parser.add_argument('--headless', action='store_true')
+    parser.add_argument('--interactions', action='store_true',
+                        help='show synthetic events and gameplay HUD')
     parser.add_argument('--ticks', type=int, default=240)
     parser.add_argument('--out', type=Path, help='optional private replay JSON')
     args = parser.parse_args(argv)
-    world = load_private_world(args.ipa, args.map) if args.ipa else synthetic_world()
+    if args.interactions and args.ipa:
+        parser.error('--interactions is only supported for the synthetic course')
+    interactive_world = None
+    if args.interactions:
+        from .scene_interactions import synthetic_interactive_world
+        interactive_world = synthetic_interactive_world()
+        world = interactive_world.scene
+    else:
+        world = load_private_world(args.ipa, args.map) if args.ipa else synthetic_world()
     if args.headless:
-        result = json.dumps(headless_replay(world, args.ticks), indent=2) + '\n'
+        if args.interactions:
+            from .events_demo import replay as replay_events
+            report = replay_events(args.ticks)
+        else:
+            report = headless_replay(world, args.ticks)
+        result = json.dumps(report, indent=2) + '\n'
         if args.out:
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(result, encoding='utf-8')
@@ -218,7 +248,8 @@ def main(argv=None) -> int:
         else:
             print(result, end='')
     else:
-        run_gui(world, title='He-Man Remake — Host Physics Prototype')
+        run_gui(world, title='He-Man Remake — Host Physics Prototype',
+                interactive_world=interactive_world)
     return 0
 
 
