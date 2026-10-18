@@ -29,3 +29,19 @@ This target is now built in a separate GitHub Actions job using the official `de
 ### Stage 020 scope
 
 This is a visibly navigable *console test map* with scrolling text tiles and synthetic event markers. It is not original He-Man gameplay, a texture renderer, or a demonstration of Switch emulator/hardware boot. The private IPA remains outside GitHub. Native host tests check tile placement, HUD marker state, scrolling offset, NUL row bounds, and fail-closed handling of invalid input.
+
+### Stage 021 boot self-check
+
+On startup, the NRO executes an independent 180-frame, fixed-step synthetic
+course using the same `hm_step` engine and `hm_probe_render` text viewport
+that the interactive console uses. It verifies movement, one jump and landing,
+pickup, checkpoint, exit, scrolling, and one visible player glyph. The
+program **refuses to start** if this self-check fails and shows an error code;
+otherwise the HUD prints `Synthetic boot self-check: PASS`.
+
+The same diagnostic is run twice by an asset-free host test compiled with both
+GCC and Clang in the existing native CI. PASS indicates **C99 simulation
+self-consistency**, not a Switch emulator boot or original iOS behaviour.
+A photograph/screenshot of this status after a real emulator or homebrew
+launch would be separate evidence of execution, and must not be conflated
+with the build-only CI evidence.

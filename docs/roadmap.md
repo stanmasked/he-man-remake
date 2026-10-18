@@ -29,6 +29,7 @@
 - [ ] Introduce a production graphics/input adapter with textures and real-time pacing for future Switch builds.
 - [x] Add first opt-in libnx/devkitA64 **console probe** build recipe (unverified cross-compilation).
 - [x] Cross-compile the synthetic text-console Switch probe to a structurally valid NRO with devkitPro in GitHub Actions.
+- [x] Add an identical GCC/Clang + libnx source-level 180-frame synthetic startup self-check with console PASS/error reporting.
 - [ ] Boot the synthetic NRO in a Switch emulator or homebrew-enabled console and confirm controller input/console lifecycle.
 - [ ] Document differences from iOS v2.0.0.
 

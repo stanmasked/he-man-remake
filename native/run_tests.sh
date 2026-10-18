@@ -61,3 +61,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/switch/tests/test_probe_view.c" \
   -lm -o "$TMP/test_probe_view"
 "$TMP/test_probe_view"
+
+# Execute a pure-C99 scripted boot diagnostic using the exact Switch engine
+# and viewport sources (the iOS IPA must never be present in CI).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/switch/source" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/switch/source/probe_view.c" \
+  "$ROOT/switch/source/probe_selfcheck.c" \
+  "$ROOT/switch/tests/test_probe_selfcheck.c" \
+  -lm -o "$TMP/test_probe_selfcheck"
+"$TMP/test_probe_selfcheck"
