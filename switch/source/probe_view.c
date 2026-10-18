@@ -84,3 +84,34 @@ int hm_probe_render(const hm_world *world, const hm_state *state,
                      &col, &row)) out[row * HM_PROBE_STRIDE + col] = '@';
     return 1;
 }
+
+/* Optional single-cell overlay for synthetic moving enemies. */
+int hm_probe_overlay_marker(const hm_world *world, const hm_state *state,
+                            char *out, size_t out_len,
+                            float x, float y, char glyph) {
+    uint32_t col, row, ox, oy, max_x, max_y, i;
+    if (!world || !state || !out || out_len < HM_PROBE_BYTES ||
+        !world->columns || !world->rows || !world->tile_size ||
+        world->columns > 4096u || world->rows > 4096u ||
+        world->tile_size > 64u ||
+        !finite_scene_value(state->camera_x) ||
+        !finite_scene_value(state->camera_y) ||
+        state->camera_x < 0.0f || state->camera_y < 0.0f ||
+        !finite_scene_value(x) || !finite_scene_value(y) ||
+        glyph < '!' || glyph > '~') return 0;
+    for (i = 0; i < HM_PROBE_ROWS; ++i) {
+        if (out[i * HM_PROBE_STRIDE + HM_PROBE_COLS] != '\0')
+            return 0;
+    }
+    max_x = world->columns > HM_PROBE_COLS ? world->columns - HM_PROBE_COLS : 0u;
+    max_y = world->rows > HM_PROBE_ROWS ? world->rows - HM_PROBE_ROWS : 0u;
+    ox = (uint32_t)(state->camera_x / (float)world->tile_size);
+    oy = (uint32_t)(state->camera_y / (float)world->tile_size);
+    if (ox > max_x) ox = max_x;
+    if (oy > max_y) oy = max_y;
+    if (visible_tile(world, ox, oy, x, y, &col, &row)) {
+        const uint32_t at = row * HM_PROBE_STRIDE + col;
+        if (out[at] != '@') out[at] = glyph;
+    }
+    return 1;
+}

@@ -1,6 +1,7 @@
 name: He-Man Python and native C core CI
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 concurrency:
