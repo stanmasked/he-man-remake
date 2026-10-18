@@ -29,7 +29,7 @@ def instrument_input(source: str) -> str:
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             '    let text = if frames == 45 { "buttons=DRIGHT" } else { "buttons=" };',
             '    std::fs::write(&path, text)?;',
-            '    writeln!(log, "HEMAN_HID_SCHEDULE frame={} buttons={}", frames, text)?;',
+            '    writeln!(log, "HEMAN_HID_SCHEDULE frame={} {}", frames, text)?;',
             '    log.flush()?;',
             "}",
         ]
