@@ -19,6 +19,7 @@
 - [x] Display synthetic event markers and a camera-aware HUD in the desktop demo, with headless CLI parity.
 - [ ] Investigate authentic iOS event scripts; never assume synthetic rules match original behavior.
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
+- [x] Prototype one synthetic patrolling enemy, X-button melee attack, HP and invulnerability in independent C99 code (NOT reverse-engineered iOS combat).
 - [x] Build a standalone platform-neutral C99 host core proof-of-concept, with native GCC/Clang test cases.
 - [x] Compare 720 C99/Python synthetic frame states and 32 packed slope-mask columns.
 - [x] Implement separate C99 packed-mask actor walking and jumping experiment.
