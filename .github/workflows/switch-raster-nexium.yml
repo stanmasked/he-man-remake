@@ -1,14 +1,10 @@
-name: He-Man raster NRO NeXium runtime smoke
+# Known-incompatible unpatched NeXium nightly: the normal devkitPro NRO
+# is rejected by the upstream loader's 16-byte wrapper-offset bug.
+# Run only manually for regression diagnosis; patched-NeXium workflows
+# perform real execution and verified guest-frame checks in PR CI.
+name: He-Man legacy unpatched NeXium smoke (manual only)
 
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/switch-raster-nexium.yml'
-      - 'raster/**'
-      - 'switch_raster/**'
-      - 'native/include/**'
-      - 'native/src/**'
-      - 'switch/source/**'
   workflow_dispatch:
 
 concurrency:
