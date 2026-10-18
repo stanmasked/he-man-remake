@@ -71,3 +71,17 @@ For reproducible **real emulator / homebrew runtime verification** (as opposed
 to CI-only cross-compilation), follow [the manual NRO boot and input checklist](../docs/switch-runtime-verification.md).
 Fatal boot and simulation errors now remain visible until Plus is pressed or
 the application is terminated. No emulator boot has been observed yet.
+
+### Stage 023: atomic gameplay update
+
+The Switch front end now uses the portable `hm_session_step` C99 adapter:
+player physics and synthetic enemy combat are advanced on a temporary copy
+and committed **only if both succeed**. Malformed combat configuration cannot
+leave a frame with updated player coordinates and stale combat state, or vice
+versa. Press B to perform the native physics reset and restore the enemy
+within the same transaction.
+
+The host-only regression `native/tests/test_session.c` checks reset,
+facing, deterministic replay and byte-for-byte rollback after deliberate
+physics/combat failures, under both GCC and Clang. This does not establish
+original iOS parity, emulator boot or hardware-accurate timing.

@@ -81,3 +81,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_combat.c" \
   -lm -o "$TMP/test_combat"
 "$TMP/test_combat"
+
+# Verify atomic combined physics/combat state transitions, including
+# rollback and reproducibility, without source assets or libnx.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/tests/test_session.c" \
+  -lm -o "$TMP/test_session"
+"$TMP/test_session"
