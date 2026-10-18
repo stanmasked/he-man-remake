@@ -94,3 +94,7 @@ Added four entirely synthetic movement fixtures comparing 180 C99/Python frames 
 ## Stage 016: C99 pixel-mask actor movement
 
 A separate native actor-step experiment now handles static packed-mask slopes, grounded walking and jumping over synthetic bitset tiles. The **existing C99 `hm_step` has not yet been switched to this interface**. See `docs/native-mask-motion.md`; run `sh native/run_tests.sh gcc` or `clang`. Original IPA and assets are not committed.
+
+## Stage 017: packed masks connected to the C99 gameplay loop
+
+The optional borrowed mask grid now drives actual `hm_step` actor collisions and bounded slope ascent/descent, while a null mask pointer preserves legacy rectangular cells. Includes native wall/headroom/rollback tests and a 26-frame C-versus-Python synthetic slope trace. See `docs/native-mask-game-loop.md`. **This is host physics research only; no original assets or Switch NRO are included.**
