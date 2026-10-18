@@ -40,3 +40,25 @@ inspection to rule out surprising emulator/window artifacts.
 
 All screenshots are transient GitHub Actions artifacts, not original
 assets. This test does not use local user-specific keys, devices or IPA.
+
+## Stage 031: direct controller movement evidence
+
+After a successful initial NeXium smoke test, a separate regression adds
+a bright magenta rectangle to the **fixed HUD**. Its horizontal position
+comes exclusively from the player's world-space x coordinate, not the
+camera, moving scenery, enemies, or the QA fingerprint.
+
+The workflow now captures three screenshots: `before.png`,
+`idle.png` (after a period without any keys) and
+`after-right.png` (after holding Right). The separate
+`player-input-check.txt` report checks:
+
+- the magenta marker can be located in all three frames;
+- it drifts no more than 10 screen pixels while no input is applied;
+- after Right is held, its centroid moves right at least 30 pixels.
+
+A failure cannot automatically distinguish controller mapping, window
+focus or guest gameplay bugs; it retains screenshot and emulator logs
+for diagnosis. This specifically strengthens the evidence of
+**directional input being handled**, without asserting fidelity to the
+original iOS game.
