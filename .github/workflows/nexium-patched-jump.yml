@@ -5,6 +5,7 @@ on:
       - '.github/workflows/nexium-patched-jump.yml'
       - 'tools/instrument_nexium_jump.py'
       - 'tools/verify_nexium_jump_pngs.py'
+      - 'tests/test_nexium_jump_instrument.py'
       - 'tools/instrument_nexium_frames.py'
       - 'tools/verify_nexium_guest_pngs.py'
       - 'patches/nexium-nro-segment-file-origin.patch'
@@ -98,7 +99,7 @@ jobs:
           git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
-          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_hid.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
+          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_jump.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
           # The new PNGs are guest frame_rx output, not Xvfb splash screenshots.
       - name: Compile genuine patched upstream debug_boot program
         shell: bash
