@@ -2,6 +2,7 @@
 #define HEMAN_CORE_H
 
 #include <stdint.h>
+#include "heman_mask.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,6 +51,10 @@ typedef struct {
     float death_margin;
     const hm_event *events; /* borrowed, up to 32 */
     uint32_t event_count;
+    /* Optional borrowed pixel-mask grid; NULL preserves solid-cell physics. */
+    const hm_mask_grid *mask_grid;
+    uint32_t max_rise; /* 0..32 pixels: optional grounded step-up */
+    uint32_t max_drop; /* 0..32 pixels: optional down-slope adhesion */
 } hm_world;
 
 typedef struct {
