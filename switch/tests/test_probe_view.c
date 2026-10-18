@@ -57,7 +57,7 @@ int main(void) {
                                   sizeof(output.text), 50.0f, 260.0f, 'E') == 1);
     assert(output.text[16u * HM_PROBE_STRIDE + 3u] == '@');
     assert(hm_probe_overlay_marker(&w, &s, output.text,
-                                  sizeof(output.text), 144.0f, 240.0f, '\\0') == 0);
+                                  sizeof(output.text), 144.0f, 240.0f, '\0') == 0);
     assert(output.text[15u * HM_PROBE_STRIDE + 9u] == 'E');
 
     s.picked = 1u;
