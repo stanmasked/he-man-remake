@@ -1,0 +1,107 @@
+name: NeXium loader regression against real devkitPro NROs
+on:
+  pull_request:
+    paths:
+      - 'tests/upstream/heman_real_nro.rs'
+      - 'patches/nexium-nro-segment-file-origin.patch'
+      - '.github/workflows/nexium-loader-real-nro.yml'
+      - 'switch_minimal/**'
+      - 'switch_raster/**'
+      - 'raster/**'
+      - 'native/src/**'
+      - 'native/include/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+
+jobs:
+  build-genuine-nros:
+    name: Build both asset-free devkitPro NROs
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile minimal guest and graphical scene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make -C switch_minimal clean all
+          make -C switch_raster clean all
+          mkdir -p nros
+          cp switch_minimal/heman_minimal_guest_probe.nro nros/
+          cp switch_raster/heman_raster_probe.nro nros/
+          for nro in nros/*.nro; do
+            test -s "$nro"
+            test "$(dd if="$nro" bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+            python3 tools/nro_layout_diagnostic.py "$nro"
+            sha256sum "$nro"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-genuine-nro-pair
+          path: nros/*.nro
+          if-no-files-found: error
+          retention-days: 7
+
+  patched-neXium-loader:
+    name: Prove unpatched rejection and patched acceptance (Rust)
+    needs: build-genuine-nros
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      CARGO_TERM_COLOR: always
+      HEMAN_EXPECT_FIXED: "0"
+      HEMAN_TEST_NROS: ${{ github.workspace }}/nros
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: heman-genuine-nro-pair
+          path: nros
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Checkout precisely pinned NeXium source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nexium-upstream
+          git -C /tmp/nexium-upstream init -q
+          git -C /tmp/nexium-upstream remote add origin https://github.com/nexium-emu/nexium.git
+          git -C /tmp/nexium-upstream fetch --depth 1 origin b6149f647f1b0824e450555beb6cfc16b6f0e075
+          git -C /tmp/nexium-upstream checkout -q --detach FETCH_HEAD
+          git -C /tmp/nexium-upstream submodule update --init --depth 1
+          mkdir -p /tmp/nexium-upstream/nexium-loader/tests
+          cp tests/upstream/heman_real_nro.rs /tmp/nexium-upstream/nexium-loader/tests/heman_real_nro.rs
+          test -f /tmp/nexium-upstream/nexium-loader/src/nro.rs
+      - name: Confirm unpatched NeXium rejects both genuine NROs
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          cargo test -p nexium-loader --test heman_real_nro -- --nocapture
+      - name: Apply candidate Rust loader patch to temporary checkout only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          git apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          git apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          git diff --stat
+      - name: Confirm patched NeXium reads full genuine NRO segments
+        shell: bash
+        env:
+          HEMAN_EXPECT_FIXED: "1"
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          cargo test -p nexium-loader --test heman_real_nro -- --nocapture
+          echo "PASS: the patched real Rust loader can read both NROs byte-for-byte"
