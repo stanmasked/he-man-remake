@@ -47,6 +47,9 @@ def inspect_nro(image: bytes) -> NroLayout:
         struct.unpack_from("<II", image, pos + off)
         for off in (0x10, 0x18, 0x20)
     ]
+    original_ends = [offset + size for offset, size in pairs]
+    # This 128-byte adjustment is the current NeXium implementation,
+    # NOT the normative devkitPro NRO segment interpretation.
     ends = [
         (offset + 128 if offset < 128 else offset) + size
         for offset, size in pairs
@@ -62,7 +65,7 @@ def inspect_nro(image: bytes) -> NroLayout:
         data_end=data_end,
         emulator_slice_bytes=available,
         original_bounds_ok=(declared_size <= len(image)
-                            and all(end <= len(image) for end in ends)),
+                            and all(end <= len(image) for end in original_ends)),
         nexium_bounds_ok=all(end <= available for end in ends),
     )
 
