@@ -10,6 +10,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
   -I"$ROOT/native/include" \
   "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
   "$ROOT/native/tests/test_core.c" \
   -lm -o "$TMP/test_core"
 
