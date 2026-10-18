@@ -53,3 +53,11 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_mask_validation_once.c" \
   -lm -o "$TMP/test_mask_validation_once"
 "$TMP/test_mask_validation_once"
+
+# Verify the same asset-free ASCII world adapter used by the Switch binary.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/switch/source" \
+  "$ROOT/switch/source/probe_view.c" \
+  "$ROOT/switch/tests/test_probe_view.c" \
+  -lm -o "$TMP/test_probe_view"
+"$TMP/test_probe_view"
