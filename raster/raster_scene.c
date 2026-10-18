@@ -92,8 +92,18 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
         !finite_limited(s->player.x) ||
         !finite_limited(s->player.feet_y) ||
         !finite_limited(s->player.camera_x) ||
+        s->player.camera_x < 0.0f ||
         !finite_limited(s->combat.enemy_x) ||
         !finite_limited(view->combat->enemy_feet_y)) return 0;
+    /* All arguments, including the borrowed event list, are checked
+       BEFORE the first pixel is written. Rejected draws are atomic. */
+    for (ev = 0u; ev < w->event_count; ++ev) {
+        const hm_event *e = &w->events[ev];
+        if (e->kind < HM_PICKUP || e->kind > HM_EXIT ||
+            !finite_limited(e->x) || !finite_limited(e->y) ||
+            !finite_limited(e->radius) ||
+            e->radius < 1.0f || e->radius > 128.0f) return 0;
+    }
 
     left = s->player.camera_x;
     top = s->player.feet_y - 143.0f;
@@ -127,8 +137,6 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
     }
     for (ev = 0u; ev < w->event_count; ++ev) {
         const hm_event *e=&w->events[ev];
-        if (!finite_limited(e->x) || !finite_limited(e->y))
-            return 0;
         sx=(int)floorf((e->x-left)*2.0f);
         sy=(int)floorf((e->y-top)*2.0f);
         if (e->kind == HM_PICKUP) {
