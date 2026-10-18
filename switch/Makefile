@@ -13,7 +13,7 @@ ELF2NRO ?= $(DEVKITPRO)/tools/bin/elf2nro
 TARGET := heman_core_probe
 ROOT := $(abspath ..)
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
-SOURCES := source/main.c source/probe_view.c source/probe_selfcheck.c source/session_selftest.c $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c
+SOURCES := source/main.c source/probe_view.c source/probe_selfcheck.c source/session_selftest.c source/runtime_replay.c $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c
 CFLAGS := -std=gnu99 -O2 -g -Wall -Wextra -ffunction-sections -fdata-sections $(ARCH) \
           -Isource -I$(ROOT)/native/include -I$(DEVKITPRO)/libnx/include -D__SWITCH__
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
