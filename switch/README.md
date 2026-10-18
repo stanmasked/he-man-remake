@@ -129,3 +129,19 @@ only after both the older physics-only and the new combined checks succeed.
 These pass/fail probes are designed for **asset-free simulation integrity**.
 They do not confirm that the compiled NRO has actually booted in an emulator
 or that its behaviour matches the original iOS title.
+
+### Stage 027: one-time synthetic healing pickup
+
+A synthetic `HM_PICKUP` event now restores **one combat HP** when its
+corresponding pickup bit is newly set by `hm_step`. Healing is capped at the
+configured initial HP. Previously collected bits do not heal again, even when
+the character remains standing on the pickup. A B-button reset restores full
+combat HP but preserves the already-collected pickup flags.
+
+Healing is applied to the temporary `hm_session` only after physics and
+combat both succeed; an invalid frame cannot accidentally consume a pickup
+or change HP. The independent host regression verifies HP bounds, repeated
+pickup contact, two concurrent pickups and rollback. The NRO's combined
+startup diagnostic now checks the same one-time pickup rule (diagnostic
+code 6). This is a hand-authored placeholder gameplay mechanic, not a claim
+about original iOS pickup or healing behaviour.
