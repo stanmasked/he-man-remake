@@ -27,6 +27,7 @@
 - [x] Reduce repeated full-mask validation to once per native simulation frame, and benchmark on a synthetic 300x19 map.
 - [x] Add a portable atomic session adapter and native tests for deterministic physics+combat transitions and rollback.
 - [x] Synchronize combat and player state on automatic synthetic hazard/fall respawns, with rollback regression.
+- [x] Add deterministic, one-frame-delayed player defeat respawn to the synthetic combat session with input validation and atomic rollback tests.
 - [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
 - [x] Add a libnx-independent, host-tested 40x20 ASCII tile viewport and synthetic pickup/checkpoint/hazard/exit markers for the Switch probe (not an original sprite renderer).
 - [ ] Introduce a production graphics/input adapter with textures and real-time pacing for future Switch builds.
