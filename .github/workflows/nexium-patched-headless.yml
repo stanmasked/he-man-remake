@@ -123,10 +123,23 @@ jobs:
             echo "Patched guest CPU boot failed with exit code $code" >&2
             exit 1
           fi
-          grep -F 'Boot context initialized' boot-evidence/minimal-debug-boot.log
-          grep -F 'Initial PC:' boot-evidence/minimal-debug-boot.log
-          grep -E 'SVC |Total cycles:' boot-evidence/minimal-debug-boot.log
-          echo 'PASS: patched NeXium reached minimal guest CPU execution'
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/minimal-debug-boot.log").read_text()
+          for marker in ("Boot context initialized", "Initial PC:"):
+              if marker not in log:
+                  raise SystemExit(f"Missing critical guest boot evidence: {marker}")
+          cycles = re.search(r"Total cycles:\s*(\d+)", log)
+          svcs = re.search(r"Total SVCs:\s*(\d+)", log)
+          if not cycles or not svcs:
+              raise SystemExit("Guest CPU/SVC totals were not recorded")
+          print("Minimal NRO retired instructions:", cycles.group(1))
+          print("Minimal NRO system calls:", svcs.group(1))
+          if int(cycles.group(1)) <= 0 or int(svcs.group(1)) <= 0:
+              raise SystemExit("No real CPU/SVC progress after NeXium boot")
+          print("PASS: patched NeXium executed minimal guest instructions")
+          PY
       - name: Run graphical probe using patched production runner
         shell: bash
         run: |
