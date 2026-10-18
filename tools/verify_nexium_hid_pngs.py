@@ -52,7 +52,7 @@ def verify(directory: Path) -> dict:
     log = (directory / "raster-runner.log").read_text()
     for marker in (
         "HEMAN_HID_SCHEDULE frame=45 buttons=DRIGHT",
-        "HEMAN_HID_SCHEDULE frame=105 buttons=buttons=",
+        "HEMAN_HID_SCHEDULE frame=105 buttons=",
     ):
         if marker not in log:
             raise ValueError(f"Missing observed guest HID schedule event: {marker}")
