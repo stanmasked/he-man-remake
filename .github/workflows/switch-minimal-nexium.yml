@@ -93,7 +93,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p runtime-evidence
+          mkdir -p runtime-evidence/nexium-profile
           sha256sum nros/heman_minimal_guest_probe.nro | tee runtime-evidence/nro-sha256.txt
           icd="$(find /usr/share/vulkan/icd.d -maxdepth 1 -name 'lvp_icd*.json' -print -quit)"
           test -n "$icd"
@@ -104,7 +104,11 @@ jobs:
           export BEFORE="$PWD/runtime-evidence/before.png"
           export IDLE="$PWD/runtime-evidence/idle.png"
           export AFTER="$PWD/runtime-evidence/after-right.png"
-          export RUST_LOG="info"
+          # NeXium uses its own FileLogger, not RUST_LOG/stdout.
+          # NEXIUM_DATA_ROOT is from nexium-common/src/paths.rs; it writes
+          # the actual emulator state transitions into $root/logs/.
+          export NEXIUM_DATA_ROOT="$PWD/runtime-evidence/nexium-profile"
+          export NEXIUM_LOG_LEVEL="debug"
           export RUST_BACKTRACE="1"
           timeout --kill-after=5s 155s xvfb-run -a -s "-screen 0 1280x720x24" bash -c '
             set -euo pipefail
@@ -141,6 +145,21 @@ jobs:
             test -s "$IDLE"
             test -s "$AFTER"
           '
+      - name: Collect real NeXium file logs
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p runtime-evidence/nexium-file-logs
+          if [ -d runtime-evidence/nexium-profile/logs ]; then
+            cp -a runtime-evidence/nexium-profile/logs/. runtime-evidence/nexium-file-logs/
+          fi
+          find runtime-evidence/nexium-file-logs -maxdepth 1 -type f -printf '%f %s bytes\\n' \\
+            | tee runtime-evidence/log-inventory.txt
+          for file in runtime-evidence/nexium-file-logs/*.log; do
+            [ -f "$file" ] || continue
+            echo "--- NeXium internal file log tail: $file ---"
+            tail -n 120 "$file" || true
+          done
       - name: Confirm fixed-color guest marker and input
         shell: bash
         run: |
