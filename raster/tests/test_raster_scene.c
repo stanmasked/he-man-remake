@@ -91,7 +91,7 @@ int main(void) {
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==0);
     assert(checksum(guarded.image)==qa);
     view.qa_state=1u;
-    assert(hm_raster_render(guarded.image,W,H,STRIDE-1u,&view)==0);
+    assert(hm_raster_render(guarded.image,W,H,W-1u,&view)==0);
     assert(checksum(guarded.image)==qa);
     assert(hm_raster_render(guarded.image,W-1u,H,STRIDE,&view)==0);
     assert(checksum(guarded.image)==qa);
