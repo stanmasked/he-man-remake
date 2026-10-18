@@ -129,3 +129,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/switch/tests/test_runtime_replay.c" \
   -lm -o "$TMP/test_runtime_replay"
 "$TMP/test_runtime_replay"
+
+# Portable RGB test renderer is compiled into the same graphics NRO.
+# Check deterministic pixels, clipping and untouched row-padding canaries.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_raster_scene.c" \
+  -lm -o "$TMP/test_raster_scene"
+"$TMP/test_raster_scene"
