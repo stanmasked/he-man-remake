@@ -38,7 +38,7 @@ int main(void) {
     assert(state.frame == 1u);
 
     /* Cooldown prevents extra hits despite repeated button presses. */
-    for (i = 0; i < 10u; ++i)
+    for (i = 0; i < 11u; ++i)
         assert(hm_combat_step(&cfg, &state, &player, 1u, 1u, 1.0f/60.0f)
                == HM_COMBAT_OK);
     assert(state.enemy_hp == 1u && state.sword_hits == 1u);
@@ -61,7 +61,7 @@ int main(void) {
 
     /* A backward attack misses; contact is subject to invulnerability. */
     assert(hm_combat_init(&cfg, &state) == HM_COMBAT_OK);
-    player.x = 120.0f;
+    player.x = 118.0f;
     assert(hm_combat_step(&cfg, &state, &player, 1u, 0u, 1.0f/60.0f)
            == HM_COMBAT_OK);
     assert(state.enemy_hp == 2u);
