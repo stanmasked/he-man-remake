@@ -35,19 +35,19 @@ jobs:
             echo "Proprietary assets may not enter a public workflow" >&2
             exit 1
           fi
-      - name: Compile graphical NRO
+      - name: Compile minimal libnx guest NRO
         shell: bash
         run: |
           set -euo pipefail
           make -C switch_minimal clean all
           test -s switch_minimal/heman_minimal_guest_probe.nro
-          test "$(dd if=switch_raster/heman_minimal_guest_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
-          sha256sum switch_raster/heman_minimal_guest_probe.nro
-      - name: Upload graphics test NRO
+          test "$(dd if=switch_minimal/heman_minimal_guest_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_minimal/heman_minimal_guest_probe.nro
+      - name: Upload isolated guest NRO
         uses: actions/upload-artifact@v4
         with:
           name: heman-minimal-nexium-nro
-          path: switch_raster/heman_minimal_guest_probe.nro
+          path: switch_minimal/heman_minimal_guest_probe.nro
           if-no-files-found: error
           retention-days: 7
 
