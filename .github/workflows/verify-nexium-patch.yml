@@ -1,0 +1,47 @@
+name: NeXium NRO compatibility patch proof
+on:
+  pull_request:
+    paths:
+      - 'tools/nro_loader_reference.py'
+      - 'tests/test_nro_loader_reference.py'
+      - 'patches/nexium-nro-segment-file-origin.patch'
+      - '.github/workflows/verify-nexium-patch.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-patch:
+    name: Verify source patch against pinned NeXium loader
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run canonical NRO fixture regressions
+        run: python3 -m unittest discover -s tests -p test_nro_loader_reference.py -v
+      - name: Download only the pinned upstream loader Rust file
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/heman-nexium-verify/nexium-loader/src
+          curl --fail --location --show-error --retry 3 \
+            "https://raw.githubusercontent.com/nexium-emu/nexium/b6149f647f1b0824e450555beb6cfc16b6f0e075/nexium-loader/src/nro.rs" \
+            -o /tmp/heman-nexium-verify/nexium-loader/src/nro.rs
+          test -s /tmp/heman-nexium-verify/nexium-loader/src/nro.rs
+      - name: Check upstream source patch applies cleanly
+        shell: bash
+        run: |
+          set -euo pipefail
+          patch_path="$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          cd /tmp/heman-nexium-verify
+          git apply --check "$patch_path"
+          git apply "$patch_path"
+          grep -F 'mmap_range: offset as usize..end as usize' nexium-loader/src/nro.rs
+          grep -F 'let image_size = header.size as usize;' nexium-loader/src/nro.rs
+          if grep -F 'const HEADER_SIZE: u32 = 128' nexium-loader/src/nro.rs; then
+            echo 'Legacy header-offset adjustment still present' >&2
+            exit 1
+          fi
+          echo 'Patch applies; corrected canonical full-file segment ranges present'
