@@ -113,3 +113,19 @@ animation, lives, menus or original iOS combat values.
 Invalid axis, timing or combat configuration prevents the entire transition:
 neither the character state nor combat state may change. The regression test
 covers normal recovery, frame/respawn counters, suppressed input, and rollback.
+
+### Stage 026: combined engine startup self-check
+
+The NRO runs a second, independent, **source-identical C99 self-check** at
+startup. Unlike the earlier physics-only check, this verifies the complete
+`hm_session_step` pathway: 30 scripted movement frames, automatic hazard
+respawn with combat restore, next-frame defeat recovery, and transactional
+rollback after intentionally malformed combat input. This check returns an
+explicit stable code 0–5; the persistent startup error screen shows code
+`100 + check_code` if the combined test fails. A PASS label is displayed
+only after both the older physics-only and the new combined checks succeed.
+
+`native/run_tests.sh` executes the same function twice on GCC and Clang.
+These pass/fail probes are designed for **asset-free simulation integrity**.
+They do not confirm that the compiled NRO has actually booted in an emulator
+or that its behaviour matches the original iOS title.

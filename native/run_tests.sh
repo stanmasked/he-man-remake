@@ -93,3 +93,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_session.c" \
   -lm -o "$TMP/test_session"
 "$TMP/test_session"
+
+# The exact combined-physics-and-combat startup diagnostic that ships in NRO.
+# Keep executable on the host without Nintendo SDK or original game assets.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/switch/source" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/switch/source/session_selftest.c" \
+  "$ROOT/switch/tests/test_session_selftest.c" \
+  -lm -o "$TMP/test_session_selftest"
+"$TMP/test_session_selftest"
