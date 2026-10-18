@@ -25,7 +25,8 @@
 - [x] Route optional packed pixel masks into the main C99 `hm_step` game-loop; compare a 26-frame synthetic incline trace.
 - [x] Reduce repeated full-mask validation to once per native simulation frame, and benchmark on a synthetic 300x19 map.
 - [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
-- [ ] Introduce a platform input/render adapter for future Switch builds.
+- [x] Add a libnx-independent, host-tested 40x20 ASCII tile viewport and synthetic pickup/checkpoint/hazard/exit markers for the Switch probe (not an original sprite renderer).
+- [ ] Introduce a production graphics/input adapter with textures and real-time pacing for future Switch builds.
 - [x] Add first opt-in libnx/devkitA64 **console probe** build recipe (unverified cross-compilation).
 - [x] Cross-compile the synthetic text-console Switch probe to a structurally valid NRO with devkitPro in GitHub Actions.
 - [ ] Boot the synthetic NRO in a Switch emulator or homebrew-enabled console and confirm controller input/console lifecycle.
