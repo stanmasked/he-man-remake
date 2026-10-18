@@ -83,6 +83,7 @@ class NativeTraceParity(unittest.TestCase):
         cls.executable = Path(cls.tmp.name)/'trace_core'
         cmd=['cc','-std=c99','-O2','-Wall','-Wextra','-Werror','-pedantic',
              '-I'+str(ROOT/'native/include'),str(ROOT/'native/src/heman_core.c'),
+             str(ROOT/'native/src/heman_mask.c'),
              str(ROOT/'native/tests/trace_core.c'),'-lm','-o',str(cls.executable)]
         subprocess.run(cmd,check=True,capture_output=True,text=True,timeout=30)
 
