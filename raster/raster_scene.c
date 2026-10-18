@@ -204,7 +204,7 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
         if (pos < -210.0f) pos = -210.0f;
         if (pos > 20.0f) pos = 20.0f;
         marker_y = 298 + (int)floorf(pos + 0.5f);
-        rect(pixels,stride,472,marker_y,14,9,UINT32_C(0xff00ffff));
+        rect(pixels,stride,472,marker_y,14,9,UINT32_C(0xffffff00));
     }
 
     /* Readable top HUD. Health ticks are clamped to the configured maximum. */
