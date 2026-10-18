@@ -156,7 +156,7 @@ jobs:
           export NEXIUM_HID_INJECT="$PWD/boot-evidence/guest-hid-input.txt"
           export NEXIUM_HID_INJECT_EXCLUSIVE="1"
           export NEXIUM_HID_TRACE="1"
-          printf 'buttons=\\n' > "$NEXIUM_HID_INJECT"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
           export RUST_LOG="info,wgpu_core=warn"
           NRO="$PWD/nros/heman_raster_probe.nro"
           set +e
