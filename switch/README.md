@@ -99,3 +99,17 @@ A deterministic C99 regression checks hazard-induced respawn, combat
 reset, counter changes and whole-session rollback on malformed parameters.
 These are author-defined test semantics, not conclusions about the
 original iOS He-Man combat rules.
+
+### Stage 025: synthetic defeat recovery
+
+If contact damage reduces the experimental player's combat HP to zero, the
+completed frame can report zero HP. **On the following fixed simulation
+frame**, `hm_session_step` performs a standard native player respawn and
+restores enemy/player combat state, regardless of movement or attack held on
+that recovery frame. This works with checkpoints through the existing native
+reset path. It does not introduce game-over graphics, original character
+animation, lives, menus or original iOS combat values.
+
+Invalid axis, timing or combat configuration prevents the entire transition:
+neither the character state nor combat state may change. The regression test
+covers normal recovery, frame/respawn counters, suppressed input, and rollback.
