@@ -2,6 +2,7 @@ name: Nintendo Switch synthetic core probe (devkitPro)
 
 on:
   push:
+    branches: [main]
     paths:
       - 'switch/**'
       - 'native/include/**'
