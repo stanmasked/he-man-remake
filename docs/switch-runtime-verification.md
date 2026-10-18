@@ -36,6 +36,12 @@ or run the original iOS IPA, its game media, or a complete He-Man remake.
 - [ ] Observe a text map with `@` (player), `#` (solid platform),
       `E` (patrolling synthetic enemy), `*` (pickup), `C`
       (checkpoint), `!` (hazard) and `>` (exit).
+- [ ] Press **Y** to execute the scripted runtime QA and observe
+      `Y QA PASS(0)` and a nonzero eight-digit fingerprint. Record this
+      fingerprint alongside the precise `.nro` SHA-256 and the GCC/Clang
+      host replay fingerprints for the **same commit**.
+- [ ] Press Y a second time: the same runtime should return the same hash.
+      Confirm the live actor, HP and enemy state were not reset by QA.
 - [ ] Press Left/Right and confirm the player's x-coordinate changes; the
       camera should advance when moving far enough right.
 - [ ] Press A, confirming vertical position/velocity changes then landing.
