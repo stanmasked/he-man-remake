@@ -222,7 +222,8 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
         !finitef(state->camera_x) || !finitef(state->camera_y) ||
         state->checkpoint < -1 || state->checkpoint >= (int32_t)w->event_count ||
         state->frame == UINT32_MAX || state->respawns == UINT32_MAX ||
-        state->landings == UINT32_MAX || state->hazards == UINT32_MAX) return HM_INVALID;
+        state->landings == UINT32_MAX || state->hazards == UINT32_MAX ||
+        w->max_rise > 32u || w->max_drop > 32u) return HM_INVALID;
     dx = input.axis * w->speed * dt;
     dy = (fminf(state->vy + w->gravity * dt, w->terminal_speed)) * dt;
     if (!finitef(dx) || !finitef(dy) || fabsf(dx) > HM_MAX_SWEEP ||
