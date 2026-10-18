@@ -17,6 +17,7 @@
 - [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
 - [x] Add independent synthetic pickup/checkpoint/hazard/exit event state and deterministic headless replay.
 - [x] Display synthetic event markers and a camera-aware HUD in the desktop demo, with headless CLI parity.
+- [x] Add one-time synthetic health restoration for pickups through atomic session state; verify cap, reset semantics and rollback with host/Switch startup checks.
 - [ ] Investigate authentic iOS event scripts; never assume synthetic rules match original behavior.
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
 - [x] Prototype one synthetic patrolling enemy, X-button melee attack, HP and invulnerability in independent C99 code (NOT reverse-engineered iOS combat).
