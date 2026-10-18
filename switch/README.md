@@ -85,3 +85,17 @@ The host-only regression `native/tests/test_session.c` checks reset,
 facing, deterministic replay and byte-for-byte rollback after deliberate
 physics/combat failures, under both GCC and Clang. This does not establish
 original iOS parity, emulator boot or hardware-accurate timing.
+
+### Stage 024: consistent synthetic respawn
+
+The shared gameplay session now also detects a world-initiated respawn
+(e.g., entering a synthetic hazard or falling below the test terrain)
+by observing the player's native respawn counter. The same transaction
+restores enemy HP, patrol position, player combat HP and cooldowns.
+If the restore is rejected, **both** player and combat state roll back.
+Explicit B-button reset continues to work as before.
+
+A deterministic C99 regression checks hazard-induced respawn, combat
+reset, counter changes and whole-session rollback on malformed parameters.
+These are author-defined test semantics, not conclusions about the
+original iOS He-Man combat rules.
