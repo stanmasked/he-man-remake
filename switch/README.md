@@ -145,3 +145,23 @@ pickup contact, two concurrent pickups and rollback. The NRO's combined
 startup diagnostic now checks the same one-time pickup rule (diagnostic
 code 6). This is a hand-authored placeholder gameplay mechanic, not a claim
 about original iOS pickup or healing behaviour.
+
+### Stage 028: controller-triggered reproducible runtime replay
+
+Press **Y** while running the experimental `.nro` to execute an entirely
+separate, fixed 180-frame C99 simulation. It runs on a local, synthetic
+level and checks a pickup, checkpoint, scripted jump/landing and melee hit.
+The exercise runs **twice**, compares the reports and exposes a hexadecimal
+FNV-1a fingerprint of quantized per-frame actor positions, HP and events.
+
+The HUD shows `Y QA READY(0)` before running the replay and
+`Y QA PASS(0) hash XXXXXXXX` on success, or a nonzero FAIL code. Pressing Y
+does not change the live level, pickups, camera or encounter. The identical
+replay runs in existing GCC and Clang host CI, printing its fingerprint;
+host/guest outputs can be compared after an independently verified boot.
+
+**Important:** passing CI and displaying a fingerprint produced by a host
+test are not evidence of a real Switch emulator boot. A real runtime screen
+or trace from a compatible homebrew environment is still required.
+Floating-point differences may require investigating any host/guest
+fingerprint disagreement rather than assuming it is a gameplay bug.
