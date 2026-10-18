@@ -1,0 +1,165 @@
+--- a/nexium-loader/src/nro.rs
++++ b/nexium-loader/src/nro.rs
+@@ -127,128 +127,109 @@
+     }
+ 
+     pub fn nro_bytes(&self) -> &[u8] {
+-        &self.mmap[self.nro_offset..]
++        // A standard NRO has a 16-byte NroStart before the NRO0 header.
++        // Segment offsets and the declared size are relative to file start.
++        &self.mmap[..self.header.size as usize]
+     }
+ 
+     pub fn romfs(&self) -> &[u8] {
+         match &self.romfs_range {
+             Some(r) => &self.mmap[r.clone()],
+             None => &[],
+         }
+     }
+ 
+     pub fn mmap_arc(&self) -> Arc<Mmap> {
+         self.mmap.clone()
+     }
+ 
+     pub fn romfs_range(&self) -> Option<Range<usize>> {
+         self.romfs_range.clone()
+     }
+ 
+     pub fn text_data(&self) -> &[u8] {
+         &self.mmap[self.text.mmap_range.clone()]
+     }
+ 
+     pub fn ro_data(&self) -> &[u8] {
+         &self.mmap[self.ro.mmap_range.clone()]
+     }
+ 
+     pub fn data_data(&self) -> &[u8] {
+         &self.mmap[self.data.mmap_range.clone()]
+     }
+ 
+     fn detect_nro_offset(mmap: &Mmap) -> Result<usize, String> {
+         if mmap.len() < 16 {
+             return Err("file too small to contain NRO".to_string());
+         }
+         let magic0 = u32::from_le_bytes([mmap[0], mmap[1], mmap[2], mmap[3]]);
+         if magic0 == 0x304F524E {
+             return Ok(0);
+         }
+         if mmap.len() >= 32 {
+             let magic16 = u32::from_le_bytes([mmap[16], mmap[17], mmap[18], mmap[19]]);
+             if magic16 == 0x304F524E {
+                 log::debug!("Detected homebrew wrapper, NRO body starts at offset 16");
+                 return Ok(16);
+             }
+         }
+         Err("no NRO magic at offset 0 or 16".to_string())
+     }
+ 
+     pub fn load_from_file(path: &str) -> Result<Self, String> {
+         let file = std::fs::File::open(path).map_err(|e| format!("Failed to open NRO: {}", e))?;
+         let mmap = unsafe { Mmap::map(&file) }.map_err(|e| format!("Failed to mmap NRO: {}", e))?;
+         Self::parse_mmap(Arc::new(mmap))
+     }
+ 
+     pub fn parse_mmap(mmap: Arc<Mmap>) -> Result<Self, String> {
+         let nro_offset = Self::detect_nro_offset(&mmap)?;
+         let nro_slice = &mmap[nro_offset..];
+         let header = NroHeader::from_bytes(nro_slice)?;
+ 
+         log::debug!(
+             "NRO: magic={:#x}, version={}, size={}, file_offset={}",
+             header.magic,
+             header.version,
+             header.size,
+             nro_offset
+         );
+ 
+-        const HEADER_SIZE: u32 = 128;
+-        let text_offset = if header.text_offset < HEADER_SIZE {
+-            header.text_offset + HEADER_SIZE
+-        } else {
+-            header.text_offset
+-        };
+-        let ro_offset = if header.ro_offset < HEADER_SIZE {
+-            header.ro_offset + HEADER_SIZE
+-        } else {
+-            header.ro_offset
+-        };
+-        let data_offset = if header.data_offset < HEADER_SIZE {
+-            header.data_offset + HEADER_SIZE
+-        } else {
+-            header.data_offset
++        // NroStart lives at file bytes 0..16, with NRO0 at file +16.
++        // Parsed metadata lives at `nro_offset`, but segment offsets are
++        // absolute to the ORIGINAL file, not to `mmap[nro_offset..]`.
++        // Appended ASET assets are outside header.size (code image).
++        let image_size = header.size as usize;
++        if image_size < 0x80 || image_size > mmap.len() {
++            return Err("Invalid NRO image size".to_string());
++        }
++        let validate = |name: &str, offset: u32, size: u32| -> Result<NroSegmentView, String> {
++            let end = offset
++                .checked_add(size)
++                .ok_or_else(|| format!("{name} segment offset overflow"))?;
++            if end as usize > image_size {
++                return Err(format!("{name} segment out of bounds"));
++            }
++            Ok(NroSegmentView {
++                offset,
++                size,
++                mmap_range: offset as usize..end as usize,
++            })
+         };
+-
++        let text = validate("Text", header.text_offset, header.text_size)?;
++        let ro = validate("RO", header.ro_offset, header.ro_size)?;
++        let data = validate("Data", header.data_offset, header.data_size)?;
++        if text.offset != 0
++            || text.mmap_range.end > ro.mmap_range.start
++            || ro.mmap_range.end > data.mmap_range.start
++        {
++            return Err("Invalid NRO segment order".to_string());
++        }
+         log::debug!(
+-            "NRO: text=[{:#x}, {:#x}), ro=[{:#x}, {:#x}), data=[{:#x}, {:#x})",
+-            text_offset,
+-            text_offset + header.text_size,
+-            ro_offset,
+-            ro_offset + header.ro_size,
+-            data_offset,
+-            data_offset + header.data_size
++            "NRO: text={:?}, ro={:?}, data={:?}",
++            text.mmap_range, ro.mmap_range, data.mmap_range
+         );
+ 
+-        if (text_offset + header.text_size) as usize > nro_slice.len() {
+-            return Err("Text segment out of bounds".to_string());
+-        }
+-        if (ro_offset + header.ro_size) as usize > nro_slice.len() {
+-            return Err("RO segment out of bounds".to_string());
+-        }
+-        if (data_offset + header.data_size) as usize > nro_slice.len() {
+-            return Err("Data segment out of bounds".to_string());
+-        }
+-
+-        let text = NroSegmentView {
+-            offset: text_offset,
+-            size: header.text_size,
+-            mmap_range: (nro_offset + text_offset as usize)
+-                ..(nro_offset + (text_offset + header.text_size) as usize),
+-        };
+-        let ro = NroSegmentView {
+-            offset: ro_offset,
+-            size: header.ro_size,
+-            mmap_range: (nro_offset + ro_offset as usize)
+-                ..(nro_offset + (ro_offset + header.ro_size) as usize),
+-        };
+-        let data = NroSegmentView {
+-            offset: data_offset,
+-            size: header.data_size,
+-            mmap_range: (nro_offset + data_offset as usize)
+-                ..(nro_offset + (data_offset + header.data_size) as usize),
+-        };
+-
+         let romfs_range = parse_asset_romfs(&mmap, header.size);
+ 
