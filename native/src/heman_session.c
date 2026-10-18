@@ -32,7 +32,11 @@ hm_session_result hm_session_step(const hm_world *world,
     if (movement.axis > 0.0f) next.facing_right = 1u;
     physics_result = hm_step(world, &next.player, movement, dt);
     if (physics_result != HM_OK) return HM_SESSION_PHYSICS_ERROR;
-    if (movement.reset) {
+    /* An automatic world respawn (e.g. a hazard or falling outside the
+       synthetic map) must restore combat along with the player. Checking
+       the counter instead of inspecting events keeps both subsystems
+       synchronized without guessing the original game's hazard rules. */
+    if (movement.reset || next.player.respawns != session->player.respawns) {
         combat_result = hm_combat_init(combat_cfg, &next.combat);
     } else {
         combat_result = hm_combat_step(combat_cfg, &next.combat, &next.player,

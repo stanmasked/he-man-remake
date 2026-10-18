@@ -105,6 +105,39 @@ int main(void) {
     assert(session.combat.player_hp == combat.player_initial_hp);
     assert(session.combat.frame == 0u);
 
+    /* An automatic hazard respawn must reset combat in the same frame:
+       neither a half-dead enemy nor partial player HP may survive. */
+    {
+        hm_world hazard_world = world_fixture();
+        const hm_event hazard = { HM_HAZARD, 32.0f, 210.0f, 10.0f };
+        hm_session hazard_session, hazard_saved;
+        hm_input idle = {0.0f, 0u, 0u};
+        hazard_world.events = &hazard;
+        hazard_world.event_count = 1u;
+        assert(hm_session_init(&hazard_world, &combat, &hazard_session)
+               == HM_SESSION_OK);
+        hazard_session.combat.enemy_hp = 1u;
+        hazard_session.combat.player_hp = 1u;
+        assert(hm_session_step(&hazard_world, &combat, &hazard_session,
+                               idle, 0u, 1.0f / 60.0f) == HM_SESSION_OK);
+        assert(hazard_session.player.respawns == 1u);
+        assert(hazard_session.player.hazards == 1u);
+        assert(hazard_session.combat.enemy_hp == combat.enemy_initial_hp);
+        assert(hazard_session.combat.player_hp == combat.player_initial_hp);
+        assert(hazard_session.combat.frame == 0u);
+
+        /* A malformed combat config after the world-level respawn fails
+           transactionally, leaving the entire caller state unchanged. */
+        hazard_saved = hazard_session;
+        combat.enemy_speed = NAN;
+        assert(hm_session_step(&hazard_world, &combat, &hazard_session,
+                               idle, 0u, 1.0f / 60.0f)
+               == HM_SESSION_COMBAT_ERROR);
+        assert(memcmp(&hazard_session, &hazard_saved,
+                      sizeof(hazard_session)) == 0);
+        combat = combat_fixture();
+    }
+
     /* Init failure must also leave the destination unchanged. */
     snapshot = session;
     combat.enemy_speed = NAN;
