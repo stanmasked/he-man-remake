@@ -5,6 +5,7 @@
 #include <string.h>
 #include "heman_core.h"
 #include "heman_combat.h"
+#include "heman_session.h"
 #include "probe_view.h"
 #include "probe_selfcheck.h"
 
@@ -49,15 +50,14 @@ static hm_combat_config make_combat(void) {
     return c;
 }
 
-/* Keep fatal diagnostics visible until Plus/app termination.
-   This allows collecting boot evidence in a homebrew emulator. */
+/* Retain diagnostic codes on screen until Plus/app termination. */
 static void show_failure_screen(PadState *pad, const char *stage,
-                                int core, int boot, int combat) {
+                                int session_error, int boot_error) {
     printf("\x1b[2J\x1b[H");
-    printf("He-Man Switch C99 synthetic probe: FAILED\n\n");
+    printf("He-Man independent Switch core probe: FAILED\n\n");
     printf("Stage: %s\n", stage);
-    printf("core result %d | boot self-check %d | combat %d\n",
-           core, boot, combat);
+    printf("session result %d | startup self-check %d\n",
+           session_error, boot_error);
     printf("Press + to quit. Record these codes for diagnosis.\n");
     consoleUpdate(NULL);
     while (appletMainLoop()) {
@@ -69,92 +69,79 @@ static void show_failure_screen(PadState *pad, const char *stage,
 
 int main(void) {
     hm_world world = make_world();
-    hm_state state;
-    hm_combat_config enemy_config = make_combat();
-    hm_combat_state enemy;
-    hm_combat_result combat_result = hm_combat_init(&enemy_config, &enemy);
-    uint8_t facing_right = 1u;
-    PadState pad;
-    hm_result result = hm_init(&world, &state);
+    hm_combat_config combat_cfg = make_combat();
+    hm_session game;
+    hm_session_result result = hm_session_init(&world, &combat_cfg, &game);
     hm_probe_check_result boot_check = hm_probe_boot_selfcheck();
+    PadState pad;
     char view[HM_PROBE_BYTES];
     uint32_t row;
     consoleInit(NULL);
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
-    if (result != HM_OK || boot_check != HM_PROBE_CHECK_OK ||
-        combat_result != HM_COMBAT_OK) {
-        show_failure_screen(&pad, "startup", (int)result,
-                            (int)boot_check, (int)combat_result);
+    if (result != HM_SESSION_OK || boot_check != HM_PROBE_CHECK_OK) {
+        show_failure_screen(&pad, "startup", (int)result, (int)boot_check);
         consoleExit(NULL);
         return 1;
     }
     while (appletMainLoop()) {
-        hm_input input = {0.0f, 0, 0};
+        hm_input movement = {0.0f, 0u, 0u};
         uint64_t down, held;
         padUpdate(&pad);
         down = padGetButtonsDown(&pad);
         held = padGetButtons(&pad);
         if (down & HidNpadButton_Plus) break;
-        if (held & HidNpadButton_Left) {
-            input.axis -= 1.0f; facing_right = 0u;
-        }
-        if (held & HidNpadButton_Right) {
-            input.axis += 1.0f; facing_right = 1u;
-        }
-        input.jump = (uint8_t)((down & HidNpadButton_A) != 0);
-        input.reset = (uint8_t)((down & HidNpadButton_B) != 0);
-        result = hm_step(&world, &state, input, 1.0f / 60.0f);
-        if (result != HM_OK) break;
-        if (input.reset) {
-            combat_result = hm_combat_init(&enemy_config, &enemy);
-        } else {
-            combat_result = hm_combat_step(&enemy_config, &enemy, &state,
-                (uint8_t)((down & HidNpadButton_X) != 0), facing_right,
-                1.0f / 60.0f);
-        }
-        if (combat_result != HM_COMBAT_OK) {
-            result = HM_INVALID; break;
-        }
-        if (state.frame % 6u == 0u) {
-            if (!hm_probe_render(&world, &state, view, sizeof(view))) {
-                result = HM_INVALID;
+        if (held & HidNpadButton_Left) movement.axis -= 1.0f;
+        if (held & HidNpadButton_Right) movement.axis += 1.0f;
+        movement.jump = (uint8_t)((down & HidNpadButton_A) != 0);
+        movement.reset = (uint8_t)((down & HidNpadButton_B) != 0);
+        result = hm_session_step(&world, &combat_cfg, &game, movement,
+                  (uint8_t)((down & HidNpadButton_X) != 0), 1.0f / 60.0f);
+        if (result != HM_SESSION_OK) break;
+        if (game.player.frame % 6u == 0u) {
+            if (!hm_probe_render(&world, &game.player, view, sizeof(view))) {
+                result = HM_SESSION_INVALID;
+                break;
+            }
+            if (game.combat.enemy_hp > 0u &&
+                !hm_probe_overlay_marker(&world, &game.player, view,
+                    sizeof(view), game.combat.enemy_x,
+                    combat_cfg.enemy_feet_y - 10.0f, 'E')) {
+                result = HM_SESSION_INVALID;
                 break;
             }
             printf("\x1b[2J\x1b[H");
-            if (enemy.enemy_hp > 0u &&
-                !hm_probe_overlay_marker(&world, &state, view, sizeof(view),
-                    enemy.enemy_x, enemy_config.enemy_feet_y - 10.0f, 'E')) {
-                result = HM_INVALID; break;
-            }
             printf("He-Man independent C99 Switch core probe\n");
-            printf("Synthetic boot self-check: PASS (180 scripted frames)\n");
+            printf("Startup self-check: PASS (180 synthetic frames)\n");
             printf("Left/Right: move | A: jump | X: attack | B: reset | +: quit\n");
             printf("@ player  # platform  * pickup  C checkpoint\n");
             printf("! hazard  > exit  E: enemy (synthetic only)\n");
             for (row = 0; row < HM_PROBE_ROWS; ++row)
                 printf("|%s|\n", &view[row * HM_PROBE_STRIDE]);
             printf("frame %lu | x %.1f feet %.1f vy %.1f\n",
-                   (unsigned long)state.frame, state.x, state.feet_y, state.vy);
+                   (unsigned long)game.player.frame, game.player.x,
+                   game.player.feet_y, game.player.vy);
             printf("ground %u wall %u ceiling %u | respawns %lu\n",
-                   state.grounded, state.wall_hit, state.ceiling_hit,
-                   (unsigned long)state.respawns);
+                   game.player.grounded, game.player.wall_hit,
+                   game.player.ceiling_hit,
+                   (unsigned long)game.player.respawns);
             printf("HP %u | enemy HP %u | sword hits %lu | taken %lu\n",
-                   enemy.player_hp, enemy.enemy_hp,
-                   (unsigned long)enemy.sword_hits,
-                   (unsigned long)enemy.player_hits);
+                   game.combat.player_hp, game.combat.enemy_hp,
+                   (unsigned long)game.combat.sword_hits,
+                   (unsigned long)game.combat.player_hits);
             printf("pickup %s checkpoint %ld hazards %lu exit %s\n",
-                   state.picked ? "yes" : "no", (long)state.checkpoint,
-                   (unsigned long)state.hazards,
-                   state.completed ? "yes" : "no");
+                   game.player.picked ? "yes" : "no",
+                   (long)game.player.checkpoint,
+                   (unsigned long)game.player.hazards,
+                   game.player.completed ? "yes" : "no");
             consoleUpdate(NULL);
         }
-        /* Approximate fixed-step pacing; no runtime timing proof yet. */
+        /* Nominal frame step; not hardware-accurate frame pacing. */
         svcSleepThread(16000000LL);
     }
-    if (result != HM_OK)
-        show_failure_screen(&pad, "simulation/viewport", (int)result,
-                            (int)boot_check, (int)combat_result);
+    if (result != HM_SESSION_OK)
+        show_failure_screen(&pad, "gameplay/viewport", (int)result,
+                            (int)boot_check);
     consoleExit(NULL);
-    return result == HM_OK ? 0 : 2;
+    return result == HM_SESSION_OK ? 0 : 2;
 }
