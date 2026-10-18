@@ -74,3 +74,7 @@ PYTHONPATH=src python -m heman_tools.host_demo --headless --ticks 240
 ```
 
 With your own IPA and local Pillow install you can optionally view an approximate collision-map test scene via `--ipa /private/He-Man-v2.0.0.ipa`. **No original textures or sprites are included.** Full notes and limitations in `docs/host-demo.md`. Total unit tests: **156 synthetic cases**.
+
+## Stage 012: pickups, checkpoints and hazard triggers
+
+Independent synthetic event logic supports one-shot pickups, checkpoint respawns, hazards, triggers and exit flags. Source game scripts remain off GitHub. Test without a graphical window: `PYTHONPATH=src python -m heman_tools.events_demo --ticks 240`. See `docs/scene-interactions.md`. This adds 19 synthetic tests (175 cumulative, pending GitHub CI).
