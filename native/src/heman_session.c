@@ -28,6 +28,16 @@ hm_session_result hm_session_step(const hm_world *world,
     if (!session || !world || !combat_cfg || attack_pressed > 1u ||
         session->facing_right > 1u) return HM_SESSION_INVALID;
     next = *session;
+    /* The test combat module considers zero HP a defeat. Restore the
+       encounter on the NEXT simulation frame, using the ordinary native
+       player respawn path so checkpoint/camera rules stay consistent.
+       Suppress directional input and attacks on that recovery frame. */
+    if (session->combat.player_hp == 0u) {
+        movement.axis = 0.0f;
+        movement.jump = 0u;
+        movement.reset = 1u;
+        attack_pressed = 0u;
+    }
     if (movement.axis < 0.0f) next.facing_right = 0u;
     if (movement.axis > 0.0f) next.facing_right = 1u;
     physics_result = hm_step(world, &next.player, movement, dt);
