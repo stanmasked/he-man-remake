@@ -105,6 +105,7 @@ int main(void) {
     assert(hm_session_init(&world, &combat, &session) == HM_SESSION_OK);
     session.combat.player_hp = 1u;
     saved = session;
+    idle.reset = 0u;
     combat.enemy_speed = NAN;
     assert(hm_session_step(&world, &combat, &session,
                            idle, 0u, 1.0f/60.0f) == HM_SESSION_COMBAT_ERROR);
