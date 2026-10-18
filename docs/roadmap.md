@@ -22,7 +22,8 @@
 - [x] Build a standalone platform-neutral C99 host core proof-of-concept, with native GCC/Clang test cases.
 - [x] Compare 720 C99/Python synthetic frame states and 32 packed slope-mask columns.
 - [x] Implement separate C99 packed-mask actor walking and jumping experiment.
-- [ ] Integrate packed masks into the main C99 game-loop and compare complete slope trajectories.
+- [x] Route optional packed pixel masks into the main C99 `hm_step` game-loop; compare a 26-frame synthetic incline trace.
+- [ ] Profile/optimize pixel-mask validation on full-sized maps, and compare real-game mechanics privately.
 - [ ] Introduce a platform input/render adapter for future Switch builds.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.
