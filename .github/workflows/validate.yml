@@ -27,3 +27,5 @@ jobs:
         run: PYTHONPATH=src python -m unittest discover -s tests -v
       - name: Host scene headless smoke test (no copyrighted assets)
         run: PYTHONPATH=src python -m heman_tools.host_demo --headless --ticks 180
+      - name: Synthetic event interactions smoke test
+        run: PYTHONPATH=src python -m heman_tools.events_demo --ticks 180
