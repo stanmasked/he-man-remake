@@ -64,3 +64,10 @@ input without state mutation. Tests run in both the GCC and Clang workflows.
 All mechanics, graphics, level boundaries, enemy behaviours and values here
 are **synthetic placeholders**; original iOS enemy/combat data is not inferred
 from these numbers. Successful NRO compilation is not an emulator boot.
+
+### Runtime verification handoff
+
+For reproducible **real emulator / homebrew runtime verification** (as opposed
+to CI-only cross-compilation), follow [the manual NRO boot and input checklist](../docs/switch-runtime-verification.md).
+Fatal boot and simulation errors now remain visible until Plus is pressed or
+the application is terminated. No emulator boot has been observed yet.
