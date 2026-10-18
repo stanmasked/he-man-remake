@@ -69,11 +69,11 @@ int main(void) {
        not the independently patrolling enemy or camera. */
     assert(guarded.image[53u*STRIDE+120u]==UINT32_C(0xffff00ff));
     /* The independent cyan world-Y HUD marker starts at feet_y=272. */
-    assert(guarded.image[302u*STRIDE+475u]==UINT32_C(0xff00ffff));
+    assert(guarded.image[302u*STRIDE+475u]==UINT32_C(0xffffff00));
     game.player.feet_y=220.0f;
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
-    assert(guarded.image[250u*STRIDE+475u]==UINT32_C(0xff00ffff));
-    assert(guarded.image[302u*STRIDE+475u]!=UINT32_C(0xff00ffff));
+    assert(guarded.image[250u*STRIDE+475u]==UINT32_C(0xffffff00));
+    assert(guarded.image[302u*STRIDE+475u]!=UINT32_C(0xffffff00));
     game.player.feet_y=272.0f;
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
     assert(checksum(guarded.image)==first);
