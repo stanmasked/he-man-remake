@@ -1,0 +1,169 @@
+name: He-Man raster NRO NeXium runtime smoke
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/switch-raster-nexium.yml'
+      - 'raster/**'
+      - 'switch_raster/**'
+      - 'native/include/**'
+      - 'native/src/**'
+      - 'switch/source/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build raster NRO for emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject proprietary game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|ogg|mp3|pvr)$'; then
+            echo "Proprietary assets may not enter a public workflow" >&2
+            exit 1
+          fi
+      - name: Compile graphical NRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_raster clean all
+          test -s switch_raster/heman_raster_probe.nro
+          test "$(dd if=switch_raster/heman_raster_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_raster/heman_raster_probe.nro
+      - name: Upload graphics test NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-nexium-input-test-nro
+          path: switch_raster/heman_raster_probe.nro
+          if-no-files-found: error
+          retention-days: 7
+
+  nexium-runtime:
+    name: Boot NRO and capture actual emulator framebuffer
+    needs: build-test
+    runs-on: ubuntu-26.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: heman-nexium-input-test-nro
+          path: nros
+      - name: Install software Vulkan and screenshot tools
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl jq xvfb xauth xdotool imagemagick python3-pil \
+            libgtk-3-0t64 libasound2t64 libudev1 libxkbcommon0 libxkbcommon-x11-0 \
+            libx11-xcb1 libxcb-cursor0 libxcb-xinerama0 libxcb-xfixes0 \
+            libxcb-randr0 libxcb-render0 libxcb-shape0 libxcb-xkb1 \
+            libvulkan1 mesa-vulkan-drivers
+      - name: Retrieve the NeXium nightly binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_json="$(curl -fsSL --retry 3 --retry-all-errors -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/nexium-emu/nexium-nightly/releases/tags/nightly)"
+          asset_url="$(printf '%s' "$release_json" | jq -r '.assets[] | select(.name == "nexium-linux-x86_64.tar.gz") | .browser_download_url')"
+          test -n "$asset_url"
+          test "$asset_url" != null
+          curl -fL --retry 3 --retry-all-errors "$asset_url" -o /tmp/nexium-linux.tar.gz
+          mkdir -p /tmp/nexium
+          tar -xzf /tmp/nexium-linux.tar.gz -C /tmp/nexium
+          emu_bin="$(find /tmp/nexium -type f -executable \( -name 'nexium-gui' -o -name 'nexium' \) -print -quit)"
+          test -n "$emu_bin"
+          echo "NEXIUM_BIN=$emu_bin" >> "$GITHUB_ENV"
+          ldd "$emu_bin" || true
+      - name: Launch graphic NRO and capture before/after right input
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-evidence
+          sha256sum nros/heman_raster_probe.nro | tee runtime-evidence/nro-sha256.txt
+          icd="$(find /usr/share/vulkan/icd.d -maxdepth 1 -name 'lvp_icd*.json' -print -quit)"
+          test -n "$icd"
+          export VK_ICD_FILENAMES="$icd"
+          export NRO="$PWD/nros/heman_raster_probe.nro"
+          export LOG="$PWD/runtime-evidence/nexium.log"
+          export BEFORE="$PWD/runtime-evidence/before.png"
+          export AFTER="$PWD/runtime-evidence/after-right.png"
+          timeout --kill-after=5s 85s xvfb-run -a -s "-screen 0 1280x720x24" bash -c '
+            set -euo pipefail
+            "$NEXIUM_BIN" "$NRO" >"$LOG" 2>&1 &
+            pid=$!
+            trap "kill -TERM $pid 2>/dev/null || true" EXIT
+            for i in $(seq 1 25); do
+              sleep 1
+              state="$(ps -o stat= -p "$pid" 2>/dev/null | tr -d " " || true)"
+              if [ -z "$state" ] || [[ "$state" == Z* ]] || ! kill -0 "$pid" 2>/dev/null; then
+                echo "NeXium exited before window capture" >&2
+                tail -100 "$LOG" || true
+                exit 1
+              fi
+            done
+            window="$(xdotool search --onlyvisible --name "NeXium" 2>/dev/null | tail -n 1 || true)"
+            test -n "$window"
+            timeout --kill-after=2s 10s import -window "$window" "$BEFORE"
+            timeout --kill-after=1s 3s xdotool windowfocus --sync "$window" || true
+            timeout --kill-after=1s 4s xdotool keydown --window "$window" Right
+            sleep 1.6
+            timeout --kill-after=1s 4s xdotool keyup --window "$window" Right
+            sleep 0.6
+            timeout --kill-after=2s 10s import -window "$window" "$AFTER"
+            test -s "$BEFORE"
+            test -s "$AFTER"
+          '
+      - name: Analyze rendered frames and controller change
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee runtime-evidence/visual-check.txt
+          from PIL import Image
+          from pathlib import Path
+
+          before = Image.open("runtime-evidence/before.png").convert("RGB")
+          after = Image.open("runtime-evidence/after-right.png").convert("RGB")
+          if before.size != after.size or before.width < 640 or before.height < 360:
+              raise SystemExit(f"Invalid emulator screenshot dimensions: {before.size}, {after.size}")
+          w, h = before.size
+          crop_box = (w // 8, h // 8, 7 * w // 8, 7 * h // 8)
+          first, second = before.crop(crop_box), after.crop(crop_box)
+          colors = len(set(first.resize((160, 90)).getdata()))
+          changed = sum(1 for a, b in zip(first.getdata(), second.getdata())
+                        if max(abs(a[0]-b[0]),abs(a[1]-b[1]),abs(a[2]-b[2])) >= 18)
+          print(f"Emulator window pixels: {w}x{h}")
+          print(f"Distinct sampled frame colors: {colors}")
+          print(f"Changed gameplay crop pixels after right input: {changed}")
+          if colors < 6:
+              raise SystemExit("Not enough color diversity to confirm synthetic renderer")
+          if changed < 600:
+              raise SystemExit("Right input did not visibly change the synthetic scene")
+          print("NeXium raster scene/input smoke check PASS")
+          PY
+      - name: Publish actual runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-nexium-raster-runtime-evidence
+          path: runtime-evidence/
+          if-no-files-found: warn
+          retention-days: 7
