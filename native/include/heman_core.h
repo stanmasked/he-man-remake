@@ -2,13 +2,14 @@
 #define HEMAN_CORE_H
 
 #include <stdint.h>
+#include "heman_mask.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* Minimal independently authored C99 host simulation. No I/O or allocations.
-   Geometry uses solid/empty rectangular cells, NOT the game's slope masks.
+   Gameplay uses solid cells by default, with optional packed pixel masks.
    A front-end owns and retains all world pointers throughout execution. */
 typedef enum {
     HM_OK = 0,
@@ -50,6 +51,10 @@ typedef struct {
     float death_margin;
     const hm_event *events; /* borrowed, up to 32 */
     uint32_t event_count;
+    /* Optional borrowed packed masks. NULL keeps rectangular solid-cell logic. */
+    const hm_mask_grid *mask_grid;
+    uint32_t max_rise; /* 0..32 pixel steps for mask-based grounded ascent */
+    uint32_t max_drop; /* 0..32 pixels for bounded ground-follow descent */
 } hm_world;
 
 typedef struct {
