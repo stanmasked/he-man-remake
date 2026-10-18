@@ -100,23 +100,30 @@ jobs:
           export VK_ICD_FILENAMES="$icd"
           export NRO="$PWD/nros/heman_minimal_guest_probe.nro"
           export LOG="$PWD/runtime-evidence/nexium.log"
+          export EARLY="$PWD/runtime-evidence/early-25s.png"
           export BEFORE="$PWD/runtime-evidence/before.png"
           export IDLE="$PWD/runtime-evidence/idle.png"
           export AFTER="$PWD/runtime-evidence/after-right.png"
           export RUST_LOG="info"
           export RUST_BACKTRACE="1"
-          timeout --kill-after=5s 85s xvfb-run -a -s "-screen 0 1280x720x24" bash -c '
+          timeout --kill-after=5s 155s xvfb-run -a -s "-screen 0 1280x720x24" bash -c '
             set -euo pipefail
             "$NEXIUM_BIN" "$NRO" >"$LOG" 2>&1 &
             pid=$!
             trap "kill -TERM $pid 2>/dev/null || true" EXIT
-            for i in $(seq 1 25); do
+            for i in $(seq 1 75); do
               sleep 1
               state="$(ps -o stat= -p "$pid" 2>/dev/null | tr -d " " || true)"
               if [ -z "$state" ] || [[ "$state" == Z* ]] || ! kill -0 "$pid" 2>/dev/null; then
                 echo "NeXium exited before window capture" >&2
                 tail -100 "$LOG" || true
                 exit 1
+              fi
+              if [ "$i" -eq 25 ]; then
+                early_window="$(xdotool search --onlyvisible --name "NeXium" 2>/dev/null | tail -n 1 || true)"
+                if [ -n "$early_window" ]; then
+                  timeout --kill-after=2s 10s import -window "$early_window" "$EARLY" || true
+                fi
               fi
             done
             window="$(xdotool search --onlyvisible --name "NeXium" 2>/dev/null | tail -n 1 || true)"
