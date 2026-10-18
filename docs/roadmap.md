@@ -21,7 +21,8 @@
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
 - [x] Build a standalone platform-neutral C99 host core proof-of-concept, with native GCC/Clang test cases.
 - [x] Compare 720 C99/Python synthetic frame states and 32 packed slope-mask columns.
-- [ ] Integrate packed masks and slope/step adhesion into the C99 game-loop, compare complete trajectories.
+- [x] Integrate opt-in packed masks with bounded slope/step motion in C99 and verify a 26-frame synthetic Python parity trace.
+- [ ] Validate more edge cases and optimize native mask performance on large maps.
 - [ ] Introduce a platform input/render adapter for future Switch builds.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.
