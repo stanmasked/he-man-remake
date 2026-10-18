@@ -17,6 +17,13 @@ int hm_mask_solid_at(const hm_mask_grid *grid, int32_t x, int32_t y);
 /* Half-open body: 0 clear, 1 overlap, -1 invalid. */
 int hm_mask_body_overlap(const hm_mask_grid *grid, float x, float feet_y,
                          float half_width, float height);
+/* INTERNAL fast path: caller MUST have called hm_mask_valid on these same
+   immutable borrowed arrays at the start of the current simulation tick.
+   Skips the O(grid cells + mask rows) structural scan, but still validates
+   body coordinates and dimensions. Do not call on untrusted arrays. */
+int hm_mask_body_overlap_prevalidated(const hm_mask_grid *grid,
+                                      float x, float feet_y,
+                                      float half_width, float height);
 /* Three foot samples, vertical scanning <= 512 px; 1 found, 0 absent, -1 bad. */
 int hm_mask_feet_contact(const hm_mask_grid *grid, float x, float half_width,
                          float begin_y, float end_y, int32_t *contact_y);

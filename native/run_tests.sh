@@ -42,3 +42,14 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_mask_game.c" \
   -lm -o "$TMP/test_mask_game"
 "$TMP/test_mask_game"
+
+
+# Full-grid validation must occur once at frame entry, while external overlap
+# calls remain safe and malformed grids must leave actor state unchanged.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/tests/test_mask_validation_once.c" \
+  -lm -o "$TMP/test_mask_validation_once"
+"$TMP/test_mask_validation_once"

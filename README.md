@@ -98,3 +98,9 @@ A separate native actor-step experiment now handles static packed-mask slopes, g
 ## Stage 017: packed masks connected to the C99 gameplay loop
 
 The optional borrowed mask grid now drives actual `hm_step` actor collisions and bounded slope ascent/descent, while a null mask pointer preserves legacy rectangular cells. Includes native wall/headroom/rollback tests and a 26-frame C-versus-Python synthetic slope trace. See `docs/native-mask-game-loop.md`. **This is host physics research only; no original assets or Switch NRO are included.**
+
+## Stage 018: faster checked collision + optional libnx build probe
+
+C99 gameplay now validates borrowed pixel masks at each frame boundary rather than for every overlap sample, keeping full validation for external callers and preserving error rollback on corrupted data. A synthetic 300x19, 900-frame local experiment improved from 0.074808s to 0.017046s CPU time (one run, **not a Switch benchmark**). See `docs/native-mask-performance.md`; run `sh native/bench_mask_step.sh gcc` for an asset-free local measurement.
+
+`switch/` now includes an **unverified devkitA64/libnx text-console build target** using the C99 core on a synthetic course, with no original iOS game content. The devkitPro SDK is not installed in the present environment; no NRO has been produced or emulator-tested. Details: `switch/README.md`.

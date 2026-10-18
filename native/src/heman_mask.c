@@ -39,10 +39,10 @@ static int solid(const hm_mask_grid *g, int32_t x, int32_t y) {
 int hm_mask_solid_at(const hm_mask_grid *g, int32_t x, int32_t y) {
     return hm_mask_valid(g) ? solid(g,x,y) : -1;
 }
-int hm_mask_body_overlap(const hm_mask_grid *g, float x, float feet,
+int hm_mask_body_overlap_prevalidated(const hm_mask_grid *g, float x, float feet,
                          float half_width, float height) {
     int32_t lo_x, hi_x, lo_y, hi_y, ix, iy;
-    if (!hm_mask_valid(g) || !isfinite(x) || !isfinite(feet) ||
+    if (!g || !isfinite(x) || !isfinite(feet) ||
         !isfinite(half_width) || !isfinite(height) ||
         half_width<=0 || 2*half_width>HM_MASK_MAX_BODY ||
         height<=0 || height>HM_MASK_MAX_BODY ||
@@ -58,6 +58,12 @@ int hm_mask_body_overlap(const hm_mask_grid *g, float x, float feet,
     }
     return 0;
 }
+int hm_mask_body_overlap(const hm_mask_grid *g, float x, float feet,
+                         float half_width, float height) {
+    if (!hm_mask_valid(g)) return -1;
+    return hm_mask_body_overlap_prevalidated(g, x, feet, half_width, height);
+}
+
 int hm_mask_feet_contact(const hm_mask_grid *g, float x, float half_width,
                          float begin_y, float end_y, int32_t *contact_y) {
     int32_t px[3], py, start, end;
