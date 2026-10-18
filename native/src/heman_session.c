@@ -57,6 +57,21 @@ hm_session_result hm_session_step(const hm_world *world,
                                        attack_pressed, next.facing_right, dt);
     }
     if (combat_result != HM_COMBAT_OK) return HM_SESSION_COMBAT_ERROR;
+
+    /* Independently authored synthetic pickup rule: each newly collected
+       world pickup restores one combat HP, up to initial maximum. The
+       engine sets the pickup bit once; old bits can never heal again.
+       Apply only after both substeps succeeded, on the temporary copy,
+       so a rejected frame cannot consume a pickup. */
+    if (!movement.reset && next.player.respawns == session->player.respawns) {
+        uint32_t newly_picked = next.player.picked & ~session->player.picked;
+        while (newly_picked && next.combat.player_hp <
+                               combat_cfg->player_initial_hp) {
+            next.combat.player_hp++;
+            newly_picked &= newly_picked - 1u;
+        }
+    }
+
     *session = next;
     return HM_SESSION_OK;
 }

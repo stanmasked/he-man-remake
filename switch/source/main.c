@@ -119,7 +119,7 @@ int main(void) {
             printf("He-Man independent C99 Switch core probe\n");
             printf("Startup: PASS (physics 180f + combined session)\n");
             printf("Left/Right: move | A: jump | X: attack | B: reset | +: quit\n");
-            printf("@ player  # platform  * pickup  C checkpoint\n");
+            printf("@ player  # platform  * heals 1 HP  C checkpoint\n");
             printf("! hazard  > exit  E: enemy (synthetic only)\n");
             for (row = 0; row < HM_PROBE_ROWS; ++row)
                 printf("|%s|\n", &view[row * HM_PROBE_STRIDE]);

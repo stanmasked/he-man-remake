@@ -14,6 +14,7 @@ hm_session_selftest_code hm_session_selftest(void) {
     hm_session game, original;
     hm_input input = {1.0f, 0u, 0u};
     const hm_event hazard = { HM_HAZARD, 32.0f, 210.0f, 10.0f };
+    const hm_event pickup = { HM_PICKUP, 32.0f, 210.0f, 10.0f };
     uint32_t col, frame;
     memset(solid, 0, sizeof(solid));
     for (col = 0; col < COLS; ++col)
@@ -93,5 +94,24 @@ hm_session_selftest_code hm_session_selftest(void) {
                         0u, 1.0f / 60.0f) != HM_SESSION_COMBAT_ERROR ||
         memcmp(&game, &original, sizeof(game)) != 0)
         return HM_SESSION_SELFTEST_ROLLBACK;
+
+    /* One new pickup heals only once; the same collected flag may not
+       repeatedly increase HP even if the actor remains at the pickup. */
+    combat.enemy_speed = 30.0f;
+    world.events = &pickup;
+    world.event_count = 1u;
+    if (hm_session_init(&world, &combat, &game) != HM_SESSION_OK)
+        return HM_SESSION_SELFTEST_PICKUP;
+    game.combat.player_hp = 1u;
+    input.axis = 0.0f;
+    if (hm_session_step(&world, &combat, &game, input,
+                        0u, 1.0f / 60.0f) != HM_SESSION_OK ||
+        game.player.picked != 1u || game.combat.player_hp != 2u)
+        return HM_SESSION_SELFTEST_PICKUP;
+    game.combat.player_hp = 1u;
+    if (hm_session_step(&world, &combat, &game, input,
+                        0u, 1.0f / 60.0f) != HM_SESSION_OK ||
+        game.player.picked != 1u || game.combat.player_hp != 1u)
+        return HM_SESSION_SELFTEST_PICKUP;
     return HM_SESSION_SELFTEST_OK;
 }

@@ -9,7 +9,8 @@ typedef enum {
     HM_SESSION_SELFTEST_MOVEMENT = 2,
     HM_SESSION_SELFTEST_HAZARD = 3,
     HM_SESSION_SELFTEST_DEFEAT = 4,
-    HM_SESSION_SELFTEST_ROLLBACK = 5
+    HM_SESSION_SELFTEST_ROLLBACK = 5,
+    HM_SESSION_SELFTEST_PICKUP = 6
 } hm_session_selftest_code;
 
 hm_session_selftest_code hm_session_selftest(void);
