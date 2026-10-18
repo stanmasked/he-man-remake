@@ -162,7 +162,7 @@ def synthetic_interactive_world() -> InteractiveWorld:
     base = synthetic_world()
     return InteractiveWorld(base, (
         SceneEvent("pickup_a", "pickup", 116, 352, 10),
-        SceneEvent("checkpoint_a", "checkpoint", 240, 368, 12),
+        SceneEvent("checkpoint_a", "checkpoint", 260, 368, 12),
         SceneEvent("switch_a", "trigger", 285, 352, 8),
         SceneEvent("spikes_a", "hazard", 394, 353, 9),
         SceneEvent("exit_a", "exit", 1380, 350, 16),
