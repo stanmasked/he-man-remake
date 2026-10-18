@@ -16,4 +16,10 @@
 int hm_probe_render(const hm_world *world, const hm_state *state,
                     char *out, size_t out_len);
 
+/* Place a visible synthetic enemy glyph without overwriting the player (@).
+   Invalid arguments leave the original buffer intact; offscreen is OK. */
+int hm_probe_overlay_marker(const hm_world *world, const hm_state *state,
+                            char *out, size_t out_len,
+                            float x, float y, char glyph);
+
 #endif
