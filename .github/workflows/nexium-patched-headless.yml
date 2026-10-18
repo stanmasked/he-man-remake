@@ -3,6 +3,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/nexium-patched-headless.yml'
+      - 'tools/instrument_nexium_frames.py'
+      - 'tools/verify_nexium_guest_pngs.py'
       - 'patches/nexium-nro-segment-file-origin.patch'
       - 'switch_minimal/**'
       - 'switch_raster/**'
@@ -80,7 +82,7 @@ jobs:
             libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
             libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
             wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev \
-            libboost-dev libvulkan1 mesa-vulkan-drivers
+            libboost-dev libvulkan1 mesa-vulkan-drivers python3-pil
       - name: Clone and patch exactly pinned upstream NeXium
         shell: bash
         run: |
@@ -94,6 +96,8 @@ jobs:
           git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
+          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_frames.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
+          # The new PNGs are guest frame_rx output, not Xvfb splash screenshots.
       - name: Compile genuine patched upstream debug_boot program
         shell: bash
         run: |
@@ -146,6 +150,7 @@ jobs:
           set -euo pipefail
           export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
           export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence"
           export RUST_LOG="info,wgpu_core=warn"
           NRO="$PWD/nros/heman_raster_probe.nro"
           set +e
@@ -177,7 +182,13 @@ jobs:
           print("Runner guest frames:", int(frames.group(1)) if frames else "unknown")
           print("PASS: patched NeXium executed actual homebrew CPU instructions")
           PY
-      - name: Upload logs even when boot crashes or times out
+      - name: Validate and fingerprint real guest framebuffer PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_guest_pngs.py boot-evidence | tee boot-evidence/guest-frame-report.json
+          sha256sum nros/heman_raster_probe.nro boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frame-sha256.txt
+      - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -185,5 +196,8 @@ jobs:
           path: |
             boot-evidence/*.log
             boot-evidence/*status.txt
+            boot-evidence/*.png
+            boot-evidence/guest-frame*.txt
+            boot-evidence/guest-frame*.json
           if-no-files-found: warn
           retention-days: 7
