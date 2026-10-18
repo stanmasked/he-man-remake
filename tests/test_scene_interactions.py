@@ -75,7 +75,7 @@ class SceneInteractionTests(unittest.TestCase):
         self.assertEqual(state.scene.actor.x, self.world.scene.spawn_x)
 
     def test_trigger_once(self):
-        state = advance_interactive(self.place(285), self.world)
+        state = advance_interactive(self.place(275), self.world)
         self.assertEqual(state.activated_triggers, ("switch_a",))
         state = advance_interactive(state, self.world)
         self.assertEqual(state.activated_triggers, ("switch_a",))
