@@ -42,3 +42,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Compile and run source-only native scenarios
         run: sh native/run_tests.sh "${{ matrix.compiler }}"
+      - name: Record synthetic mask CPU benchmark (non-gating)
+        run: sh native/bench_mask_step.sh gcc
+
