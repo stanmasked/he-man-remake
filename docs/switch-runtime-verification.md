@@ -39,6 +39,9 @@ or run the original iOS IPA, its game media, or a complete He-Man remake.
 - [ ] Press Left/Right and confirm the player's x-coordinate changes; the
       camera should advance when moving far enough right.
 - [ ] Press A, confirming vertical position/velocity changes then landing.
+- [ ] After taking contact damage, collect a * pickup and verify HP
+      increases by one (not beyond full HP); the same pickup must not heal
+      again on subsequent frames.
 - [ ] Move close to the enemy, face it and press X. A successful hit changes
       enemy HP; a swing out of range or backwards must not.
 - [ ] Approach the enemy and verify that the HP/contact-hit counters can
