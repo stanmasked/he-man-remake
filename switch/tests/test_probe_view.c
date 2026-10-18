@@ -49,6 +49,17 @@ int main(void) {
     for (col = 0; col < HM_PROBE_ROWS; ++col)
         assert(output.text[col * HM_PROBE_STRIDE + HM_PROBE_COLS] == '\0');
 
+    /* An enemy glyph respects camera tiles and cannot erase the player. */
+    assert(hm_probe_overlay_marker(&w, &s, output.text,
+                                  sizeof(output.text), 144.0f, 240.0f, 'E') == 1);
+    assert(output.text[15u * HM_PROBE_STRIDE + 9u] == 'E');
+    assert(hm_probe_overlay_marker(&w, &s, output.text,
+                                  sizeof(output.text), 50.0f, 260.0f, 'E') == 1);
+    assert(output.text[16u * HM_PROBE_STRIDE + 3u] == '@');
+    assert(hm_probe_overlay_marker(&w, &s, output.text,
+                                  sizeof(output.text), 144.0f, 240.0f, '\\0') == 0);
+    assert(output.text[15u * HM_PROBE_STRIDE + 9u] == 'E');
+
     s.picked = 1u;
     s.checkpoint = 1;
     assert(hm_probe_render(&w, &s, output.text, sizeof(output.text)) == 1);
