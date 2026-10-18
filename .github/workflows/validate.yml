@@ -1,4 +1,4 @@
-name: He-Man core and host scene CI
+name: He-Man Python and native C core CI
 on:
   push:
   pull_request:
@@ -31,3 +31,14 @@ jobs:
         run: PYTHONPATH=src python -m heman_tools.events_demo --ticks 180
       - name: Event HUD host CLI smoke test (synthetic only)
         run: PYTHONPATH=src python -m heman_tools.host_demo --headless --interactions --ticks 180
+
+  native:
+    name: Native C99 core (${{ matrix.compiler }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run source-only native scenarios
+        run: sh native/run_tests.sh "${{ matrix.compiler }}"

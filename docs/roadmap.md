@@ -19,6 +19,8 @@
 - [x] Display synthetic event markers and a camera-aware HUD in the desktop demo, with headless CLI parity.
 - [ ] Investigate authentic iOS event scripts; never assume synthetic rules match original behavior.
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
+- [x] Build a standalone platform-neutral C99 host core proof-of-concept, with native GCC/Clang test cases.
+- [ ] Compare Python and C gameplay traces; add alpha collision slopes and a real platform backend.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.
 

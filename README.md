@@ -82,3 +82,7 @@ Independent synthetic event logic supports one-shot pickups, checkpoint respawns
 ## Stage 013: visible event markers and HUD
 
 Enable the asset-free desktop event course with `PYTHONPATH=src python -m heman_tools.host_demo --interactions`. It displays pickups, checkpoints, hazards, triggers and exit icons plus a basic status HUD. For headless CI use `--interactions --headless --ticks 180`. It runs **only with the synthetic scene**; combining `--interactions` and `--ipa` is rejected. See `docs/event-hud.md`. This adds 15 synthetic tests; staged total 190 tests pending CI.
+
+## Stage 014: portable C99 host core
+
+An independently authored C99 simulation now exists under `native/`, with no GUI, file access, original media or external dependencies. It models static rectangular-cell physics, camera movement and synthetic checkpoints/pickups/hazards. Build with `sh native/run_tests.sh gcc` or `sh native/run_tests.sh clang`. Both compilers pass eight native scenario groups locally; GitHub Actions now checks both. **The existing Python/Tkinter game demo does not yet use this new C core**, and there is no Switch NRO. See `docs/native-core.md`.
