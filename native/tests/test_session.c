@@ -138,6 +138,45 @@ int main(void) {
         combat = combat_fixture();
     }
 
+    /* A synthetic combat defeat is visible for one completed frame.
+       The next call then restores player and encounter atomically through
+       the native respawn operation, ignoring incoming motion and attack. */
+    {
+        hm_session defeated, saved;
+        hm_input right = {1.0f, 0u, 0u};
+        assert(hm_session_init(&world, &combat, &defeated) == HM_SESSION_OK);
+        defeated.combat.player_hp = 0u;
+        defeated.combat.enemy_hp = 1u;
+        defeated.combat.sword_cooldown = 8u;
+        saved = defeated;
+        assert(hm_session_step(&world, &combat, &defeated,
+                               right, 1u, 1.0f / 60.0f) == HM_SESSION_OK);
+        assert(defeated.player.x == world.spawn_x);
+        assert(defeated.player.respawns == saved.player.respawns + 1u);
+        assert(defeated.player.frame == saved.player.frame + 1u);
+        assert(defeated.combat.player_hp == combat.player_initial_hp);
+        assert(defeated.combat.enemy_hp == combat.enemy_initial_hp);
+        assert(defeated.combat.sword_cooldown == 0u);
+        assert(defeated.combat.frame == 0u);
+
+        /* Even a defeat recovery must roll back on invalid physics
+           input (bad dt), preserving both states and all counters. */
+        defeated.combat.player_hp = 0u;
+        saved = defeated;
+        assert(hm_session_step(&world, &combat, &defeated,
+                               right, 1u, NAN) == HM_SESSION_PHYSICS_ERROR);
+        assert(memcmp(&defeated, &saved, sizeof(defeated)) == 0);
+
+        /* Reinitialization of combat may also fail. The player must not
+           be respawned unless the whole transaction can commit. */
+        combat.enemy_speed = NAN;
+        assert(hm_session_step(&world, &combat, &defeated,
+                               right, 1u, 1.0f / 60.0f)
+               == HM_SESSION_COMBAT_ERROR);
+        assert(memcmp(&defeated, &saved, sizeof(defeated)) == 0);
+        combat = combat_fixture();
+    }
+
     /* Init failure must also leave the destination unchanged. */
     snapshot = session;
     combat.enemy_speed = NAN;
