@@ -27,6 +27,10 @@ hm_session_result hm_session_step(const hm_world *world,
     hm_combat_result combat_result;
     if (!session || !world || !combat_cfg || attack_pressed > 1u ||
         session->facing_right > 1u) return HM_SESSION_INVALID;
+    /* Check the caller's axis before replacing movement during defeat
+       recovery. Otherwise a NaN/out-of-range command would be hidden. */
+    if (!(movement.axis >= -1.0f && movement.axis <= 1.0f))
+        return HM_SESSION_PHYSICS_ERROR;
     next = *session;
     /* The test combat module considers zero HP a defeat. Restore the
        encounter on the NEXT simulation frame, using the ordinary native
