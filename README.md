@@ -54,3 +54,7 @@ Experimental fixed-step gravity, landing, jump and bounded slope adhesion over *
 ## Stage 009: full-body collision checks
 
 Host-only prototype covers static walls, ceilings, full rectangular body overlap, swept motion, gravity and jumps. Synthetic test suite: **122 tests**. The original IPA is needed only for an optional *local* collision probe; no original resources or reports are committed. See docs/full-body-physics.md. **This is not yet a playable Nintendo Switch game.**
+
+## Stage 010: bounded slope adhesion
+
+Adds optional experimental full-body uphill/downhill support following with ceiling clearance, tall-wall rejection and safe step limits. The original physics constants remain unknown. See `docs/slope-adherence.md`. All **135 synthetic tests** passed locally. The game is still not playable on Switch.
