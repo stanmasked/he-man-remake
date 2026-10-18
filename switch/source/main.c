@@ -8,6 +8,7 @@
 #include "heman_session.h"
 #include "probe_view.h"
 #include "probe_selfcheck.h"
+#include "session_selftest.h"
 
 #define W 48u
 #define H 24u
@@ -73,14 +74,18 @@ int main(void) {
     hm_session game;
     hm_session_result result = hm_session_init(&world, &combat_cfg, &game);
     hm_probe_check_result boot_check = hm_probe_boot_selfcheck();
+    hm_session_selftest_code session_check = hm_session_selftest();
     PadState pad;
     char view[HM_PROBE_BYTES];
     uint32_t row;
     consoleInit(NULL);
     padConfigureInput(1, HidNpadStyleSet_NpadStandard);
     padInitializeDefault(&pad);
-    if (result != HM_SESSION_OK || boot_check != HM_PROBE_CHECK_OK) {
-        show_failure_screen(&pad, "startup", (int)result, (int)boot_check);
+    if (result != HM_SESSION_OK || boot_check != HM_PROBE_CHECK_OK ||
+        session_check != HM_SESSION_SELFTEST_OK) {
+        show_failure_screen(&pad, "startup", (int)result,
+                            boot_check != HM_PROBE_CHECK_OK ? (int)boot_check :
+                            100 + (int)session_check);
         consoleExit(NULL);
         return 1;
     }
@@ -112,7 +117,7 @@ int main(void) {
             }
             printf("\x1b[2J\x1b[H");
             printf("He-Man independent C99 Switch core probe\n");
-            printf("Startup self-check: PASS (180 synthetic frames)\n");
+            printf("Startup: PASS (physics 180f + combined session)\n");
             printf("Left/Right: move | A: jump | X: attack | B: reset | +: quit\n");
             printf("@ player  # platform  * pickup  C checkpoint\n");
             printf("! hazard  > exit  E: enemy (synthetic only)\n");
