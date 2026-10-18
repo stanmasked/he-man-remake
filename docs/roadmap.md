@@ -11,7 +11,8 @@
 - [x] Decode local-space .shape polygons and circles, with 409/409 private archive validation and synthetic tests.
 - [x] Implement an asset-free SVG schematic viewer for local level coordinates.
 - [x] Implement experimental per-pixel collision-mask readout and deterministic host-only landing/jump prototype (approximation, not original physics).
-- [ ] Verify original tile collision rules; add walls, head collisions and full player body.
+- [x] Prototype static two-way wall and head collisions for a rectangular body (experimental, not verified iOS physics).
+- [ ] Verify original tile collision rules, slope adhesion and one-way ledges.
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [ ] Build and test gameplay systems (movement, camera, combat) on host fixtures.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
