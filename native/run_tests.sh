@@ -10,6 +10,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
   -I"$ROOT/native/include" \
   "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
   "$ROOT/native/tests/test_core.c" \
   -lm -o "$TMP/test_core"
 
@@ -32,3 +33,12 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_mask_motion.c" \
   -lm -o "$TMP/test_mask_motion"
 "$TMP/test_mask_motion"
+
+# Main C99 game loop with the optional borrowed pixel mask grid.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/tests/test_mask_game.c" \
+  -lm -o "$TMP/test_mask_game"
+"$TMP/test_mask_game"

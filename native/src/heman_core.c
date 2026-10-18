@@ -19,7 +19,7 @@ static int finitef(float x) {
 
 int hm_overlaps(const hm_world *w, float x, float feet_y) {
     int32_t x0, x1, y0, y1, gx, gy;
-    if (!w || !w->solid || !finitef(x) || !finitef(feet_y) ||
+    if (!w || (!w->solid && !w->mask_grid) || !finitef(x) || !finitef(feet_y) ||
         !finitef(w->actor_half_width) || !finitef(w->actor_height) ||
         !w->columns || !w->rows || !w->tile_size ||
         w->actor_half_width <= 0.0f || w->actor_height <= 0.0f ||
@@ -28,6 +28,11 @@ int hm_overlaps(const hm_world *w, float x, float feet_y) {
         w->columns > HM_MAX_CELLS / w->rows ||
         w->tile_size > 64u || w->tile_size < 1u) {
         return 1; /* do not regard malformed geometry as safe */
+    }
+    if (w->mask_grid) {
+        const int result = hm_mask_body_overlap(w->mask_grid, x, feet_y,
+                                                w->actor_half_width, w->actor_height);
+        return result != 0; /* malformed masks fail closed */
     }
     /* Avoid float->int overflow, with a finite game-space safety envelope. */
     if (fabsf(x) > 1000000.0f || fabsf(feet_y) > 1000000.0f) {
@@ -57,10 +62,10 @@ static int valid_world(const hm_world *w) {
         w->actor_height, w->speed, w->gravity, w->jump_speed,
         w->terminal_speed, w->viewport_width, w->viewport_height,
         w->death_margin};
-    if (!w->solid || !w->columns || !w->rows || !w->tile_size ||
+    if ((!w->solid && !w->mask_grid) || !w->columns || !w->rows || !w->tile_size ||
         w->rows > HM_MAX_CELLS || w->columns > HM_MAX_CELLS / w->rows ||
         w->columns > 4096u || w->rows > 4096u || w->tile_size > 64u ||
-        w->event_count > HM_MAX_EVENTS ||
+        w->event_count > HM_MAX_EVENTS || w->max_rise > 32u || w->max_drop > 32u ||
         (w->event_count && !w->events)) return 0;
     for (i = 0; i < sizeof(p) / sizeof(p[0]); ++i) if (!finitef(p[i])) return 0;
     if (w->actor_half_width <= 0 || w->actor_half_width > HM_MAX_BODY / 2 ||
@@ -68,7 +73,15 @@ static int valid_world(const hm_world *w) {
         w->speed <= 0 || w->gravity <= 0 || w->jump_speed <= 0 ||
         w->terminal_speed <= 0 || w->viewport_width < 1 ||
         w->viewport_height < 1 || w->death_margin < 0) return 0;
-    for (i = 0; i < w->columns * w->rows; ++i) if (w->solid[i] > 1u) return 0;
+    if (w->mask_grid) {
+        if (!hm_mask_valid(w->mask_grid) ||
+            w->mask_grid->columns != w->columns ||
+            w->mask_grid->rows != w->rows ||
+            w->mask_grid->tile_size != w->tile_size) return 0;
+    } else {
+        for (i = 0; i < w->columns * w->rows; ++i)
+            if (w->solid[i] > 1u) return 0;
+    }
     for (i = 0; i < w->event_count; ++i) {
         const hm_event *e = &w->events[i];
         if (e->kind < HM_PICKUP || e->kind > HM_EXIT ||
@@ -122,6 +135,44 @@ static float sweep(const hm_world *w, float x, float feet, float delta,
     return start + delta;
 }
 
+/* Opt-in masked slope handling. The entire body must clear each lift and
+   horizontal step, and the destination must have bounded vertical support.
+   Returns 1 if the grounded motion was completed. The legacy solid-cell
+   stepping path is not changed when mask_grid == NULL. */
+static int follow_slope(const hm_world *w, hm_state *s, float dx) {
+    float horizontal, foot, raised, advanced;
+    int blocked, collision, rise;
+    const float before = s->feet_y;
+    if (!w->mask_grid || !s->grounded || !supported(w,s->x,before))
+        return 0;
+    horizontal = sweep(w,s->x,before,dx,1,&blocked);
+    if (blocked && dx != 0.0f && w->max_rise) {
+        for (rise=1; rise<=(int)w->max_rise; ++rise) {
+            raised = sweep(w,s->x,before,-(float)rise,0,&collision);
+            if (collision || fabsf(raised-(before-(float)rise))>0.0001f) break;
+            advanced = sweep(w,s->x,raised,dx,1,&collision);
+            if (collision) continue;
+            foot = sweep(w,advanced,raised,(float)rise+(float)w->max_drop+0.5f,
+                         0,&collision);
+            if (collision && foot <= before + (float)w->max_drop + 0.0001f) {
+                s->x=advanced; s->feet_y=foot; s->vy=0;
+                s->grounded=1; s->wall_hit=0; s->ceiling_hit=0;
+                return 1;
+            }
+        }
+        return 0; /* wall or ceiling: normal sweep reports wall contact */
+    }
+    if (!blocked) {
+        foot = sweep(w,horizontal,before,(float)w->max_drop+0.5f,0,&collision);
+        if (collision && foot <= before+(float)w->max_drop+0.0001f) {
+            s->x=horizontal; s->feet_y=foot; s->vy=0;
+            s->grounded=1; s->wall_hit=0; s->ceiling_hit=0;
+            return 1;
+        }
+    }
+    return 0; /* walk-off or wall handled by default swept fall logic */
+}
+
 static void respawn(const hm_world *w, hm_state *s) {
     if (s->checkpoint >= 0) {
         const hm_event *e = &w->events[s->checkpoint];
@@ -165,7 +216,7 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
     float old_x, old_feet, dx, dy, target, max_scroll_x, max_scroll_y, factor;
     uint32_t i;
     int hit, teleported = 0, hazard = 0;
-    if (!w || !state || !w->solid || !finitef(dt) || dt <= 0.0f || dt > 1.0f / 30.0f ||
+    if (!w || !state || (!w->solid && !w->mask_grid) || !finitef(dt) || dt <= 0.0f || dt > 1.0f / 30.0f ||
         !finitef(input.axis) || fabsf(input.axis) > 1.0f ||
         !finitef(state->x) || !finitef(state->feet_y) || !finitef(state->vy) ||
         !finitef(state->camera_x) || !finitef(state->camera_y) ||
@@ -176,6 +227,10 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
     dy = (fminf(state->vy + w->gravity * dt, w->terminal_speed)) * dt;
     if (!finitef(dx) || !finitef(dy) || fabsf(dx) > HM_MAX_SWEEP ||
         fabsf(dy) > HM_MAX_SWEEP || w->event_count > HM_MAX_EVENTS) return HM_LIMIT;
+    if (w->mask_grid && (!hm_mask_valid(w->mask_grid) ||
+        w->mask_grid->columns != w->columns ||
+        w->mask_grid->rows != w->rows ||
+        w->mask_grid->tile_size != w->tile_size)) return HM_INVALID;
     if (hm_overlaps(w, state->x, state->feet_y)) return HM_COLLISION;
     s = *state;
     old_x = state->x; old_feet = state->feet_y;
@@ -184,6 +239,8 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
         respawn(w, &s);
         teleported = 1;
     } else {
+        if (s.grounded && !input.jump && w->mask_grid &&
+            follow_slope(w,&s,dx)) goto physics_finished;
         s.x = sweep(w, s.x, s.feet_y, dx, 1, &hit);
         s.wall_hit = (uint8_t)hit;
         s.ceiling_hit = 0;
@@ -209,6 +266,7 @@ hm_result hm_step(const hm_world *w, hm_state *state, hm_input input, float dt) 
             teleported = 1;
         }
     }
+physics_finished:
     for (i = 0; i < w->event_count; ++i) {
         const hm_event *e = &w->events[i];
         if (!crossed(w, e, old_x, old_feet, s.x, s.feet_y, teleported)) continue;
