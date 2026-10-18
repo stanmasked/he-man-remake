@@ -80,6 +80,8 @@ static void jump_and_input_rollback(void) {
     assert(memcmp(&old,&s,sizeof s)==0);
     ids[0]=1;
     w.max_rise=33;
+    assert(hm_step(&w,&s,input,1.0f/60.0f)==HM_INVALID);
+    assert(memcmp(&old,&s,sizeof s)==0);
     assert(hm_init(&w,&s)==HM_INVALID);
 }
 int main(void) {
