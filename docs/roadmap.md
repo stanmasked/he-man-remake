@@ -25,6 +25,7 @@
 - [x] Implement separate C99 packed-mask actor walking and jumping experiment.
 - [x] Route optional packed pixel masks into the main C99 `hm_step` game-loop; compare a 26-frame synthetic incline trace.
 - [x] Reduce repeated full-mask validation to once per native simulation frame, and benchmark on a synthetic 300x19 map.
+- [x] Add a portable atomic session adapter and native tests for deterministic physics+combat transitions and rollback.
 - [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
 - [x] Add a libnx-independent, host-tested 40x20 ASCII tile viewport and synthetic pickup/checkpoint/hazard/exit markers for the Switch probe (not an original sprite renderer).
 - [ ] Introduce a production graphics/input adapter with textures and real-time pacing for future Switch builds.
