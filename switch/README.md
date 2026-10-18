@@ -45,3 +45,22 @@ self-consistency**, not a Switch emulator boot or original iOS behaviour.
 A photograph/screenshot of this status after a real emulator or homebrew
 launch would be separate evidence of execution, and must not be conflated
 with the build-only CI evidence.
+
+### Stage 022: synthetic melee-combat interaction
+
+A hand-authored experimental enemy patrol now travels between two x-bounds.
+Press **X** for a directional short-range sword attack. Press **B** to reset
+both the physics probe and enemy. The text viewport renders the enemy as
+`E` and the HUD shows player/enemy HP, successful sword hits and contact
+damage. A finite attack cooldown and short damage-invulnerability period
+prevent every-frame hit repetition. Combat and actor motion still use
+approximate fixed-step time, not real hardware frame pacing.
+
+The combat engine is an independent, no-allocation C99 module
+(`native/src/heman_combat.c`). A separate native regression exercises
+sword direction, cooldown, patrol bounds, HP, invulnerability and invalid
+input without state mutation. Tests run in both the GCC and Clang workflows.
+
+All mechanics, graphics, level boundaries, enemy behaviours and values here
+are **synthetic placeholders**; original iOS enemy/combat data is not inferred
+from these numbers. Successful NRO compilation is not an emulator boot.
