@@ -23,9 +23,11 @@
 - [x] Compare 720 C99/Python synthetic frame states and 32 packed slope-mask columns.
 - [x] Implement separate C99 packed-mask actor walking and jumping experiment.
 - [x] Route optional packed pixel masks into the main C99 `hm_step` game-loop; compare a 26-frame synthetic incline trace.
-- [ ] Profile/optimize pixel-mask validation on full-sized maps, and compare real-game mechanics privately.
+- [x] Reduce repeated full-mask validation to once per native simulation frame, and benchmark on a synthetic 300x19 map.
+- [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
 - [ ] Introduce a platform input/render adapter for future Switch builds.
-- [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
+- [x] Add first opt-in libnx/devkitA64 **console probe** build recipe (unverified cross-compilation).
+- [ ] Actually compile the homebrew NRO with devkitPro and run an emulator smoke test.
 - [ ] Document differences from iOS v2.0.0.
 
 No original IPA or extracted copyrighted resource may be committed, uploaded as Actions artifact, or placed in a public GitHub issue.
