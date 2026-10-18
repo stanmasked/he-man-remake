@@ -45,3 +45,42 @@ jobs:
             exit 1
           fi
           echo 'Patch applies; corrected canonical full-file segment ranges present'
+
+  validate-built-raster-nro:
+    name: Inspect actual devkitPro-built graphics NRO
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-build original asset-free graphical NRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make -C switch_raster clean all
+      - name: Verify canonical format and reproduce loader mismatch
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 - <<'PY'
+          from pathlib import Path
+          from nro_loader_reference import parse_standard_nro
+          p = Path("switch_raster/heman_raster_probe.nro")
+          image = p.read_bytes()
+          header = parse_standard_nro(image)
+          assert image[16:20] == b"NRO0"
+          assert header.text.offset == 0
+          assert header.data.end <= header.size <= len(image)
+          assert header.ro.end <= header.data.offset
+          print("Actual devkitPro NRO image bytes:", header.size)
+          print("Original full-file data range:",
+                hex(header.data.offset), hex(header.data.end))
+          print("Broken NeXium header-relative slice:",
+                hex(len(image)-16))
+          print("Reference NRO segment layout: PASS")
+          PY
