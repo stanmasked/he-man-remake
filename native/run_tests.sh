@@ -14,3 +14,12 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   -lm -o "$TMP/test_core"
 
 "$TMP/test_core"
+
+
+# Mask geometry tests are separate from the rectangular gameplay core.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/tests/test_mask.c" \
+  -lm -o "$TMP/test_mask"
+"$TMP/test_mask"

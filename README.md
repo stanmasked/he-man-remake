@@ -86,3 +86,7 @@ Enable the asset-free desktop event course with `PYTHONPATH=src python -m heman_
 ## Stage 014: portable C99 host core
 
 An independently authored C99 simulation now exists under `native/`, with no GUI, file access, original media or external dependencies. It models static rectangular-cell physics, camera movement and synthetic checkpoints/pickups/hazards. Build with `sh native/run_tests.sh gcc` or `sh native/run_tests.sh clang`. Both compilers pass eight native scenario groups locally; GitHub Actions now checks both. **The existing Python/Tkinter game demo does not yet use this new C core**, and there is no Switch NRO. See `docs/native-core.md`.
+
+## Stage 015: compare portable C with host Python
+
+Added four entirely synthetic movement fixtures comparing 180 C99/Python frames each (720 frame comparisons) and a packed C99 pixel-mask reader checked against 32 Python mask columns. These tests cover a shared rectangular-collision subset and read-only slope-mask geometry; **the C game loop does not yet walk on slopes**. Run `sh native/run_tests.sh gcc` and `PYTHONPATH=src python -m unittest discover -s tests -v`. See `docs/native-parity.md`. No iOS assets or Switch NRO are included.

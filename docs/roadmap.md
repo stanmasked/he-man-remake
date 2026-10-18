@@ -20,7 +20,9 @@
 - [ ] Investigate authentic iOS event scripts; never assume synthetic rules match original behavior.
 - [ ] Add enemies, combat, real camera logic and animation from original game data.
 - [x] Build a standalone platform-neutral C99 host core proof-of-concept, with native GCC/Clang test cases.
-- [ ] Compare Python and C gameplay traces; add alpha collision slopes and a real platform backend.
+- [x] Compare 720 C99/Python synthetic frame states and 32 packed slope-mask columns.
+- [ ] Integrate packed masks and slope/step adhesion into the C99 game-loop, compare complete trajectories.
+- [ ] Introduce a platform input/render adapter for future Switch builds.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.
 
