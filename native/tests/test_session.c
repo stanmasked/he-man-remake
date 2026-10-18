@@ -167,6 +167,14 @@ int main(void) {
                                right, 1u, NAN) == HM_SESSION_PHYSICS_ERROR);
         assert(memcmp(&defeated, &saved, sizeof(defeated)) == 0);
 
+        /* Invalid caller input is not masked by the forced reset. */
+        right.axis = NAN;
+        assert(hm_session_step(&world, &combat, &defeated,
+                               right, 1u, 1.0f / 60.0f)
+               == HM_SESSION_PHYSICS_ERROR);
+        assert(memcmp(&defeated, &saved, sizeof(defeated)) == 0);
+        right.axis = 1.0f;
+
         /* Reinitialization of combat may also fail. The player must not
            be respawned unless the whole transaction can commit. */
         combat.enemy_speed = NAN;
