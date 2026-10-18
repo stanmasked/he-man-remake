@@ -39,3 +39,30 @@ production readiness.
 
 The original user-owned IPA, proprietary game assets, keys and firmware
 remain outside the public GitHub repository.
+
+## Diagnosis of the first live failure
+
+First real patched-NeXium input run
+[#39176583738](https://github.com/stanmasked/he-man-remake/actions/runs/39176583738)
+successfully executed the 640x360 synthetic guest and recorded the
+A-button press at frame 45 and release at frame 58. The three saved
+guest PNGs showed that the unique height marker **really did move**:
+
+| Guest frame | Marker range in screen Y (pixels) | Meaning |
+| --- | --- | --- |
+| 30 | 298–306 | Ground |
+| 65 | 228–236 | Jump in progress, 70 pixels higher |
+| 120 | 298–306 | Returned to ground |
+
+The initial verifier rejected the frame because it expected a
+`cyan RGB(0,255,255)` marker, while the source had mistakenly used
+C RGBA8888 word `0xff00ffff`, which becomes **yellow** when stored as
+little-endian RGBA bytes. The corrected word `0xffffff00` produces
+true cyan bytes `00 ff ff ff`. The C renderer and its native tests are
+both corrected, and `tests/test_native_rgba_markers.py` locks down
+the actual RGBA byte meaning so this error cannot recur unnoticed.
+
+This was a **marker color mismatch**, not evidence of broken jump
+physics or failed NeXium A-button delivery. Nevertheless, the stage
+will only be merged once the corrected end-to-end CI validates the
+real cyan PNGs and the full jump/landing scenario.
