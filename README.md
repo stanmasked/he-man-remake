@@ -28,3 +28,9 @@ PYTHONPATH=src python -m heman_tools.waypoints_cli --ipa /secure/local/path/He-M
 The original IPA is never uploaded by any CLI. Local reports are excluded by `.gitignore`, and GitHub Actions uses synthetic tests only.
 
 See `docs/roadmap.md` for the next tasks.
+
+## Stages 005–006: schematics and geometric shape data
+
+The asset-free SVG viewer renders decoded object and point coordinates with `PYTHONPATH=src python -m heman_tools.viewer_cli --ipa /private/He-Man-v2.0.0.ipa --out local_reports/level1.svg`. See `docs/level-viewer.md`.
+
+The new `.shape` parser reads local-space polygons, circles and reference names. Run `PYTHONPATH=src python -m heman_tools.shape_scan --ipa /private/He-Man-v2.0.0.ipa --out local_reports/shapes.json`. See `docs/shape-format.md`. No collision map or playable Switch build has yet been completed.
