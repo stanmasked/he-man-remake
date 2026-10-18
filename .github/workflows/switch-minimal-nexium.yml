@@ -43,6 +43,9 @@ jobs:
           test -s switch_minimal/heman_minimal_guest_probe.nro
           test "$(dd if=switch_minimal/heman_minimal_guest_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_minimal/heman_minimal_guest_probe.nro
+          # This reports a pre-existing loader bug without modifying the
+          # genuine devkitPro NRO or declaring the cross-build invalid.
+          python3 tools/nro_layout_diagnostic.py switch_minimal/heman_minimal_guest_probe.nro
       - name: Upload isolated guest NRO
         uses: actions/upload-artifact@v4
         with:
