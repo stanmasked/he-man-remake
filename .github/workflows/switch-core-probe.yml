@@ -34,7 +34,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$'; then
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files > /tmp/heman-tracked-paths.txt
+          if grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$ /tmp/heman-tracked-paths.txt; then
             echo 'Original game assets are forbidden in this repository' >&2
             exit 1
           fi
