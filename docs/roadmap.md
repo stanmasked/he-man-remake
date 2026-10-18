@@ -10,7 +10,9 @@
 - [ ] Identify collision tile semantics and match shape ownership and object relationships.
 - [x] Decode local-space .shape polygons and circles, with 409/409 private archive validation and synthetic tests.
 - [x] Implement an asset-free SVG schematic viewer for local level coordinates.
-- [ ] Reconstruct ground tile collisions, and match primitive shape resources to level objects.
+- [x] Implement experimental per-pixel collision-mask readout and deterministic host-only landing/jump prototype (approximation, not original physics).
+- [ ] Verify original tile collision rules; add walls, head collisions and full player body.
+- [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [ ] Build and test gameplay systems (movement, camera, combat) on host fixtures.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.

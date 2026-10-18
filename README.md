@@ -46,3 +46,7 @@ PYTHONPATH=src python -m heman_tools.tilemap_cli --ipa /secure/local/He-Man-v2.0
 ```
 
 No tile shape-to-physics mapping or Switch build is claimed yet. Total synthetic test suite: **82 tests**.
+
+## Stage 008: host-side mask physics experiment
+
+Experimental fixed-step gravity, landing, jump and bounded slope adhesion over **locally decoded alpha masks** (not confirmed original iOS physics). The user-owned IPA and atlas remain outside GitHub. Run `PYTHONPATH=src python -m heman_tools.collision_probe --ipa /private/He-Man-v2.0.0.ipa --map MUMap1-1.map --out local_reports/level1_probe.json` after installing Pillow locally. All CI tests use synthetic masks. See `docs/physics-prototype.md`. Host test suite: **100 tests**. No playable Switch binary is available yet.
