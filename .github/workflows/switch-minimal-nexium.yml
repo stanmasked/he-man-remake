@@ -153,8 +153,7 @@ jobs:
           if [ -d runtime-evidence/nexium-profile/logs ]; then
             cp -a runtime-evidence/nexium-profile/logs/. runtime-evidence/nexium-file-logs/
           fi
-          find runtime-evidence/nexium-file-logs -maxdepth 1 -type f -printf '%f %s bytes\\n' \\
-            | tee runtime-evidence/log-inventory.txt
+          find runtime-evidence/nexium-file-logs -maxdepth 1 -type f -printf '%f %s bytes\n' | tee runtime-evidence/log-inventory.txt
           for file in runtime-evidence/nexium-file-logs/*.log; do
             [ -f "$file" ] || continue
             echo "--- NeXium internal file log tail: $file ---"
