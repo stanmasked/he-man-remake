@@ -106,3 +106,14 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/switch/tests/test_session_selftest.c" \
   -lm -o "$TMP/test_session_selftest"
 "$TMP/test_session_selftest"
+
+# One-time synthetic pickup heal, HP saturation and atomic rollback.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/tests/test_session_pickup.c" \
+  -lm -o "$TMP/test_session_pickup"
+"$TMP/test_session_pickup"
