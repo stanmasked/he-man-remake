@@ -11,10 +11,11 @@
 - [x] Decode local-space .shape polygons and circles, with 409/409 private archive validation and synthetic tests.
 - [x] Implement an asset-free SVG schematic viewer for local level coordinates.
 - [x] Implement experimental per-pixel collision-mask readout and deterministic host-only landing/jump prototype (approximation, not original physics).
-- [x] Prototype static two-way wall and head collisions for a rectangular body (experimental, not verified iOS physics).
-- [ ] Verify original tile collision rules, slope adhesion and one-way ledges.
+- [x] Prototype static full-body wall/ceiling collisions and bounded slope adhesion (not authentic iOS physics).
+- [ ] Verify actual tile semantics, one-way platforms, hitbox dimensions and original movement constants.
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
-- [ ] Build and test gameplay systems (movement, camera, combat) on host fixtures.
+- [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
+- [ ] Add enemies, combat, real camera logic and animation from original game data.
 - [ ] Introduce a Nintendo Switch homebrew build target and emulator smoke tests.
 - [ ] Document differences from iOS v2.0.0.
 
