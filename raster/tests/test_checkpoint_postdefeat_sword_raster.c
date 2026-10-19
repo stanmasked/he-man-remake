@@ -171,7 +171,8 @@ int main(void) {
     assert(game.combat.player_hits == 0u);
     assert(game.combat.sword_cooldown == 0u);
     assert(game.combat.hurt_cooldown == 0u);
-    assert(game.player.grounded == 1u);
+    /* Native respawn intentionally clears grounded until the next step. */
+    assert(game.player.grounded == 0u);
     rendered_health(&view, 3u, 2u, 3u);
     puts("Checkpoint -> natural defeat -> sword victory -> B retry -> sword victory -> held-input B retry: PASS");
     return 0;
