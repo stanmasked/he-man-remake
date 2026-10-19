@@ -228,6 +228,15 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing real D-pad"):
             self.evaluate()
 
+    def test_capture_log_with_fake_prefix_is_rejected(self):
+        path = self.dir / "raster-runner.log"
+        original = path.read_text()
+        anchor = "HEMAN_GUEST_FRAME_PNG frame=121 "
+        self.assertIn(anchor, original)
+        path.write_text(original.replace(anchor, "bogus " + anchor))
+        with self.assertRaisesRegex(ValueError, "Missing actual guest capture"):
+            self.evaluate()
+
     def test_missing_runner_log_rejected(self):
         (self.dir / "raster-runner.log").unlink()
         with self.assertRaises(FileNotFoundError):
