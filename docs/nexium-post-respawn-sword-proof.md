@@ -35,6 +35,15 @@ world-x marker pixels at world x=50, and unchanged player position.
 It also requires all genuine frame captures and four precise HID events
 in the NeXium runner log.
 
+## Same-core C99 rehearsal
+
+`raster/tests/test_post_respawn_sword_raster.c` runs an identical damage
+and respawn encounter using the unmodified gameplay C99 sources. It simulates
+the X button edge on guest-equivalent ticks 66 and 85 and checks the live
+renderer RGB tick pixels at frames 62/79/115/170. GCC and Clang compile
+and execute this case in `native/run_tests.sh`. This is a host rehearsal,
+not a substitute for real NeXium HID events or guest framebuffer evidence.
+
 The separate `.github/workflows/nexium-patched-post-respawn-sword.yml`
 runs a genuine devkitPro NRO in a patched, pinned NeXium execution
 backend and uploads guest PNGs and logs even if verification fails.
