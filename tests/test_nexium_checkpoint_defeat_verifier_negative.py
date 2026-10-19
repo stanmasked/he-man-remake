@@ -199,6 +199,18 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not checkpoint"):
             self.evaluate()
 
+    def test_one_world_unit_checkpoint_recovery_drift_rejected(self):
+        # Two HUD pixels = 1 world unit: previously >3.0 tolerance
+        # accepted this incorrect checkpoint respawn coordinate.
+        self.images[121].center = 207.5
+        with self.assertRaisesRegex(ValueError, "Automatic respawn returned"):
+            self.evaluate()
+
+    def test_one_world_unit_late_checkpoint_drift_rejected(self):
+        self.images[145].center = 207.5
+        with self.assertRaisesRegex(ValueError, "wrong world x marker"):
+            self.evaluate()
+
     def test_wrong_final_hp_rejected(self):
         self.images[145].hp = 3
         with self.assertRaisesRegex(ValueError, "unexpected HP/respawn"):
