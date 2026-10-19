@@ -31,6 +31,10 @@ endif
 ifeq ($(CHECKPOINT_PROBE),1)
 CFLAGS += -DHM_CHECKPOINT_PROBE=1
 endif
+# Opt-in checkpoint + native contact-defeat scenario for real NeXium HID.
+ifeq ($(CHECKPOINT_DEFEAT_PROBE),1)
+CFLAGS += -DHM_CHECKPOINT_PROBE=1 -DHM_CHECKPOINT_DEFEAT_PROBE=1
+endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 .PHONY: all clean
