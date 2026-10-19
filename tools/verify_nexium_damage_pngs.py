@@ -8,8 +8,6 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from PIL import Image
-from verify_nexium_guest_pngs import describe
 
 FRAMES = (10, 25, 40, 61, 62)
 EXPECTED_HEALTH = (2, 2, 1, 0, 3)
@@ -23,6 +21,10 @@ HP_X=(18,36,54)
 
 
 def verify(directory: Path) -> dict:
+    # The constants above intentionally import without optional Pillow:
+    # source-only CI can test the byte/color contract without GUI packages.
+    from PIL import Image
+    from verify_nexium_guest_pngs import describe
     states=[]
     marker_x=[]
     raw_hp=[]
