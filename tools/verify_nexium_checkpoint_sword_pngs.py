@@ -58,8 +58,13 @@ def verify(folder: Path) -> dict:
                          "marker_x": round(x, 2), "native_counter": counter,
                          "colors": colors}
 
+    # Read actual motion from the source-authored world-x marker, not
+    # guessed HID-to-frame scheduling. Original world speed is 2 units
+    # per simulation tick: one tick shifts marker center by 4 pixels.
+    # Keep a bounded quantized approach; enforce respawn at exact x=90.
     approach_x = states[80]["marker_x"]
-    if not any(abs(approach_x - v) < 0.51 for v in (205.5, 209.5)):
+    ticks = (approach_x - 125.5) / 4.0
+    if not (19 <= ticks <= 24 and abs(ticks - round(ticks)) <= 0.125):
         raise ValueError("Unexpected predeath real D-pad distance")
     for frame, expected_hp, enemy_hp, respawn, x in (
         (30, 3, 2, COUNTER_OFF, 125.5),
