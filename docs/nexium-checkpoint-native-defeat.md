@@ -60,8 +60,8 @@ The pinned NeXium guest frame evidence from failing workflow 39299874720
 confirmed the activation position is precisely **world x=90**, not the
 original estimated 92. Frame 122 displays 0 HP, frame 123 shows 3 HP
 and the native respawn counter, and frame 124 displays 2 HP after a
-new contact. That workflow failed solely on the too-strict old x=92
-expectation; the corrected current-head CI must pass independently.
+new contact. The first observed failure was the too-strict old x=92 expectation;
+the corrected current-head CI must pass independently.
 
 The exact HP timeline above remains a **test hypothesis until current-head
 NeXium CI passes**. This is not a recreation of the original proprietary
