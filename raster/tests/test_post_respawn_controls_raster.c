@@ -72,6 +72,26 @@ int main(void) {
     for (t = 1u; t <= 110u; ++t) {
         hm_input input = {0.0f, 0u, 0u};
         uint8_t sword = (uint8_t)(t == 77u || t == 95u);
+        /* A rejected post-respawn input must never advance cooldown,
+           mutate HP, or alter actor/camera state. Verify atomic rollback
+           byte-for-byte before the regular simulated frame proceeds. */
+        if (t == 94u || t == 109u) {
+            hm_session snapshot = s;
+            hm_input bad = {0.0f, 0u, 0u};
+            hm_session_result expected;
+            uint8_t bad_attack = 0u;
+            if (t == 94u) {
+                bad.axis = 2.0f;
+                expected = HM_SESSION_PHYSICS_ERROR;
+            } else {
+                bad_attack = 2u;
+                expected = HM_SESSION_INVALID;
+            }
+            assert(hm_session_step(&w, &c, &s, bad, bad_attack,
+                                   1.0f / 60.0f) == expected);
+            assert(memcmp(&s, &snapshot, sizeof(s)) == 0);
+            expect_pixels(&v, 2u, t == 94u ? 1u : 0u);
+        }
         /* Controls held during defeat recovery must not leak into
            the newly initialized player or restarted encounter. */
         if (t == 62u) {
