@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from instrument_nexium_frames import instrument as instrument_frames
 
-FRAMES = (62, 90, 160)
+FRAMES = (62, 90, 160, 220)
 RIGHT_PRESS_FRAME = 80
 RIGHT_RELEASE_FRAME = 145
 
@@ -17,7 +17,7 @@ RIGHT_RELEASE_FRAME = 145
 def instrument(source: str) -> str:
     output = instrument_frames(source)
     old = "if matches!(frames, 30 | 120 | 300) {"
-    new = "if matches!(frames, 62 | 90 | 160) {"
+    new = "if matches!(frames, 62 | 90 | 160 | 220) {"
     if output.count(old) != 2:
         raise ValueError("Pinned upstream frame capture paths changed")
     output = output.replace(old, new)
