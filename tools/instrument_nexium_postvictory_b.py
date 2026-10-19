@@ -16,13 +16,16 @@ from instrument_nexium_checkpoint_sword import (
 
 RETRY_FRAMES = (*range(190, 212), 220, 242, 270)
 FRAMES = (*BASE_FRAMES, *RETRY_FRAMES)
+# The second X arrives before the next 30-frame contact hit after B.
+# X frames 205/221 are 16 apart (>15 native sword cooldown), and both
+# follow the real B release at 201; no guest state is overridden.
 RETRY_EVENTS = (
     (194, "buttons=B"),
     (201, "buttons="),
-    (208, "buttons=X"),
-    (215, "buttons="),
-    (227, "buttons=X"),
-    (234, "buttons="),
+    (205, "buttons=X"),
+    (212, "buttons="),
+    (221, "buttons=X"),
+    (228, "buttons="),
 )
 HID_EVENTS = (*BASE_HID_EVENTS, *RETRY_EVENTS)
 
@@ -42,11 +45,11 @@ def instrument(source: str) -> str:
         if output.count(anchor) != 1:
             raise ValueError("Expected one pinned guest receiver per branch")
         code = (
-            "if matches!(frames, 194 | 201 | 208 | 215 | 227 | 234) {",
+            "if matches!(frames, 194 | 201 | 205 | 212 | 221 | 228) {",
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             "    let action = match frames {",
             '        194 => "buttons=B",',
-            '        208 | 227 => "buttons=X",',
+            '        205 | 221 => "buttons=X",',
             '        _ => "buttons=",',
             "    };",
             "    std::fs::write(&path, action)?;",
