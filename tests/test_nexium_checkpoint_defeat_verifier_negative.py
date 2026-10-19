@@ -122,6 +122,26 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         self.assertEqual(result["health_before_death"], [3, 2, 1])
         self.assertEqual(result["final_hp_at_frame_145"], 2)
 
+    def test_real_neXium_21_step_approach_is_valid(self):
+        # Independent true guest runs captured 20 or 21 D-pad steps.
+        # Both must still recover at exactly checkpoint world x=90.
+        for frame in FRAMES:
+            if frame != 30 and frame <= 122:
+                self.images[frame].center = 209.5
+        result = self.evaluate()
+        self.assertEqual(result["native_death_frame"], 120)
+        self.assertEqual(result["respawn_world_x"], 205.5)
+
+    def test_player_drift_before_defeat_is_rejected(self):
+        self.images[118].center = 209.5
+        with self.assertRaisesRegex(ValueError, "moved away from enemy"):
+            self.evaluate()
+
+    def test_unobserved_intermediate_travel_distance_is_rejected(self):
+        self.images[80].center = 207.5
+        with self.assertRaisesRegex(ValueError, "Unexpected predeath D-pad"):
+            self.evaluate()
+
     def test_no_visible_zero_hp_frame_rejected(self):
         self.images[120].hp = 1
         with self.assertRaisesRegex(ValueError, "exactly one visible natural death"):
