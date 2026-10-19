@@ -51,6 +51,11 @@ source tests; `tests/test_nexium_checkpoint_defeat_instrument.py`
 checks both pinned Rust frame receiver paths, the precise HID schedule
 and renderer endianness.
 
+A further `tests/test_nexium_checkpoint_defeat_verifier_negative.py` suite
+executes the unchanged production verifier on 19 source-only scenarios:
+one valid transition and 18 intentionally corrupted outcomes. The fake
+image decoder is never a substitute for real NeXium guest evidence.
+
 The exact HP timeline above remains a **test hypothesis until current-head
 NeXium CI passes**. This is not a recreation of the original proprietary
 iOS game's assets or behavior, and does not establish operation on real
