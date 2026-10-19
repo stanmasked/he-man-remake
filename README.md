@@ -1,8 +1,20 @@
-# He-Man Switch Remake — research tools
+# He-Man Switch Remake — original-format research and independent Switch prototype
 
-Personal-use reimplementation research based on the user's locally obtained iOS copy of *He-Man: The Most Powerful Game in the Universe* (v2.0.0). This public repository contains **source-only, read-only format-analysis utilities**. It is **not a playable Nintendo Switch build**.
+Personal-use research based on the user's privately held iOS copy of *He-Man: The Most Powerful Game in the Universe* (v2.0.0). This public repository contains **read-only format-analysis tools, independently written C99 gameplay experiments, and a playable but synthetic Nintendo Switch homebrew test scene**. It is **not** a working port or faithful remake of the proprietary iOS game.
 
-All original characters, game assets, sound, trademarks, and code remain the property of their respective rightsholders. **No IPA, APK, OBB, executable, textures, levels, music, extracted resources or private audit reports belong in this repository.** These files must be kept off GitHub entirely.
+All original characters, game assets, sound, trademarks, and code remain the property of their respective rightsholders. **No IPA, APK, OBB, original executable, commercial textures, levels, music, extracted resources or private audit reports belong in this repository.** These files must be kept off GitHub entirely.
+
+## Verified status as of 20 October 2026
+
+- **Private iOS data analysis:** conservative local readers for `.lvl`, `.shape`, multilayer `.map`, counted objects, named points and related geometry. Validation against the user's privately held IPA is reported below; it does not establish original game-rule fidelity.
+- **Independent C99 gameplay core:** synthetic movement, collisions/slopes, pickups, hazards, checkpoint respawns, single-enemy patrol/combat, sword cooldown and controller-driven transitions. Host CI checks the code under **GCC and Clang**; these mechanics are deliberately *not claimed* to match the original game.
+- **Compiled Nintendo Switch NRO:** a standalone 640×360 asset-free graphical homebrew prototype using libnx/devkitA64, with Left/Right, A jump, X sword, B retry and a source-authored HUD. The `HM_EXIT` world event now displays **CLEAR** when the synthetic level is completed. Latest source and host renderer tests: [PR #55](https://github.com/stanmasked/he-man-remake/pull/55) (14/14 current-head workflows passed and merged).
+- **Actual NeXium guest execution:** real emulated AArch64 game instructions, libnx calls and screenshots verified controller motion, jumping, health loss, checkpoint defeat/recovery, two sword attacks, and a **second two-hit victory after a real B press**: [PR #54](https://github.com/stanmasked/he-man-remake/pull/54), [successful guest workflow](https://github.com/stanmasked/he-man-remake/actions/runs/39330254162). The new CLEAR badge has **host/native test coverage only** until it receives its own genuine NeXium PNG proof.
+- **Still missing:** faithful original level construction from private assets, original enemy/character behavior, art, animation, audio, menus, save data, authored campaign progression, robust production frame pacing, real-device profiling and comprehensive game playtesting. No claim is made that the original iOS gameplay runs on Switch.
+
+This section reflects the **verified `main` branch after Stage 055**. Earlier stage notes below are preserved as dated development history; their past-tense statements such as “no NRO exists yet” describe the state *at those earlier stages*, not the current repository.
+
+For the current worklist see [docs/roadmap.md](docs/roadmap.md), and for the Switch prototype see [switch_raster/README.md](switch_raster/README.md).
 
 ## Stage 001: level headers
 
