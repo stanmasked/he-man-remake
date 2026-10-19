@@ -27,6 +27,10 @@ endif
 ifeq ($(DAMAGE_PROBE),1)
 CFLAGS += -DHM_DAMAGE_PROBE=1
 endif
+# Stage 049 test-only checkpoint guest NRO; normal graphics unchanged.
+ifeq ($(CHECKPOINT_PROBE),1)
+CFLAGS += -DHM_CHECKPOINT_PROBE=1
+endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 .PHONY: all clean

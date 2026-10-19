@@ -14,12 +14,21 @@
 #define W 48u
 #define H 24u
 static uint8_t cells[W*H];
+/* Opt-in test-only checkpoint near initial spawn for real NeXium HID
+   travel and native B-button respawn. All gameplay rules are unchanged. */
+#ifdef HM_CHECKPOINT_PROBE
+static const hm_event events[] = {
+    {HM_CHECKPOINT,90.0f,272.0f,8.0f},
+    {HM_HAZARD,210.0f,262.0f,8.0f}
+};
+#else
 static const hm_event events[] = {
     {HM_PICKUP,170.0f,251.0f,8.0f},
     {HM_CHECKPOINT,340.0f,257.0f,8.0f},
     {HM_HAZARD,585.0f,257.0f,8.0f},
     {HM_EXIT,728.0f,257.0f,8.0f}
 };
+#endif
 
 static hm_world make_world(void) {
     hm_world w;
@@ -36,7 +45,8 @@ static hm_world make_world(void) {
     w.terminal_speed=1400.0f;
     w.viewport_width=320.0f;w.viewport_height=240.0f;
     w.death_margin=96.0f;
-    w.events=events;w.event_count=4u;
+    w.events=events;
+    w.event_count=(uint32_t)(sizeof(events)/sizeof(events[0]));
     return w;
 }
 
