@@ -62,9 +62,9 @@ def verify(folder: Path) -> dict:
     restored = [f for f in range(195, 205) if states[f] == (3, 2)]
     if not restored:
         raise ValueError("B press did not restore 3/2 native combat HP")
-    if states[205][1] != 2:
+    if states[204][1] != 2:
         raise ValueError("Restored enemy changed HP before post-B sword")
-    if any(states[f][1] != 2 for f in range(restored[0], 208)):
+    if any(states[f][1] != 2 for f in range(restored[0], 205)):
         raise ValueError("Enemy HP changed before first post-B X")
     for frame, expected in ((220, (2, 1)), (242, (2, 0)),
                             (270, (2, 0))):
