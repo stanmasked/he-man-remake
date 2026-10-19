@@ -15,8 +15,10 @@ The instrumenter modifies only the *temporary upstream Rust runner* to:
 - Capture guest `frame_rx` RGBA PNGs at frames **62, 90, 160, 220**.
 - Write `buttons=DRIGHT` through NeXium's existing
   `NEXIUM_HID_INJECT` mechanism after receiving frame **80**.
-- Release Right with `buttons=` after receiving frame **145**.
+- Release Right with `buttons=` after receiving frame **120**.
 - Log both injected HID actions and all four real guest screenshot events.
+
+The synthetic course contains a health pickup at x=170. Releasing Right at frame 120 keeps the player short of that pickup, so the test isolates movement/stop behavior without incidental healing.
 
 The production guest NRO, combat mechanics, native death/respawn logic and
 raster HUD have **no special-case input or state overrides**.
@@ -35,7 +37,7 @@ raster HUD have **no special-case input or state overrides**.
 All four frames must retain complete **2/2 enemy HP**, exactly three authentic
 player HUD tick colors, 192 magenta marker pixels, ≥8 scene colors, and an
 unchanged native respawn indicator. The runner log must record frame captures
-and both controller actions at frames 80 and 145.
+and both controller actions at frames 80 and 120.
 
 This is more evidence than a frame count, guessed character position or
 synthetic desktop screenshot. The verifier rejects missing/incorrect guest
