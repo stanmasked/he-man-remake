@@ -62,6 +62,27 @@ static void hex_score(uint32_t *pixels, uint32_t stride, uint32_t value,
     }
 }
 
+/* Independent small 3x5 text badge for a completed synthetic course.
+   Drawn only from the native HM_EXIT state; no new graphics assets. */
+static void exit_clear_badge(uint32_t *pixels, uint32_t stride) {
+    static const char *const letters[5] = {
+        "111100100100111", /* C */
+        "100100100100111", /* L */
+        "111100110100111", /* E */
+        "010101111101101", /* A */
+        "110101110101101"  /* R */
+    };
+    uint32_t ch, row, col;
+    rect(pixels,stride,546,46,85,26,UINT32_C(0xff216950));
+    rect(pixels,stride,549,49,79,20,UINT32_C(0xff315472));
+    for (ch=0u; ch<5u; ++ch)
+        for (row=0u; row<5u; ++row)
+            for (col=0u; col<3u; ++col)
+                if (letters[ch][row*3u+col] == '1')
+                    rect(pixels,stride,553+(int)(ch*15u+col*3u),
+                         53+(int)row*3,3,3,UINT32_C(0xfff0d486));
+}
+
 static int finite_limited(float f) {
     return isfinite(f) && f >= -100000.0f && f <= 100000.0f;
 }
@@ -232,5 +253,8 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
                               UINT32_C(0xff354967));
     hex_score(pixels,stride,view->qa_fingerprint,495,11,
               UINT32_C(0xfff1e6bf));
+    /* HM_EXIT already sets the durable native completion flag. Expose
+       that existing result directly in the Switch raster HUD. */
+    if (s->player.completed) exit_clear_badge(pixels,stride);
     return 1;
 }

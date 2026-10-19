@@ -101,6 +101,44 @@ int main(void) {
     qa=checksum(guarded.image);
     assert(qa!=moved);
 
+    /* Stage 055: the actual HM_EXIT completion state must reveal a
+       source-authored CLEAR indicator without changing game state. */
+    assert(guarded.image[47u*STRIDE+547u]!=UINT32_C(0xff216950));
+    assert(guarded.image[53u*STRIDE+553u]!=UINT32_C(0xfff0d486));
+    {
+        const hm_event with_exit[] = {
+            {HM_PICKUP,80.0f,251.0f,8.0f},
+            {HM_CHECKPOINT,128.0f,251.0f,8.0f},
+            {HM_EXIT,210.0f,272.0f,8.0f}
+        };
+        const hm_input idle = {0.0f,0u,0u};
+        const hm_session saved = game;
+        /* Drive completion through the unchanged native event/physics
+           step rather than mutating the flag to fake a level clear. */
+        assert(game.player.x==210.0f);
+        /* Preserve the player's activated checkpoint index (1);
+           replacing the entire event table with only HM_EXIT would
+           correctly fail core state validation before the test. */
+        world.events=with_exit;
+        world.event_count=3u;
+        assert(hm_session_step(&world,&combat,&game,idle,0u,
+                               1.0f/60.0f)==HM_SESSION_OK);
+        assert(game.player.completed==1u);
+        world.events=events;
+        world.event_count=2u;
+        assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
+        assert(guarded.image[47u*STRIDE+547u]==UINT32_C(0xff216950));
+        assert(guarded.image[53u*STRIDE+553u]==UINT32_C(0xfff0d486));
+        assert(checksum(guarded.image)!=qa);
+        assert(guarded.prefix==UINT32_C(0x01234567));
+        assert(guarded.suffix==UINT32_C(0x89abcdef));
+        for(row=0u;row<H;++row)
+            assert(guarded.image[row*STRIDE+W]==UINT32_C(0x5a5a5a5a));
+        game=saved;
+    }
+    assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
+    assert(checksum(guarded.image)==qa);
+
     /* Any invalid request leaves the entire pre-existing image unchanged. */
     view.qa_state=3u;
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==0);
