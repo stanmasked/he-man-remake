@@ -58,10 +58,13 @@ def verify(folder: Path) -> dict:
                          "marker_x": round(x, 2), "native_counter": counter,
                          "colors": colors}
 
+    approach_x = states[80]["marker_x"]
+    if not any(abs(approach_x - v) < 0.51 for v in (205.5, 209.5)):
+        raise ValueError("Unexpected predeath real D-pad distance")
     for frame, expected_hp, enemy_hp, respawn, x in (
         (30, 3, 2, COUNTER_OFF, 125.5),
-        (80, 2, 2, COUNTER_OFF, 205.5),
-        (105, 1, 2, COUNTER_OFF, 205.5),
+        (80, 2, 2, COUNTER_OFF, approach_x),
+        (105, 1, 2, COUNTER_OFF, approach_x),
         (140, 2, 1, COUNTER_ON, 205.5),
         (160, 2, 0, COUNTER_ON, 205.5),
         (185, 2, 0, COUNTER_ON, 205.5),
@@ -84,8 +87,9 @@ def verify(folder: Path) -> dict:
         state = states[f]
         if state["enemy_hp"] != 2:
             raise ValueError("Enemy attacked before native defeat/recovery")
-        if abs(state["marker_x"] - 205.5) > 3:
-            raise ValueError("Character did not stay at activated checkpoint")
+        expected_x = approach_x if f <= died_at else 205.5
+        if abs(state["marker_x"] - expected_x) > 0.51:
+            raise ValueError("Character moved before death or missed checkpoint recovery")
         counter = COUNTER_OFF if f <= died_at else COUNTER_ON
         if state["native_counter"] != counter:
             raise ValueError("Wrong native respawn marker chronology")
