@@ -77,7 +77,9 @@ int main(void) {
         assert(hm_session_step(&w, &c, &s, input, sword,
                                1.0f / 60.0f) == HM_SESSION_OK);
         assert(s.player.feet_y == 272.0f);
-        assert(s.player.grounded);
+        /* The native respawn path intentionally clears grounded until
+           gravity/contact settles on the next regular step. */
+        assert(t == 62u ? !s.player.grounded : s.player.grounded);
         if (t == 61u) {
             assert(s.combat.player_hp == 0u);
             assert(s.combat.player_hits == 3u);
