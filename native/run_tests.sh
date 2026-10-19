@@ -170,3 +170,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_damage_respawn_raster.c" \
   -lm -o "$TMP/test_damage_respawn_raster"
 "$TMP/test_damage_respawn_raster"
+
+# Stage 040: exact C99 damage, invulnerability, death and next-frame recovery;
+# verify the three real player HP HUD ticks and no unexpected movement.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_contact_recovery_raster.c" \
+  -lm -o "$TMP/test_contact_recovery_raster"
+"$TMP/test_contact_recovery_raster"
