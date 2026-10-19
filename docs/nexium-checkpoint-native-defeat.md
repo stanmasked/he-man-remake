@@ -56,15 +56,21 @@ executes the unchanged production verifier on 19 source-only scenarios:
 one valid transition and 18 intentionally corrupted outcomes. The fake
 image decoder is never a substitute for real NeXium guest evidence.
 
-Two independent pinned NeXium guest runs (39299874720 and
-39303499444) captured **world x=90 or x=92 before death**, depending on
-whether 20 or 21 actual D-pad ticks were delivered. Both produced
-**native recovery at exactly world x=90**. The verifier permits only
-those two predeath positions, requires the player to remain stationary
-before defeat, and enforces the checkpoint's exact recovery position. Frame 122 displays 0 HP, frame 123 shows 3 HP
-and the native respawn counter, and frame 124 displays 2 HP after a
-new contact. The first observed failure was the too-strict old x=92 expectation;
-the corrected current-head CI must pass independently.
+Three pinned NeXium guest runs (#39299874720, #39303499444,
+#39307615257) captured **world x=90, x=92, or x=94 before defeat**:
+respectively 20, 21, or 22 genuine rightward input ticks. The first two
+show native defeat/recovery on frames 122→123, the third on 121→122.
+All three show **checkpoint respawn at exactly world x=90**, followed
+by new native contact damage on the next frame.
+
+The verifier now derives predeath travel from the genuine guest world-x
+marker, accepts only a bounded number of physically quantized input
+steps (19–24), and requires that the hero remain at the same position
+through the fatal collision. It still strictly enforces exact world x=90
+after recovery, the 0→3 HP next-frame transition, the checkpoint flag,
+and real guest frame/HID evidence. This addresses the previous
+overspecified frame delivery assumptions; the corrected current-head
+CI must pass independently.
 
 The exact HP timeline above remains a **test hypothesis until current-head
 NeXium CI passes**. This is not a recreation of the original proprietary
