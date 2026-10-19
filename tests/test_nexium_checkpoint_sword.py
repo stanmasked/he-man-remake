@@ -138,6 +138,21 @@ class CheckpointSwordTests(unittest.TestCase):
         self.assertEqual(result["native_recovery_frame"], 123)
         self.assertEqual(result["enemy_health_after_each_attack"], [1, 0])
 
+    def test_third_genuine_22_tick_checkpoint_approach(self):
+        # Actual NeXium input edge can produce world x=94 before
+        # native defeat; checkpoint recovery remains precisely x=90.
+        for frame in FRAMES:
+            if frame != 30 and frame <= 122:
+                self.pixels[frame].x = 213.5
+        result = self.result()
+        self.assertEqual(result["native_recovery_frame"], 123)
+        self.assertEqual(result["enemy_health_after_each_attack"], [1, 0])
+
+    def test_impossible_25_tick_checkpoint_approach_rejected(self):
+        self.pixels[80].x = 225.5
+        with self.assertRaisesRegex(ValueError, "Unexpected predeath"):
+            self.result()
+
     def test_unexpected_predeath_input_drift_is_rejected(self):
         self.pixels[118].x = 209.5
         with self.assertRaisesRegex(ValueError, "moved before death"):
