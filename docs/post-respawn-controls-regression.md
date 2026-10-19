@@ -15,9 +15,11 @@ With the hero at x=50 and an enemy patrolling x=46..54, contact damage uses the 
 | 76 | Two frames of left input | Player x=70, facing left |
 | 77 | Sword press facing opponent | Enemy HP 1/2 |
 | 95 | Second sword press after cooldown | Enemy HP 0/2 |
+| 94 | Invalid horizontal axis before second hit | Atomic rejection; HP/cooldowns/frame unchanged |
+| 109 | Invalid attack flag after enemy defeat | Atomic rejection; no gameplay state change |
 | 110 | Idle after defeat of enemy | Player HP 2/3, enemy HP 0, respawns=1 |
 
-The native reset clears the grounded flag on frame 62; grounding returns on the following step. The test deliberately submits Left, Jump, and Sword during recovery and asserts no leaked motion, facing change, or sword hit. The test checks player and enemy HP pixels, world-x magenta marker, grounded world-y yellow marker and genuine respawn counter marker.
+The native reset clears the grounded flag on frame 62; grounding returns on the following step. The test deliberately submits Left, Jump, and Sword during recovery and asserts no leaked motion, facing change, or sword hit. Invalid post-recovery movement and attack commands are separately rejected without changing any session bytes or HUD pixels. The test checks player and enemy HP pixels, world-x magenta marker, grounded world-y yellow marker and genuine respawn counter marker.
 
 Host checks are part of both existing commands:
 
