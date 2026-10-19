@@ -101,6 +101,23 @@ int main(void) {
     qa=checksum(guarded.image);
     assert(qa!=moved);
 
+    /* Stage 055: the actual HM_EXIT completion state must reveal a
+       source-authored CLEAR indicator without changing game state. */
+    assert(guarded.image[47u*STRIDE+547u]!=UINT32_C(0xff216950));
+    assert(guarded.image[53u*STRIDE+553u]!=UINT32_C(0xfff0d486));
+    game.player.completed=1u;
+    assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
+    assert(guarded.image[47u*STRIDE+547u]==UINT32_C(0xff216950));
+    assert(guarded.image[53u*STRIDE+553u]==UINT32_C(0xfff0d486));
+    assert(checksum(guarded.image)!=qa);
+    assert(guarded.prefix==UINT32_C(0x01234567));
+    assert(guarded.suffix==UINT32_C(0x89abcdef));
+    for(row=0u;row<H;++row)
+        assert(guarded.image[row*STRIDE+W]==UINT32_C(0x5a5a5a5a));
+    game.player.completed=0u;
+    assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==1);
+    assert(checksum(guarded.image)==qa);
+
     /* Any invalid request leaves the entire pre-existing image unchanged. */
     view.qa_state=3u;
     assert(hm_raster_render(guarded.image,W,H,STRIDE,&view)==0);
