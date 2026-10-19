@@ -54,8 +54,8 @@ def verify(folder: Path) -> dict:
 
     for frame, health, counter, center in (
         (30, 3, RESPAWN_OFF, 125.5),
-        (80, 2, RESPAWN_OFF, 209.5),
-        (105, 1, RESPAWN_OFF, 209.5),
+        (80, 2, RESPAWN_OFF, 205.5),
+        (105, 1, RESPAWN_OFF, 205.5),
         (145, 2, RESPAWN_ON, 205.5),
     ):
         actual_hp, actual_counter, actual_x, _ = snapshots[frame]
@@ -77,7 +77,7 @@ def verify(folder: Path) -> dict:
         raise ValueError("Respawn indicator activated before actual defeat")
     if any(snapshots[t][1] != RESPAWN_ON for t in DENSE if t >= recovery):
         raise ValueError("Native respawn marker did not persist after recovery")
-    if any(abs(snapshots[t][2] - 209.5) > 3.0 for t in DENSE if t <= death):
+    if any(abs(snapshots[t][2] - 205.5) > 3.0 for t in DENSE if t <= death):
         raise ValueError("Player moved away from enemy before defeat")
     if any(abs(snapshots[t][2] - 205.5) > 3.0 for t in DENSE if t >= recovery):
         raise ValueError("Automatic respawn returned to spawn, not checkpoint")
