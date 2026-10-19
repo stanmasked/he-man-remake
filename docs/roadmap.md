@@ -37,10 +37,26 @@
 - [x] Add an identical GCC/Clang + libnx source-level 180-frame synthetic startup self-check with console PASS/error reporting.
 - [x] Add a second source-identical host/Switch boot self-check covering combined movement, hazard respawn, combat defeat and atomic rollback.
 - [x] Add controller-triggered deterministic 180-frame runtime replay with a shared GCC/Clang/Switch fingerprint and nonmutating live-state contract.
-- [ ] Boot the synthetic NRO in a Switch emulator or homebrew-enabled console and confirm controller input/console lifecycle.
+- [x] Boot independently authored synthetic Switch NROs in **NeXium** and verify genuine guest framebuffer and controller input (not physical Nintendo Switch proof). See [PR #54](https://github.com/stanmasked/he-man-remake/pull/54).
 - [ ] Document differences from iOS v2.0.0.
 
 No original IPA or extracted copyrighted resource may be committed, uploaded as Actions artifact, or placed in a public GitHub issue.
 
 - [x] Add a separate synthetic 640x360 libnx software-framebuffer NRO with a portable host-tested parallax/tile/player/enemy scene (not original game assets).
-- [ ] Confirm raster NRO execution, correct RGBA colors and controller-driven updates in a Nintendo Switch homebrew emulator or on hardware.
+- [x] Confirm asset-free 640x360 raster NRO execution and actual controller-driven RGBA HUD updates in **NeXium**, including checkpoint recovery and two X victories; **hardware remains untested**. See [PR #54](https://github.com/stanmasked/he-man-remake/pull/54).
+
+## Verification milestone — 20 October 2026
+
+- [x] Confirm first checkpoint death and **next-frame native recovery** using exact guest NeXium input logs and genuine HUD screenshots: [PR #50](https://github.com/stanmasked/he-man-remake/pull/50).
+- [x] Require strict full-line HID press/release identity so held buttons cannot impersonate released buttons: [PR #51](https://github.com/stanmasked/he-man-remake/pull/51).
+- [x] Prove first **two-X** sword victory after natural checkpoint death with original guest PNG HP 2→1→0: [PR #52](https://github.com/stanmasked/he-man-remake/pull/52).
+- [x] Validate B/manual replay after victory through original C99 engine and both native compilers: [PR #53](https://github.com/stanmasked/he-man-remake/pull/53).
+- [x] Prove real NeXium **B-retry then second two-X victory** using authentic emulated framebuffer captures: [PR #54](https://github.com/stanmasked/he-man-remake/pull/54).
+- [x] Draw independent **CLEAR** HUD only after native `HM_EXIT` completion and test source RGBA pixels under GCC/Clang; all prior NeXium regressions green: [PR #55](https://github.com/stanmasked/he-man-remake/pull/55).
+- [ ] Obtain separate **genuine NeXium guest PNG** proof of native `HM_EXIT` activation and the new CLEAR badge by injected real D-pad movement (host coverage alone does not count).
+- [ ] Replace synthetic world geometry with *private* verified level/collision reconstruction from user's own IPA, without committing extracted commercial resources.
+- [ ] Reproduce original iOS gameplay rules (enemy AI, damage, level triggers, camera, physics) based on private comparative traces rather than synthetic assumptions.
+- [ ] Implement real content pipeline, animation, sound, menu, save/continue and complete multi-level campaign.
+- [ ] Test stable frame pacing, memory, handheld/docked input and rendering on Nintendo Switch hardware; verify real-game parity privately.
+
+**Status boundary:** Successful NeXium NRO proofs establish that the independent synthetic prototype boots and responds to inputs. They **do not establish** a playable remake of the original commercial iOS game. Never publish IPA bytes, extracted assets or private reports to GitHub.
