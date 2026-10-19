@@ -20,6 +20,10 @@ SOURCES := source/main.c $(ROOT)/raster/raster_scene.c \
 CFLAGS := -std=gnu99 -O2 -Wall -Wextra -Werror $(ARCH) \
           -I$(ROOT)/native/include -I$(ROOT)/raster \
           -I$(ROOT)/switch/source -I$(DEVKITPRO)/libnx/include -D__SWITCH__
+# Opt-in, asset-free attack scenario. The normal NRO is unchanged.
+ifeq ($(ATTACK_PROBE),1)
+CFLAGS += -DHM_ATTACK_PROBE=1
+endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 .PHONY: all clean

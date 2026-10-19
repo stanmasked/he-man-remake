@@ -142,3 +142,17 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_raster_scene.c" \
   -lm -o "$TMP/test_raster_scene"
 "$TMP/test_raster_scene"
+
+
+# Stage 039: source-only near-range sword combat and actual enemy HP pixels.
+# Uses identical session / renderer C sources as the devkitPro attack NRO.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_attack_raster.c" \
+  -lm -o "$TMP/test_attack_raster"
+"$TMP/test_attack_raster"
