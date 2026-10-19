@@ -205,6 +205,34 @@ class CheckpointGuestVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing real NeXium checkpoint HID"):
             self.evaluate()
 
+    def test_false_release_right_still_held_is_rejected(self):
+        # A prefix search for "buttons=" would incorrectly accept this.
+        log = self.log.read_text()
+        old = "HEMAN_CHECKPOINT_HID frame=78 buttons=\n"
+        self.assertIn(old, log)
+        self.log.write_text(log.replace(old,
+            "HEMAN_CHECKPOINT_HID frame=78 buttons=DRIGHT\n"))
+        with self.assertRaisesRegex(ValueError, "Missing real NeXium checkpoint HID"):
+            self.evaluate()
+
+    def test_false_b_release_still_held_is_rejected(self):
+        log = self.log.read_text()
+        old = "HEMAN_CHECKPOINT_HID frame=117 buttons=\n"
+        self.assertIn(old, log)
+        self.log.write_text(log.replace(old,
+            "HEMAN_CHECKPOINT_HID frame=117 buttons=B\n"))
+        with self.assertRaisesRegex(ValueError, "Missing real NeXium checkpoint HID"):
+            self.evaluate()
+
+    def test_extra_unrelated_log_text_does_not_mask_release(self):
+        log = self.log.read_text()
+        old = "HEMAN_CHECKPOINT_HID frame=174 buttons=\n"
+        self.assertIn(old, log)
+        self.log.write_text(log.replace(old,
+            "prefix HEMAN_CHECKPOINT_HID frame=174 buttons=\n"))
+        with self.assertRaisesRegex(ValueError, "Missing real NeXium checkpoint HID"):
+            self.evaluate()
+
     def test_missing_runner_log_fails_closed(self):
         self.log.unlink()
         with self.assertRaises(FileNotFoundError):
