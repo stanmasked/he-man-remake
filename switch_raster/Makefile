@@ -24,6 +24,9 @@ CFLAGS := -std=gnu99 -O2 -Wall -Wextra -Werror $(ARCH) \
 ifeq ($(ATTACK_PROBE),1)
 CFLAGS += -DHM_ATTACK_PROBE=1
 endif
+ifeq ($(DAMAGE_PROBE),1)
+CFLAGS += -DHM_DAMAGE_PROBE=1
+endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 .PHONY: all clean
