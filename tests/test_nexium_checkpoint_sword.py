@@ -108,10 +108,22 @@ class CheckpointSwordTests(unittest.TestCase):
         result = instrument(UPSTREAM)
         self.assertEqual(result.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
         self.assertEqual(result.count("HEMAN_CHECKPOINT_SWORD_HID frame="), 2)
-        self.assertEqual(result.count("matches!(frames, 45 | 66 | 129 | 136 | 148 | 155)"), 2)
-        self.assertEqual(HID_EVENTS[-1], (155, "buttons="))
+        self.assertEqual(result.count("matches!(frames, 45 | 66 | 133 | 140 | 153 | 160)"), 2)
+        self.assertEqual(HID_EVENTS[-1], (160, "buttons="))
         with self.assertRaises(ValueError):
             instrument(result)
+
+    def test_x_inputs_are_after_dense_death_capture(self):
+        # The dense death/recovery window ends at frame 130. A sword
+        # attack at frame 129 could already alter enemy HP at 130 and
+        # make the verifier's pre-combat invariant self-contradictory.
+        from verify_nexium_checkpoint_sword_pngs import DENSE
+        first, second = [frame for frame, buttons in HID_EVENTS
+                         if buttons == "buttons=X"]
+        self.assertGreater(first, max(DENSE))
+        self.assertGreaterEqual(second - first, 15)
+        self.assertLess(first, 140)
+        self.assertLess(second, 160)
 
     def test_original_rgba_pixels_exact(self):
         for value, expected in (
@@ -193,10 +205,10 @@ class CheckpointSwordTests(unittest.TestCase):
     def test_fake_x_release_still_held_rejected(self):
         log = self.path / "raster-runner.log"
         t = log.read_text()
-        self.assertIn("HEMAN_CHECKPOINT_SWORD_HID frame=155 buttons=\n", t)
+        self.assertIn("HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=\n", t)
         log.write_text(t.replace(
-            "HEMAN_CHECKPOINT_SWORD_HID frame=155 buttons=\n",
-            "HEMAN_CHECKPOINT_SWORD_HID frame=155 buttons=X\n"
+            "HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=\n",
+            "HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=X\n"
         ))
         with self.assertRaisesRegex(ValueError, "Missing exact real NeXium HID"):
             self.result()
