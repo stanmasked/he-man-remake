@@ -117,6 +117,63 @@ int main(void) {
     assert(game.combat.player_hits == 1u);
     assert(game.combat.sword_hits == 2u);
     rendered_health(&view, 2u, 0u, 1u);
-    puts("Checkpoint natural combat defeat -> auto-recover -> two sword hits: PASS");
+
+    /* Stage 053: a manual B-reset *after victory* must re-arm the whole
+       enemy encounter while preserving the active checkpoint. Sending X
+       on the reset tick must not become a hidden extra sword hit. */
+    input.axis = 0.0f;
+    input.jump = 0u;
+    input.reset = 1u;
+    assert(hm_session_step(&world, &combat, &game, input, 1u,
+                           1.0f/60.0f) == HM_SESSION_OK);
+    assert(game.player.respawns == 2u);
+    assert(game.combat.frame == 0u);
+    assert(game.combat.sword_hits == 0u);
+    assert(game.combat.player_hits == 0u);
+    assert(game.combat.sword_cooldown == 0u);
+    assert(game.combat.hurt_cooldown == 0u);
+    assert(game.combat.enemy_x == combat.enemy_start_x);
+    assert(game.combat.direction == 1);
+    assert(game.facing_right == 1u);
+    rendered_health(&view, 3u, 2u, 2u);
+
+    /* Starting a new encounter at the exact checkpoint can still deal
+       fresh contact damage; two legitimate presses must defeat the
+       restored enemy without retaining any prior sword cooldown. */
+    input.reset = 0u;
+    assert(hm_session_step(&world, &combat, &game, input, 1u,
+                           1.0f/60.0f) == HM_SESSION_OK);
+    assert(game.combat.sword_hits == 1u);
+    rendered_health(&view, 2u, 1u, 2u);
+    for (t = 0u; t < 15u; ++t)
+        assert(hm_session_step(&world, &combat, &game, input, 0u,
+                               1.0f/60.0f) == HM_SESSION_OK);
+    assert(game.combat.sword_cooldown == 0u);
+    assert(game.combat.hurt_cooldown > 0u);
+    assert(hm_session_step(&world, &combat, &game, input, 1u,
+                           1.0f/60.0f) == HM_SESSION_OK);
+    assert(game.combat.sword_hits == 2u);
+    assert(game.combat.player_hits == 1u);
+    rendered_health(&view, 2u, 0u, 2u);
+
+    /* A third manual reset with held Left, Jump and X is another
+       full replay, but cannot teleport away from the activated checkpoint
+       or attack during the reset. The facing direction may legitimately
+       follow the held axis, unlike the auto-recovery suppression path. */
+    input.axis = -1.0f;
+    input.jump = 1u;
+    input.reset = 1u;
+    assert(hm_session_step(&world, &combat, &game, input, 1u,
+                           1.0f/60.0f) == HM_SESSION_OK);
+    assert(game.player.respawns == 3u);
+    assert(game.combat.frame == 0u);
+    assert(game.combat.sword_hits == 0u);
+    assert(game.combat.player_hits == 0u);
+    assert(game.combat.sword_cooldown == 0u);
+    assert(game.combat.hurt_cooldown == 0u);
+    /* Native respawn intentionally clears grounded until the next step. */
+    assert(game.player.grounded == 0u);
+    rendered_health(&view, 3u, 2u, 3u);
+    puts("Checkpoint -> natural defeat -> sword victory -> B retry -> sword victory -> held-input B retry: PASS");
     return 0;
 }
