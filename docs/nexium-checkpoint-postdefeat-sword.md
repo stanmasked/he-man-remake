@@ -42,6 +42,13 @@ receiver paths are pinned; authentic frame logs, exact full HID lines,
 and actual PNGs are mandatory. Artifacts are saved even if verification
 fails.
 
+A new portable native test, `raster/tests/test_checkpoint_postdefeat_sword_raster.c`,
+replays the unchanged checkpoint encounter using actual C99 movement,
+three contact hits, native recovery and two sword presses. It checks
+checkpoint flag and player/enemy HP pixels in the original 640×360
+renderer. `native/run_tests.sh` runs it on both GCC and Clang. This
+is independent host evidence, NOT guest HID proof.
+
 `tests/test_nexium_checkpoint_sword.py` provides ten fast host-side
 regression tests for the original renderer colors, dual NeXium Rust
 receiver patches, exact events and fail-closed rejection of missing
