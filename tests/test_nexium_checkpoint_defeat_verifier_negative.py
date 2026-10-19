@@ -126,7 +126,8 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         # Independent true guest runs captured 20 or 21 D-pad steps.
         # Both must still recover at exactly checkpoint world x=90.
         for frame in FRAMES:
-            if frame != 30 and frame <= 122:
+            # Fixture's actual death frame is 120, with recovery at 121.
+            if frame != 30 and frame <= 120:
                 self.images[frame].center = 209.5
         result = self.evaluate()
         self.assertEqual(result["native_death_frame"], 120)
