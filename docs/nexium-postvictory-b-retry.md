@@ -17,13 +17,15 @@ to the existing Stage 052 **unchanged source-only devkitPro Switch NRO**:
 | 185 | Original enemy defeated (0 HP), hero alive (2 HP) |
 | 194 / 201 | **New B manual reset / release** |
 | 190–211 | Dense real guest PNG captures around B and first retry |
-| 208 / 215 | **New first X attack / release** |
-| 227 / 234 | **New second X attack / release** |
+| 205 / 212 | **New first X attack / release** |
+| 221 / 228 | **New second X attack / release** |
 | 220 | Expect enemy HP 1, hero HP 2 |
 | 242 / 270 | Expect enemy HP 0, hero HP 2, world x=90 |
 
-Both X presses occur after the B release and are 19 guest frames
-apart (the C99 sword has a 15-frame cooldown). Genuine input edge
+Both X presses occur after the B release and are 16 guest frames
+apart (the C99 sword has a 15-frame cooldown). The second X is also
+scheduled before the next potential 30-frame contact hit after B,
+avoiding a false defeat due to guest input-delivery jitter. Genuine input edge
 delivery can shift by a frame; the PNG verifier discovers the exact
 first **3 hero / 2 enemy HP** reset frame in the 195–204 capture
 window instead of assuming one HID/guest scheduling identity.
