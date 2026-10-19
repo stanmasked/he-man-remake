@@ -72,7 +72,7 @@ def verify(folder: Path) -> dict:
         actual_hp, actual_counter, actual_x, _ = snapshots[frame]
         if actual_hp != health or actual_counter != counter:
             raise ValueError(f"Frame {frame}: unexpected HP/respawn state")
-        if abs(actual_x - center) > 3.0:
+        if abs(actual_x - center) > 0.51:
             raise ValueError(f"Frame {frame}: wrong world x marker")
 
     zeros = [t for t in DENSE if snapshots[t][0] == 0]
@@ -90,7 +90,7 @@ def verify(folder: Path) -> dict:
         raise ValueError("Native respawn marker did not persist after recovery")
     if any(abs(snapshots[t][2] - approach_x) > 0.51 for t in DENSE if t <= death):
         raise ValueError("Player moved away from enemy before defeat")
-    if any(abs(snapshots[t][2] - 205.5) > 3.0 for t in DENSE if t >= recovery):
+    if any(abs(snapshots[t][2] - 205.5) > 0.51 for t in DENSE if t >= recovery):
         raise ValueError("Automatic respawn returned to spawn, not checkpoint")
     if any(snapshots[t][0] != 1 for t in DENSE if t < death):
         raise ValueError("Contact cooldown/defeat health progression changed")
