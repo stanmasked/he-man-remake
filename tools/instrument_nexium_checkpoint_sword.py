@@ -10,13 +10,16 @@ from pathlib import Path
 from instrument_nexium_frames import instrument as capture
 
 FRAMES = (30, 80, 105, *range(116, 131), 140, 160, 185)
+# Keep both X presses strictly AFTER the dense 116..130 death/recovery
+# evidence: an early attack would make the truthful enemy-HP=2 invariant
+# through frame 130 contradict the very action being tested.
 HID_EVENTS = (
     (45, "buttons=DRIGHT"),
     (66, "buttons="),
-    (129, "buttons=X"),
-    (136, "buttons="),
-    (148, "buttons=X"),
-    (155, "buttons="),
+    (133, "buttons=X"),
+    (140, "buttons="),
+    (153, "buttons=X"),
+    (160, "buttons="),
 )
 
 
@@ -32,11 +35,11 @@ def instrument(source: str) -> str:
         if output.count(anchor) != 1:
             raise ValueError("Expected unique pinned NeXium frame receiver")
         events = (
-            "if matches!(frames, 45 | 66 | 129 | 136 | 148 | 155) {",
+            "if matches!(frames, 45 | 66 | 133 | 140 | 153 | 160) {",
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             '    let action = match frames {',
             '        45 => "buttons=DRIGHT",',
-            '        129 | 148 => "buttons=X",',
+            '        133 | 153 => "buttons=X",',
             '        _ => "buttons=",',
             '    };',
             '    std::fs::write(&path, action)?;',
