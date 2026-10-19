@@ -36,7 +36,7 @@ def instrument(source: str) -> str:
     output = output.replace(original, replacement)
 
     for indent in ("            ", "        "):
-        anchor = indent + replacement
+        # Anchor at a line boundary: eight spaces must not falsely match\n        # a suffix of the twelve-space guest receiver branch.\n        anchor = "\n" + indent + replacement
         if output.count(anchor) != 1:
             raise ValueError("Expected one pinned guest receiver per branch")
         code = (
@@ -53,7 +53,7 @@ def instrument(source: str) -> str:
             "}",
         )
         patch = "\n".join(indent + line for line in code)
-        output = output.replace(anchor, patch + "\n" + anchor, 1)
+        output = output.replace(anchor, "\n" + patch + anchor, 1)
 
     if output.count("HEMAN_POSTVICTORY_HID frame=") != 2:
         raise ValueError("Both pinned guest receivers must inject B and X")
