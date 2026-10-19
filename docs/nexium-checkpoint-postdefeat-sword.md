@@ -25,15 +25,18 @@ from exactly the same C99 physics, combat, session and raster sources.
 Guest PNG captures are scheduled at 30, 80, 105, every frame 116–130,
 140, 160, and 185. The verifier *discovers* the death frame within
 the 116–130 window, requires immediate recovery, the original green
-checkpoint flag, world-x=90 and native green respawn counter, and
+checkpoint flag, stable world-x=90 or 92 before death, but exact world-x=90
+**after recovery**, and native green respawn counter, and
 inspects each rendered HP tick. Expected enemy progression: 2 HP
 through frame 130 → 1 HP by frame 140 → 0 HP by frame 160, remaining
 defeated at frame 185. Player HP remains 2 after the enemy is defeated.
 
 The timing is a **test hypothesis** until the pinned patched NeXium
-workflow provides real guest framebuffer evidence. The exact original
-checkpoint transition on 122→123 has been observed in Stage 050's
-first-run saved guest PNGs; attack success has not yet been confirmed.
+workflow provides real guest framebuffer evidence. Two genuine NeXium Stage 050 runs have shown 20 or 21 D-pad steps
+before release (world-x=90 or 92); both return exactly to world-x=90 on
+recovery at frame 123. The original checkpoint death→recovery transition
+on frames 122→123 is confirmed in both saved guest captures, but a new
+X-button attack victory is not confirmed until this stage's CI passes.
 
 `.github/workflows/nexium-patched-checkpoint-sword.yml` cross-builds
 a genuine devkitPro NRO and runs the pinned NeXium Rust AArch64 backend,
