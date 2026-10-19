@@ -31,9 +31,9 @@ class PostVictoryGuestTests(unittest.TestCase):
                 p.hp, p.enemy = 2, 0
             elif f == 195:
                 p.hp, p.enemy = 3, 2
-            elif f < 209:
+            elif f < 206:
                 p.hp, p.enemy = 2, 2
-            elif f < 237:
+            elif f < 223:
                 p.hp, p.enemy = 2, 1
             else:
                 p.hp, p.enemy = 2, 0
@@ -86,13 +86,13 @@ class PostVictoryGuestTests(unittest.TestCase):
     def test_only_postvictory_B_and_two_new_X_presses(self):
         self.assertEqual(
             [x for x in RETRY_EVENTS if x[1] != "buttons="],
-            [(194, "buttons=B"), (208, "buttons=X"), (227, "buttons=X")]
+            [(194, "buttons=B"), (205, "buttons=X"), (221, "buttons=X")]
         )
         self.assertEqual(len(RETRY_EVENTS), 6)
         self.assertEqual(HID_EVENTS[:len(BASE_HID_EVENTS)], BASE_HID_EVENTS)
         self.assertEqual(FRAMES[:len(BASE_FRAMES)], BASE_FRAMES)
-        self.assertGreater(208, 201)
-        self.assertGreaterEqual(227 - 208, 15)
+        self.assertGreater(205, 201)
+        self.assertGreaterEqual(221 - 205, 15)
 
     def test_full_valid_guest_mock_contract(self):
         data = self.evidence()
@@ -109,8 +109,8 @@ class PostVictoryGuestTests(unittest.TestCase):
             self.evidence()
 
     def test_false_postvictory_X_release_rejected(self):
-        self.replace_line("HEMAN_POSTVICTORY_HID frame=234 buttons=",
-                          "HEMAN_POSTVICTORY_HID frame=234 buttons=X")
+        self.replace_line("HEMAN_POSTVICTORY_HID frame=228 buttons=",
+                          "HEMAN_POSTVICTORY_HID frame=228 buttons=X")
         with self.assertRaisesRegex(ValueError, "Missing exact postvictory"):
             self.evidence()
 
@@ -143,7 +143,7 @@ class PostVictoryGuestTests(unittest.TestCase):
             self.evidence()
 
     def test_enemy_falsely_hit_before_postvictory_X_rejected(self):
-        self.pixels[207].enemy = 1
+        self.pixels[204].enemy = 1
         with self.assertRaisesRegex(ValueError, "before first post-B X"):
             self.evidence()
 
