@@ -52,10 +52,18 @@ def verify(folder: Path) -> dict:
             raise ValueError(f"Frame {frame}: invalid native respawn marker")
         snapshots[frame] = (health, counter, world_x, colors)
 
+    # Genuine NeXium frame_rx evidence on the same pinned emulator shows
+    # either 20 or 21 player input steps before release (x=90 or x=92).
+    # Record the real predeath location; never broaden checkpoint respawn x.
+    approach_x = snapshots[80][2]
+    if not any(abs(approach_x - candidate) < 0.51
+               for candidate in (205.5, 209.5)):
+        raise ValueError("Unexpected predeath D-pad travel distance")
+
     for frame, health, counter, center in (
         (30, 3, RESPAWN_OFF, 125.5),
-        (80, 2, RESPAWN_OFF, 205.5),
-        (105, 1, RESPAWN_OFF, 205.5),
+        (80, 2, RESPAWN_OFF, approach_x),
+        (105, 1, RESPAWN_OFF, approach_x),
         (145, 2, RESPAWN_ON, 205.5),
     ):
         actual_hp, actual_counter, actual_x, _ = snapshots[frame]
@@ -77,7 +85,7 @@ def verify(folder: Path) -> dict:
         raise ValueError("Respawn indicator activated before actual defeat")
     if any(snapshots[t][1] != RESPAWN_ON for t in DENSE if t >= recovery):
         raise ValueError("Native respawn marker did not persist after recovery")
-    if any(abs(snapshots[t][2] - 205.5) > 3.0 for t in DENSE if t <= death):
+    if any(abs(snapshots[t][2] - approach_x) > 0.51 for t in DENSE if t <= death):
         raise ValueError("Player moved away from enemy before defeat")
     if any(abs(snapshots[t][2] - 205.5) > 3.0 for t in DENSE if t >= recovery):
         raise ValueError("Automatic respawn returned to spawn, not checkpoint")
