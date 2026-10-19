@@ -77,13 +77,16 @@ def verify(folder: Path) -> dict:
     if abs(world_x[4] - world_x[3]) > 8:
         raise ValueError(f"Hero kept moving after Right release: {world_x}")
 
+    # Exact line comparison is essential: "buttons=" must NOT accept
+    # "buttons=DRIGHT" or "buttons=B" via a prefix substring match.
     log = (folder / "raster-runner.log").read_text()
+    log_lines = set(log.splitlines())
     for frame in FRAMES:
         if f"HEMAN_GUEST_FRAME_PNG frame={frame} " not in log:
             raise ValueError(f"Missing true guest framebuffer event at {frame}")
     for frame, action in HID_EVENTS:
         marker = f"HEMAN_CHECKPOINT_HID frame={frame} {action}"
-        if marker not in log:
+        if marker not in log_lines:
             raise ValueError(f"Missing real NeXium checkpoint HID: {marker}")
 
     return {"guest_frame_evidence": frames,
