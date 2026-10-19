@@ -17,9 +17,11 @@ including the entire `buttons=` state, to exact log lines from
 `splitlines()`. This is independent of controller injection and
 does **not** modify game logic, pinned upstream Rust code or frame capture.
 
-Additional source-only negative tests reject falsely claimed releases for
-D-pad Right and B, a trailing `buttons= extra` suffix, and an unrelated
-prefix prepended to an otherwise correct event. Existing valid traces
+Seven new source-only negative tests reject falsely claimed releases for
+D-pad Right and B, a trailing `buttons= extra` suffix, an unrelated
+prefix prepended to an otherwise correct HID event, and fake guest frame
+capture records that occur only inside unrelated log text. Genuine capture
+events must begin at the start of their own log lines. Existing valid traces
 must remain accepted.
 
 Only the Python image/log verifiers and Python test suites are changed.
