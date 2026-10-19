@@ -16,7 +16,13 @@
 static uint8_t cells[W*H];
 /* Opt-in test-only checkpoint near initial spawn for real NeXium HID
    travel and native B-button respawn. All gameplay rules are unchanged. */
-#ifdef HM_CHECKPOINT_PROBE
+#if defined(HM_EXIT_PROBE)
+/* Test-only native exit within D-pad travel from spawn x=50.
+   Unmodified world event processing drives player.completed. */
+static const hm_event events[] = {
+    {HM_EXIT,90.0f,272.0f,8.0f}
+};
+#elif defined(HM_CHECKPOINT_PROBE)
 static const hm_event events[] = {
     {HM_CHECKPOINT,90.0f,272.0f,8.0f},
     {HM_HAZARD,210.0f,262.0f,8.0f}
