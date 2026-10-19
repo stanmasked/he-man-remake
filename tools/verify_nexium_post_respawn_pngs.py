@@ -58,7 +58,7 @@ def verify(folder: Path) -> dict:
     for frame in FRAMES:
         if f"HEMAN_GUEST_FRAME_PNG frame={frame} " not in log:
             raise ValueError(f"Missing genuine guest frame capture log {frame}")
-    for frame, action in ((80, "buttons=DRIGHT"), (145, "buttons=")):
+    for frame, action in ((80, "buttons=DRIGHT"), (120, "buttons=")):
         if f"HEMAN_RESPAWN_HID frame={frame} {action}" not in log:
             raise ValueError(f"Missing genuine NeXium HID event {frame} {action}")
     return {"frames": values, "respawn_marker_present": True,
