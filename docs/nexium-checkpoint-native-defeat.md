@@ -14,14 +14,14 @@ combat configuration, game logic and artwork are unchanged.
 
 NeXium's existing HID input file sends **D-pad Right at guest frame 45**
 and releases it after guest frame 66. The synthetic hero moves from world
-x=50 to approximately x=92, activating the checkpoint before sustained
+x=50 to x=90, activating the checkpoint before sustained
 enemy contact. No further controller input or game-state modifications
 occur. The C99 combat loop reduces health via repeated collisions:
 
 | Guest frame | Expected evidence |
 | --- | --- |
 | 30 | Initial world x=50; 3 HP; yellow checkpoint |
-| 80 | Checkpoint green, world x≈92; 2 HP; respawns=0 |
+| 80 | Checkpoint green, world x=90; 2 HP; respawns=0 |
 | 105 | 1 HP, same checkpoint position |
 | 116–130 | Dense real guest PNGs; exactly one 0-HP frame followed immediately by 3 HP and a persistent green native respawn marker |
 | 145 | World x=90 (checkpoint, not x=50); 2 HP from a later new contact, one or more respawns indicated |
@@ -55,6 +55,13 @@ A further `tests/test_nexium_checkpoint_defeat_verifier_negative.py` suite
 executes the unchanged production verifier on 19 source-only scenarios:
 one valid transition and 18 intentionally corrupted outcomes. The fake
 image decoder is never a substitute for real NeXium guest evidence.
+
+The pinned NeXium guest frame evidence from failing workflow 39299874720
+confirmed the activation position is precisely **world x=90**, not the
+original estimated 92. Frame 122 displays 0 HP, frame 123 shows 3 HP
+and the native respawn counter, and frame 124 displays 2 HP after a
+new contact. That workflow failed solely on the too-strict old x=92
+expectation; the corrected current-head CI must pass independently.
 
 The exact HP timeline above remains a **test hypothesis until current-head
 NeXium CI passes**. This is not a recreation of the original proprietary
