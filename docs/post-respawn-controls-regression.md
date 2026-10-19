@@ -9,7 +9,7 @@ With the hero at x=50 and an enemy patrolling x=46..54, contact damage uses the 
 | Frame | Action | Expected outcome |
 | --- | --- | --- |
 | 61 | Third contact | Hero HP 0/3 |
-| 62 | Native next-frame recovery | HP 3/3, respawns=1, encounter restored |
+| 62 | Recovery while holding Left, Jump and Sword | HP 3/3, respawns=1, encounter restored; held controls suppressed |
 | 63 | Right input | Player x=52, fresh contact HP 2/3 |
 | 74 | Right input over twelve frames | Player x=74, facing right |
 | 76 | Two frames of left input | Player x=70, facing left |
@@ -17,7 +17,7 @@ With the hero at x=50 and an enemy patrolling x=46..54, contact damage uses the 
 | 95 | Second sword press after cooldown | Enemy HP 0/2 |
 | 110 | Idle after defeat of enemy | Player HP 2/3, enemy HP 0, respawns=1 |
 
-The native reset clears the grounded flag on frame 62; grounding returns on the following step. The test checks player and enemy HP pixels, world-x magenta marker, grounded world-y yellow marker and genuine respawn counter marker.
+The native reset clears the grounded flag on frame 62; grounding returns on the following step. The test deliberately submits Left, Jump, and Sword during recovery and asserts no leaked motion, facing change, or sword hit. The test checks player and enemy HP pixels, world-x magenta marker, grounded world-y yellow marker and genuine respawn counter marker.
 
 Host checks are part of both existing commands:
 
