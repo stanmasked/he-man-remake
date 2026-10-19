@@ -17,10 +17,17 @@ from exactly the same C99 physics, combat, session and raster sources.
 | 66 | D-pad released, hero remains at x=90 in enemy contact range |
 | 122 | Captured native 0-HP defeat in previous genuine NeXium run |
 | 123 | Captured native 3-HP automatic checkpoint respawn in prior run |
-| 129 | X pressed — first sword attack after natural respawn |
-| 136 | X released |
-| 148 | X pressed — second sword attack after cooldown |
-| 155 | X released |
+| 133 | X pressed — first sword attack after natural respawn |
+| 140 | X released |
+| 153 | X pressed — second sword attack after cooldown |
+| 160 | X released |
+
+Both X presses deliberately occur **after** the 116–130 dense death-window
+captures. The previous first press at frame 129 risked damaging the enemy
+before frame 130, contradicting the verifier's full enemy-HP invariant
+through natural death/recovery even if guest combat worked correctly.
+The revised presses are at frames 133 and 153 (20 frames apart, beyond
+the 15-frame sword cooldown).
 
 Guest PNG captures are scheduled at 30, 80, 105, every frame 116–130,
 140, 160, and 185. The verifier *discovers* the death frame within
