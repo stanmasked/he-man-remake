@@ -183,6 +183,13 @@ class CheckpointSwordTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid combat/respawn HP"):
             self.result()
 
+    def test_post_victory_one_world_unit_drift_rejected(self):
+        # Exact checkpoint world-x must persist after X attacks; the
+        # prior >3px tolerance would accept this marker displacement.
+        self.pixels[160].x = 207.5
+        with self.assertRaisesRegex(ValueError, "incorrect world-x marker"):
+            self.result()
+
     def test_fake_x_release_still_held_rejected(self):
         log = self.path / "raster-runner.log"
         t = log.read_text()
