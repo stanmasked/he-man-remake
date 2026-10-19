@@ -79,6 +79,18 @@ static hm_combat_config make_combat(void) {
     c.enemy_speed=8.0f;
     c.hurt_cooldown_frames=30u;
 #endif
+#ifdef HM_CHECKPOINT_DEFEAT_PROBE
+    /* Optional checkpoint-and-contact encounter. Movement is injected
+       through the real NeXium D-pad after boot: the hero first activates
+       the ordinary x=90 checkpoint, then the native combat loop causes
+       three real contact hits with 30-frame immunity. Respawn logic,
+       input handling and the renderer are completely unmodified. */
+    c.patrol_left=86.0f;
+    c.patrol_right=94.0f;
+    c.enemy_start_x=90.0f;
+    c.enemy_speed=8.0f;
+    c.hurt_cooldown_frames=30u;
+#endif
     return c;
 }
 
