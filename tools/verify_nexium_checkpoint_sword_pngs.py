@@ -78,7 +78,7 @@ def verify(folder: Path) -> dict:
         if (state["player_hp"], state["enemy_hp"],
                 state["native_counter"]) != (expected_hp, enemy_hp, respawn):
             raise ValueError(f"Frame {frame}: invalid combat/respawn HP state")
-        if abs(state["marker_x"] - x) > 3:
+        if abs(state["marker_x"] - x) > 0.51:
             raise ValueError(f"Frame {frame}: incorrect world-x marker")
 
     death = [f for f in DENSE if states[f]["player_hp"] == 0]
