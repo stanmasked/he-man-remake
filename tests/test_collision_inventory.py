@@ -6,7 +6,8 @@ import unittest
 import zipfile
 
 from heman_tools.collision_inventory import (
-    main, private_output_path, scan_local_ipa, summarize_collision_layer,
+    compare_screen_pair, main, private_output_path, scan_local_ipa,
+    summarize_collision_layer,
 )
 from heman_tools.tilemap import TileMapFormatError, parse_tilemap
 from test_tilemap import layer, sample
@@ -98,6 +99,61 @@ class CollisionInventoryTests(unittest.TestCase):
                                  b"not a valid multilayer map")
             with self.assertRaises(TileMapFormatError):
                 scan_local_ipa(ipa, "Fake.map")
+
+    def test_identical_private_screen_packs(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "fake.ipa"
+            with zipfile.ZipFile(ipa, "w") as archive:
+                for pack in ("screen-med", "screen-xlarge"):
+                    archive.writestr(
+                        f"Payload/MOTU.app/{pack}/maps/Fake.map", sample())
+            report = compare_screen_pair(ipa, "Fake.map")
+            self.assertTrue(report["exact_map_bytes_match"])
+            self.assertTrue(report["collision_inventory_match"])
+            self.assertEqual(report["screen_med_occupied_cells"], 5)
+
+    def test_byte_difference_detected_even_when_inventory_equal(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "fake.ipa"
+            # Only the non-physics visible flag differs. Candidate occupancy
+            # stays equal, but source bytes must still be reported as distinct.
+            a = sample(layer(shown=0))
+            b = sample(layer(shown=1))
+            with zipfile.ZipFile(ipa, "w") as archive:
+                archive.writestr(
+                    "Payload/MOTU.app/screen-med/maps/Fake.map", a)
+                archive.writestr(
+                    "Payload/MOTU.app/screen-xlarge/maps/Fake.map", b)
+            report = compare_screen_pair(ipa, "Fake.map")
+            self.assertFalse(report["exact_map_bytes_match"])
+            self.assertTrue(report["collision_inventory_match"])
+
+    def test_missing_second_screen_pack_rejected(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "fake.ipa"
+            with zipfile.ZipFile(ipa, "w") as archive:
+                archive.writestr(
+                    "Payload/MOTU.app/screen-med/maps/Fake.map", sample())
+            with self.assertRaises(ValueError):
+                compare_screen_pair(ipa, "Fake.map")
+
+    def test_cli_screen_pair_report_remains_private(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "synthetic.ipa"
+            with zipfile.ZipFile(ipa, "w") as archive:
+                for screen in ("screen-med", "screen-xlarge"):
+                    archive.writestr(
+                        f"Payload/MOTU.app/{screen}/maps/Fake.map", sample())
+            out = Path.cwd() / "local_reports" / "synthetic-screen-pair-test.json"
+            try:
+                self.assertEqual(main(["--ipa", str(ipa), "--map", "Fake.map",
+                                       "--out", str(out),
+                                       "--compare-screens"]), 0)
+                result = json.loads(out.read_text())
+                self.assertTrue(result["exact_map_bytes_match"])
+                self.assertNotIn("tile_ids", result)
+            finally:
+                out.unlink(missing_ok=True)
 
     def test_private_output_only(self):
         for name in ("README.json", "docs/report.json",
