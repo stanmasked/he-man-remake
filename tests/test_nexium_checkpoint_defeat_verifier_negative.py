@@ -256,6 +256,35 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing real D-pad"):
             self.evaluate()
 
+    def test_false_release_right_still_held_is_rejected(self):
+        log_path = self.dir / "raster-runner.log"
+        log = log_path.read_text()
+        old = "HEMAN_CHECKPOINT_DEFEAT_HID frame=66 buttons=\n"
+        self.assertIn(old, log)
+        log_path.write_text(log.replace(old,
+            "HEMAN_CHECKPOINT_DEFEAT_HID frame=66 buttons=DRIGHT\n"))
+        with self.assertRaisesRegex(ValueError, "Missing real D-pad"):
+            self.evaluate()
+
+    def test_release_with_suffix_in_log_line_is_rejected(self):
+        log_path = self.dir / "raster-runner.log"
+        log = log_path.read_text()
+        old = "HEMAN_CHECKPOINT_DEFEAT_HID frame=66 buttons=\n"
+        self.assertIn(old, log)
+        log_path.write_text(log.replace(old,
+            "HEMAN_CHECKPOINT_DEFEAT_HID frame=66 buttons= extra\n"))
+        with self.assertRaisesRegex(ValueError, "Missing real D-pad"):
+            self.evaluate()
+
+    def test_capture_log_with_fake_prefix_is_rejected(self):
+        path = self.dir / "raster-runner.log"
+        original = path.read_text()
+        anchor = "HEMAN_GUEST_FRAME_PNG frame=121 "
+        self.assertIn(anchor, original)
+        path.write_text(original.replace(anchor, "bogus " + anchor))
+        with self.assertRaisesRegex(ValueError, "Missing actual guest capture"):
+            self.evaluate()
+
     def test_missing_runner_log_rejected(self):
         (self.dir / "raster-runner.log").unlink()
         with self.assertRaises(FileNotFoundError):

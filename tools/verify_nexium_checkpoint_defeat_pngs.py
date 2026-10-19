@@ -98,12 +98,16 @@ def verify(folder: Path) -> dict:
     # cannot occur before the next 30-frame cooldown.
     if any(snapshots[t][0] not in (2, 3) for t in DENSE if t > recovery):
         raise ValueError("Player lost multiple HP immediately after recovery")
+    # Reject a spoofed release: "buttons=DRIGHT" has the prefix
+    # "buttons=" but is NOT the requested fully released controller.
     log = (folder / "raster-runner.log").read_text()
+    log_lines = set(log.splitlines())
     for frame in FRAMES:
-        if f"HEMAN_GUEST_FRAME_PNG frame={frame} " not in log:
+        if not any(line.startswith(f"HEMAN_GUEST_FRAME_PNG frame={frame} ")
+                   for line in log_lines):
             raise ValueError(f"Missing actual guest capture log for {frame}")
     for frame, action in HID_EVENTS:
-        if f"HEMAN_CHECKPOINT_DEFEAT_HID frame={frame} {action}" not in log:
+        if f"HEMAN_CHECKPOINT_DEFEAT_HID frame={frame} {action}" not in log_lines:
             raise ValueError(f"Missing real D-pad checkpoint event at {frame}")
 
     return {
