@@ -155,7 +155,7 @@ class CheckpointSwordTests(unittest.TestCase):
 
     def test_incorrect_respawn_x_rejected(self):
         self.pixels[123].x = 125.5
-        with self.assertRaisesRegex(ValueError, "activated checkpoint"):
+        with self.assertRaisesRegex(ValueError, "missed checkpoint recovery"):
             self.result()
 
     def test_missing_death_frame_rejected(self):
