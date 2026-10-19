@@ -56,9 +56,12 @@ executes the unchanged production verifier on 19 source-only scenarios:
 one valid transition and 18 intentionally corrupted outcomes. The fake
 image decoder is never a substitute for real NeXium guest evidence.
 
-The pinned NeXium guest frame evidence from failing workflow 39299874720
-confirmed the activation position is precisely **world x=90**, not the
-original estimated 92. Frame 122 displays 0 HP, frame 123 shows 3 HP
+Two independent pinned NeXium guest runs (39299874720 and
+39303499444) captured **world x=90 or x=92 before death**, depending on
+whether 20 or 21 actual D-pad ticks were delivered. Both produced
+**native recovery at exactly world x=90**. The verifier permits only
+those two predeath positions, requires the player to remain stationary
+before defeat, and enforces the checkpoint's exact recovery position. Frame 122 displays 0 HP, frame 123 shows 3 HP
 and the native respawn counter, and frame 124 displays 2 HP after a
 new contact. The first observed failure was the too-strict old x=92 expectation;
 the corrected current-head CI must pass independently.
