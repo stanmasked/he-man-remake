@@ -11,7 +11,7 @@ from instrument_nexium_frames import instrument as instrument_frames
 
 FRAMES = (62, 90, 160, 220)
 RIGHT_PRESS_FRAME = 80
-RIGHT_RELEASE_FRAME = 145
+RIGHT_RELEASE_FRAME = 120
 
 
 def instrument(source: str) -> str:
@@ -26,7 +26,7 @@ def instrument(source: str) -> str:
         if output.count(anchor) != 1:
             raise ValueError("Pinned frame receiver insertion point missing")
         events = (
-            "if matches!(frames, 80 | 145) {",
+            "if matches!(frames, 80 | 120) {",
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             '    let action = if frames == 80 { "buttons=DRIGHT" } else { "buttons=" };',
             '    std::fs::write(&path, action)?;',
