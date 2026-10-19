@@ -19,15 +19,18 @@ from exactly the same C99 physics, combat, session and raster sources.
 | 123 | Captured native 3-HP automatic checkpoint respawn in prior run |
 | 133 | X pressed — first sword attack after natural respawn |
 | 140 | X released |
-| 153 | X pressed — second sword attack after cooldown |
-| 160 | X released |
+| 149 | X pressed — second sword attack after cooldown |
+| 156 | X released |
 
 Both X presses deliberately occur **after** the 116–130 dense death-window
 captures. The previous first press at frame 129 risked damaging the enemy
 before frame 130, contradicting the verifier's full enemy-HP invariant
 through natural death/recovery even if guest combat worked correctly.
-The revised presses are at frames 133 and 153 (20 frames apart, beyond
-the 15-frame sword cooldown).
+The revised presses are at frames 133 and 149 (16 frames apart, beyond
+the 15-frame sword cooldown). The second attack is intentionally before
+roughly frame 153–154, when 30-frame contact immunity can end after
+the new hit at frame 123–124. This avoids an input-versus-contact
+ordering race without changing the game engine.
 
 Guest PNG captures are scheduled at 30, 80, 105, every frame 116–130,
 140, 160, and 185. The verifier *discovers* the death frame within
