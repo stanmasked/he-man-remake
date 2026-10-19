@@ -49,6 +49,15 @@ static hm_combat_config make_combat(void) {
     c.contact_range=9.0f;c.enemy_initial_hp=2u;
     c.player_initial_hp=3u;c.sword_cooldown_frames=15u;
     c.hurt_cooldown_frames=45u;
+#ifdef HM_ATTACK_PROBE
+    /* A dedicated combat-distance scenario for real input / HUD testing.
+       Only the opt-in attack NRO uses it. The actual combat rules, core
+       gameplay transition and rendering are completely unmodified. */
+    c.patrol_left=66.0f;
+    c.patrol_right=74.0f;
+    c.enemy_start_x=68.0f;
+    c.enemy_speed=8.0f;
+#endif
     return c;
 }
 
