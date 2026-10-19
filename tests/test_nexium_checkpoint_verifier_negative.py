@@ -233,6 +233,14 @@ class CheckpointGuestVerifierTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Missing real NeXium checkpoint HID"):
             self.evaluate()
 
+    def test_capture_log_prefixed_with_unrelated_text_is_rejected(self):
+        original = self.log.read_text()
+        anchor = "HEMAN_GUEST_FRAME_PNG frame=145 "
+        self.assertIn(anchor, original)
+        self.log.write_text(original.replace(anchor, "bogus " + anchor))
+        with self.assertRaisesRegex(ValueError, "Missing true guest framebuffer"):
+            self.evaluate()
+
     def test_missing_runner_log_fails_closed(self):
         self.log.unlink()
         with self.assertRaises(FileNotFoundError):
