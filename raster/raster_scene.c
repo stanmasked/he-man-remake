@@ -193,6 +193,20 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
         rect(pixels,stride,marker_x,47,12,16,UINT32_C(0xffff00ff));
     }
 
+    /* Fixed guest-HUD world-y ruler. Camera follows the hero vertically,
+       so sprite screen Y alone is not proof that D-pad A caused a jump.
+       The cyan marker is driven only by world-space player foot Y, and
+       cannot be moved by enemy patrol, backgrounds or moving camera. */
+    rect(pixels,stride,468,76,22,257,UINT32_C(0xff283d51));
+    {
+        float pos = s->player.feet_y - 272.0f;
+        int marker_y;
+        if (pos < -210.0f) pos = -210.0f;
+        if (pos > 20.0f) pos = 20.0f;
+        marker_y = 298 + (int)floorf(pos + 0.5f);
+        rect(pixels,stride,472,marker_y,14,9,UINT32_C(0xffffff00));
+    }
+
     /* Readable top HUD. Health ticks are clamped to the configured maximum. */
     rect(pixels,stride,0,0,HM_RASTER_WIDTH,38,UINT32_C(0xff1b2c46));
     for (col=0u;col<view->combat->player_initial_hp && col<20u;++col)
