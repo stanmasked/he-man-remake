@@ -58,6 +58,17 @@ static hm_combat_config make_combat(void) {
     c.enemy_start_x=68.0f;
     c.enemy_speed=8.0f;
 #endif
+#ifdef HM_DAMAGE_PROBE
+    /* Dedicated no-input contact-damage/respawn encounter.
+       Keep the actual combat and respawn engines unchanged. At 60 Hz,
+       contact damage occurs at frames 1, 31 and 61, then native
+       defeat recovery restores both subsystems on frame 62. */
+    c.patrol_left=46.0f;
+    c.patrol_right=54.0f;
+    c.enemy_start_x=50.0f;
+    c.enemy_speed=8.0f;
+    c.hurt_cooldown_frames=30u;
+#endif
     return c;
 }
 
