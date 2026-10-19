@@ -13,16 +13,19 @@ FRAMES = (30, 80, 105, *range(116, 131), 140, 160, 185)
 # The second X press must precede the next 30-frame contact hit
 # after recovery (~frame 153/154), to verify a clean victory rather
 # than the exact scheduler race between sword and enemy contact.
-# Keep both X presses strictly AFTER the dense 116..130 death/recovery
-# evidence: an early attack would make the truthful enemy-HP=2 invariant
-# through frame 130 contradict the very action being tested.
+# Keep both X presses strictly AFTER dense 116..130 death/recovery
+# evidence. The 2026-10-19 NeXium trace showed HP=2->1 by frame 140,
+# but the former 133/149 schedule missed the second hit: frame 160 had
+# player/enemy HP=1/1, followed by another respawn. Advance the first X
+# edge and allow 17 received-frame intervals before the second edge;
+# do not relax the guest PNG verifier or modify native combat rules.
 HID_EVENTS = (
     (45, "buttons=DRIGHT"),
     (66, "buttons="),
-    (133, "buttons=X"),
-    (140, "buttons="),
-    (149, "buttons=X"),
-    (156, "buttons="),
+    (131, "buttons=X"),
+    (138, "buttons="),
+    (148, "buttons=X"),
+    (155, "buttons="),
 )
 
 
@@ -38,11 +41,11 @@ def instrument(source: str) -> str:
         if output.count(anchor) != 1:
             raise ValueError("Expected unique pinned NeXium frame receiver")
         events = (
-            "if matches!(frames, 45 | 66 | 133 | 140 | 149 | 156) {",
+            "if matches!(frames, 45 | 66 | 131 | 138 | 148 | 155) {",
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             '    let action = match frames {',
             '        45 => "buttons=DRIGHT",',
-            '        133 | 149 => "buttons=X",',
+            '        131 | 148 => "buttons=X",',
             '        _ => "buttons=",',
             '    };',
             '    std::fs::write(&path, action)?;',
