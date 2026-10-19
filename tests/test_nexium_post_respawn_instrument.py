@@ -40,7 +40,7 @@ class PostRespawnRunnerTests(unittest.TestCase):
         self.assertEqual(rust.count("HEMAN_RESPAWN_HID frame="), 2)
         self.assertEqual(rust.count(
             "matches!(frames, 62 | 90 | 160 | 220)"), 2)
-        self.assertEqual(rust.count("matches!(frames, 80 | 145)"), 2)
+        self.assertEqual(rust.count("matches!(frames, 80 | 120)"), 2)
         self.assertEqual(rust.count("buttons=DRIGHT"), 2)
         self.assertEqual(rust.count("buttons="), 4)
 
