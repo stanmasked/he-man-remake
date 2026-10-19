@@ -97,6 +97,37 @@ def scan_local_ipa(ipa: Path, name: str, screen: str = "screen-med") -> dict:
     return {"map": name, "screen": screen, **summarize_collision_layer(parsed)}
 
 
+
+def compare_screen_pair(ipa: Path, name: str) -> dict:
+    """Check exact screen-med versus screen-xlarge .map bytes, privately.
+
+    Matching aggregate statistics alone can hide different cell placement,
+    so exact source-byte equality is an independent, stricter gate.
+    """
+    med = scan_local_ipa(ipa, name, "screen-med")
+    large = scan_local_ipa(ipa, name, "screen-xlarge")
+    with zipfile.ZipFile(ipa, "r") as archive:
+        paths = (
+            f"Payload/MOTU.app/screen-med/maps/{name}",
+            f"Payload/MOTU.app/screen-xlarge/maps/{name}",
+        )
+        a, b = (archive.read(filename) for filename in paths)
+    same_inventory = ({k: v for k, v in med.items() if k != "screen"} ==
+                      {k: v for k, v in large.items() if k != "screen"})
+    return {
+        "map": name,
+        "screen_pair": ["screen-med", "screen-xlarge"],
+        "exact_map_bytes_match": a == b,
+        "collision_inventory_match": same_inventory,
+        "screen_med_occupied_cells": med["occupied_cells"],
+        "screen_xlarge_occupied_cells": large["occupied_cells"],
+        "interpretation": (
+            "Byte equality and occupancy summary agreement are structural "
+            "checks only; neither establishes original collision semantics."
+        ),
+    }
+
+
 def private_output_path(path: Path) -> Path:
     """Require an ignored local_reports JSON path, not a tracked repository file."""
     local_root = Path.cwd() / "local_reports"
@@ -116,14 +147,25 @@ def main(argv=None) -> int:
     parser.add_argument("--screen", choices=("screen-med", "screen-xlarge"),
                         default="screen-med")
     parser.add_argument("--out", required=True, type=Path)
+    parser.add_argument("--compare-screens", action="store_true",
+                        help="check same map in both iOS screen resource packs")
     args = parser.parse_args(argv)
     out = private_output_path(args.out)
-    report = scan_local_ipa(args.ipa, args.name, args.screen)
+    if args.compare_screens:
+        if args.screen != "screen-med":
+            parser.error("--screen is not used with --compare-screens")
+        report = compare_screen_pair(args.ipa, args.name)
+    else:
+        report = scan_local_ipa(args.ipa, args.name, args.screen)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n",
                    encoding="utf-8")
-    print(f"Analysed {report['occupied_cells']} candidate cells; "
-          "details saved privately under local_reports/")
+    if args.compare_screens:
+        print("Compared both private screen map packs; "
+              "structural result saved under local_reports/")
+    else:
+        print(f"Analysed {report['occupied_cells']} candidate cells; "
+              "details saved privately under local_reports/")
     return 0
 
 
