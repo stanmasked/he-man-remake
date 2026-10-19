@@ -108,8 +108,8 @@ class CheckpointSwordTests(unittest.TestCase):
         result = instrument(UPSTREAM)
         self.assertEqual(result.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
         self.assertEqual(result.count("HEMAN_CHECKPOINT_SWORD_HID frame="), 2)
-        self.assertEqual(result.count("matches!(frames, 45 | 66 | 133 | 140 | 153 | 160)"), 2)
-        self.assertEqual(HID_EVENTS[-1], (160, "buttons="))
+        self.assertEqual(result.count("matches!(frames, 45 | 66 | 133 | 140 | 149 | 156)"), 2)
+        self.assertEqual(HID_EVENTS[-1], (156, "buttons="))
         with self.assertRaises(ValueError):
             instrument(result)
 
@@ -123,7 +123,19 @@ class CheckpointSwordTests(unittest.TestCase):
         self.assertGreater(first, max(DENSE))
         self.assertGreaterEqual(second - first, 15)
         self.assertLess(first, 140)
-        self.assertLess(second, 160)
+        # The recovered hero was hit at ~frame 124; its 30-frame
+        # immunity can expire around frame 154. The second X must
+        # arrive early enough to kill the enemy before another hit.
+        self.assertLessEqual(second, 150)
+
+    def test_sword_release_and_repress_before_next_contact(self):
+        events = list(HID_EVENTS)
+        self.assertEqual([frame for frame, button in events
+                          if button == "buttons=X"], [133, 149])
+        self.assertEqual([frame for frame, button in events
+                          if button == "buttons=" and frame > 100], [140, 156])
+        self.assertLess(events[-2][0], 153)
+        self.assertEqual(events, sorted(events))
 
     def test_original_rgba_pixels_exact(self):
         for value, expected in (
@@ -205,10 +217,10 @@ class CheckpointSwordTests(unittest.TestCase):
     def test_fake_x_release_still_held_rejected(self):
         log = self.path / "raster-runner.log"
         t = log.read_text()
-        self.assertIn("HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=\n", t)
+        self.assertIn("HEMAN_CHECKPOINT_SWORD_HID frame=156 buttons=\n", t)
         log.write_text(t.replace(
-            "HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=\n",
-            "HEMAN_CHECKPOINT_SWORD_HID frame=160 buttons=X\n"
+            "HEMAN_CHECKPOINT_SWORD_HID frame=156 buttons=\n",
+            "HEMAN_CHECKPOINT_SWORD_HID frame=156 buttons=X\n"
         ))
         with self.assertRaisesRegex(ValueError, "Missing exact real NeXium HID"):
             self.result()
