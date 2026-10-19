@@ -210,3 +210,19 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_post_respawn_sword_raster.c" \
   -lm -o "$TMP/test_post_respawn_sword_raster"
 "$TMP/test_post_respawn_sword_raster"
+
+
+# Stage 048: activate a synthetic checkpoint away from spawn, suffer real
+# contact defeat, recover at that checkpoint, defeat the contact enemy, then
+# trigger a hazard and verify the next native respawn uses the checkpoint.
+# Examine checkpoint flag, world-X marker, HP and respawn HUD pixels.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_checkpoint_respawn_combat_raster.c" \
+  -lm -o "$TMP/test_checkpoint_respawn_combat_raster"
+"$TMP/test_checkpoint_respawn_combat_raster"
