@@ -129,6 +129,20 @@ class CheckpointSwordTests(unittest.TestCase):
         self.assertEqual(data["enemy_health_after_each_attack"], [1, 0])
         self.assertEqual(data["hero_health_after_victory"], 2)
 
+    def test_genuine_21_step_checkpoint_approach(self):
+        # Actual pinned NeXium runs vary by one D-pad tick before release.
+        for frame in FRAMES:
+            if frame != 30 and frame <= 122:
+                self.pixels[frame].x = 209.5
+        result = self.result()
+        self.assertEqual(result["native_recovery_frame"], 123)
+        self.assertEqual(result["enemy_health_after_each_attack"], [1, 0])
+
+    def test_unexpected_predeath_input_drift_is_rejected(self):
+        self.pixels[118].x = 209.5
+        with self.assertRaisesRegex(ValueError, "moved before death"):
+            self.result()
+
     def test_enemy_has_not_taken_first_sword_hit(self):
         self.pixels[140].enemy = 2
         with self.assertRaisesRegex(ValueError, "invalid combat/respawn HP"):
