@@ -226,3 +226,17 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_checkpoint_respawn_combat_raster.c" \
   -lm -o "$TMP/test_checkpoint_respawn_combat_raster"
 "$TMP/test_checkpoint_respawn_combat_raster"
+
+
+# Stage 052: same-core synthetic checkpoint contact death, next-frame
+# recovery, then two real C99 sword strikes against live rendered HP HUD.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_checkpoint_postdefeat_sword_raster.c" \
+  -lm -o "$TMP/test_checkpoint_postdefeat_sword_raster"
+"$TMP/test_checkpoint_postdefeat_sword_raster"
