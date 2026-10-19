@@ -133,6 +133,21 @@ class CheckpointNaturalDeathEvidenceTests(unittest.TestCase):
         self.assertEqual(result["native_death_frame"], 120)
         self.assertEqual(result["respawn_world_x"], 205.5)
 
+    def test_real_nexium_22_step_approach_is_valid(self):
+        # The third genuine NeXium archive measured world x=94,
+        # then exact x=90 after automatic respawn.
+        for frame in FRAMES:
+            if frame != 30 and frame <= 120:
+                self.images[frame].center = 213.5
+        result = self.evaluate()
+        self.assertEqual(result["native_death_frame"], 120)
+        self.assertEqual(result["respawn_world_x"], 205.5)
+
+    def test_approach_outside_plausible_tick_window_rejected(self):
+        self.images[80].center = 245.5
+        with self.assertRaisesRegex(ValueError, "Unexpected predeath D-pad"):
+            self.evaluate()
+
     def test_player_drift_before_defeat_is_rejected(self):
         self.images[118].center = 209.5
         with self.assertRaisesRegex(ValueError, "moved away from enemy"):
