@@ -144,7 +144,7 @@ class PostVictoryGuestTests(unittest.TestCase):
 
     def test_enemy_falsely_hit_before_postvictory_X_rejected(self):
         self.pixels[204].enemy = 1
-        with self.assertRaisesRegex(ValueError, "before first post-B X"):
+        with self.assertRaisesRegex(ValueError, "before post-B sword"):
             self.evidence()
 
     def test_first_postvictory_X_missed_rejected(self):
