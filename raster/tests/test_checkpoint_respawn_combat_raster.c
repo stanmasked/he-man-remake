@@ -27,6 +27,9 @@ static void render_assert(const hm_raster_view *view,
                           uint32_t respawns, uint32_t player_x) {
     uint32_t i;
     uint32_t marker_x = 20u + 2u * player_x + 5u;
+    /* Flag is in world coordinates; at x=104 the hero overlays its
+       center, so sample the still-visible left edge instead. */
+    uint32_t checkpoint_flag_x = player_x == 104u ? 187u : 190u;
     const hm_session *s = view->game;
     assert(s->combat.player_hp == hp);
     assert(s->combat.enemy_hp == enemy_hp);
@@ -50,7 +53,7 @@ static void render_assert(const hm_raster_view *view,
            (respawns ? UINT32_C(0xff42d58a) : UINT32_C(0xff283d51)));
     /* World checkpoint flag changes yellow to green only on activation.
        Sample the flag between the hero's head/body and sword at x=190. */
-    assert(pixels[250u * WIDTH + 190u] == UINT32_C(0xff77e4a6));
+    assert(pixels[250u * WIDTH + checkpoint_flag_x] == UINT32_C(0xff77e4a6));
 }
 
 static void step_ok(const hm_world *w, const hm_combat_config *c,
