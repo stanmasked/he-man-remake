@@ -1,0 +1,212 @@
+name: Patched NeXium genuine HM_EXIT CLEAR through D-pad visual proof
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nexium-patched-exit-clear.yml'
+      - 'tools/instrument_nexium_exit_clear.py'
+      - 'tools/instrument_nexium_hid.py'
+      - 'tools/verify_nexium_exit_clear_pngs.py'
+      - 'tests/test_nexium_exit_clear.py'
+      - 'tools/instrument_nexium_frames.py'
+      - 'tools/verify_nexium_guest_pngs.py'
+      - 'patches/nexium-nro-segment-file-origin.patch'
+      - 'switch_minimal/**'
+      - 'switch_raster/**'
+      - 'raster/**'
+      - 'native/src/**'
+      - 'native/include/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-genuine-nros:
+    name: Cross-build real asset-free guest files
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build independent homebrew probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make -C switch_minimal clean all
+          make -C switch_raster clean all TARGET=heman_exit_probe EXIT_PROBE=1
+          mkdir -p nros
+          cp switch_minimal/heman_minimal_guest_probe.nro nros/
+          cp switch_raster/heman_exit_probe.nro nros/
+          sha256sum nros/*.nro
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-headless-probe-nros
+          path: nros/*.nro
+          if-no-files-found: error
+          retention-days: 7
+
+  headless-guest-runner:
+    name: Compile patched NeXium and execute guest CPU/runner
+    needs: build-genuine-nros
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      RUST_BACKTRACE: "1"
+      NEXIUM_CPU_BACKEND: rustarmic
+      NEXIUM_DEBUG_RUNNER_SECONDS: "16"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: heman-headless-probe-nros
+          path: nros
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux development dependencies used by NeXium
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libgtk-3-dev libasound2-dev libpulse-dev libudev-dev libdbus-1-dev \
+            libibus-1.0-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev \
+            libboost-dev libvulkan1 mesa-vulkan-drivers python3-pil
+      - name: Clone and patch exactly pinned upstream NeXium
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nexium-upstream
+          git -C /tmp/nexium-upstream init -q
+          git -C /tmp/nexium-upstream remote add origin https://github.com/nexium-emu/nexium.git
+          git -C /tmp/nexium-upstream fetch --depth 1 origin b6149f647f1b0824e450555beb6cfc16b6f0e075
+          git -C /tmp/nexium-upstream checkout -q --detach FETCH_HEAD
+          git -C /tmp/nexium-upstream submodule update --init --depth 1
+          git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
+          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_exit_clear.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
+          # The new PNGs are guest frame_rx output, not Xvfb splash screenshots.
+      - name: Compile genuine patched upstream debug_boot program
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          cargo build -p nexium-gui --bin debug_boot --no-default-features --features backend-rustarmic
+          test -x target/debug/debug_boot
+          cp target/debug/debug_boot "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+          sha256sum "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+      - name: Run bare libnx app with patched AArch64 CPU backend
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/minimal-debug-boot.log"
+          export RUST_LOG="info,wgpu_core=warn"
+          NRO="$PWD/nros/heman_minimal_guest_probe.nro"
+          set +e
+          timeout --kill-after=6s 85s boot-evidence/debug_boot "$NRO" rustarmic \
+            >boot-evidence/minimal-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/minimal-exit-status.txt
+          tail -n 80 boot-evidence/minimal-debug-boot.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Patched guest CPU boot failed with exit code $code" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/minimal-debug-boot.log").read_text()
+          for marker in ("Boot context initialized", "Initial PC:"):
+              if marker not in log:
+                  raise SystemExit(f"Missing critical guest boot evidence: {marker}")
+          cycles = re.search(r"Total cycles:\s*(\d+)", log)
+          svcs = re.search(r"Total SVCs:\s*(\d+)", log)
+          if not cycles or not svcs:
+              raise SystemExit("Guest CPU/SVC totals were not recorded")
+          print("Minimal NRO retired instructions:", cycles.group(1))
+          print("Minimal NRO system calls:", svcs.group(1))
+          if int(cycles.group(1)) <= 0 or int(svcs.group(1)) <= 0:
+              raise SystemExit("No real CPU/SVC progress after NeXium boot")
+          print("PASS: patched NeXium executed minimal guest instructions")
+          PY
+      - name: Run graphical probe using patched production runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          export RUST_LOG="info,wgpu_core=warn"
+          NRO="$PWD/nros/heman_exit_probe.nro"
+          set +e
+          timeout --kill-after=6s 95s boot-evidence/debug_boot "$NRO" rustarmic runner \
+            >boot-evidence/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/raster-exit-status.txt
+          tail -n 100 boot-evidence/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Patched graphical guest execution failed (status $code)" >&2
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/raster-runner.log").read_text()
+          if "Production runner complete" not in log:
+              raise SystemExit("Runner never completed")
+          matches = re.findall(r"cycles=(\d+) svcs=(\d+) frames=(\d+)", log)
+          if not matches:
+              raise SystemExit("No periodic guest execution reports")
+          cycles = max(int(x[0]) for x in matches)
+          svcs = max(int(x[1]) for x in matches)
+          print(f"Patched guest ran: cycles={cycles}, svcs={svcs}")
+          if cycles == 0 or svcs == 0:
+              raise SystemExit("No CPU cycles/SVCs: cannot claim guest execution")
+          frames = re.search(r"Production runner complete: frames=(\d+)", log)
+          print("Runner guest frames:", int(frames.group(1)) if frames else "unknown")
+          print("PASS: patched NeXium executed actual homebrew CPU instructions")
+          PY
+      - name: Verify native HM_EXIT completion badge from original guest PNGs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_exit_clear_pngs.py boot-evidence | tee boot-evidence/guest-exit-clear-report.json
+          sha256sum nros/heman_exit_probe.nro boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frame-sha256.txt
+      - name: Upload logs and guest PNGs even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-patched-nexium-exit-clear-logs
+          path: |
+            boot-evidence/*.log
+            boot-evidence/*status.txt
+            boot-evidence/*.png
+            boot-evidence/guest-frame*.txt
+            boot-evidence/guest-frame*.json
+            boot-evidence/guest-exit-clear-report.json
+          if-no-files-found: warn
+          retention-days: 7

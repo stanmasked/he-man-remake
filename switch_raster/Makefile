@@ -31,6 +31,10 @@ endif
 ifeq ($(CHECKPOINT_PROBE),1)
 CFLAGS += -DHM_CHECKPOINT_PROBE=1
 endif
+# Opt-in real NeXium D-pad → native HM_EXIT → visible CLEAR proof.
+ifeq ($(EXIT_PROBE),1)
+CFLAGS += -DHM_EXIT_PROBE=1
+endif
 # Opt-in checkpoint + native contact-defeat scenario for real NeXium HID.
 ifeq ($(CHECKPOINT_DEFEAT_PROBE),1)
 CFLAGS += -DHM_CHECKPOINT_PROBE=1 -DHM_CHECKPOINT_DEFEAT_PROBE=1
