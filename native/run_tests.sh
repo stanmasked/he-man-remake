@@ -197,3 +197,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_post_respawn_controls_raster.c" \
   -lm -o "$TMP/test_post_respawn_controls_raster"
 "$TMP/test_post_respawn_controls_raster"
+
+# Stage 046: rehearse real NeXium post-respawn X test against the unchanged
+# C99 game state and RGBA8888 renderer, on GCC and Clang.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_post_respawn_sword_raster.c" \
+  -lm -o "$TMP/test_post_respawn_sword_raster"
+"$TMP/test_post_respawn_sword_raster"
