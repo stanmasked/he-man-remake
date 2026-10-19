@@ -78,7 +78,7 @@ class PostVictoryGuestTests(unittest.TestCase):
         self.assertEqual(source.count("HEMAN_CHECKPOINT_SWORD_HID frame="), 2)
         self.assertEqual(source.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
         self.assertEqual(source.count(
-            "if matches!(frames, 194 | 201 | 208 | 215 | 227 | 234)"
+            "if matches!(frames, 194 | 201 | 205 | 212 | 221 | 228)"
         ), 2)
         with self.assertRaisesRegex(ValueError, "already been instrumented"):
             instrument(source)
