@@ -31,7 +31,7 @@ class FakePixels:
         self.counter = RESPAWN_OFF if frame <= 120 else RESPAWN_ON
         self.flag = FLAG_OFF if frame == 30 else FLAG_ON
         self.center = 125.5 if frame == 30 else (
-            209.5 if frame <= 120 else 205.5
+            205.5
         )
         self.markers = 192
         self.colors = 18
