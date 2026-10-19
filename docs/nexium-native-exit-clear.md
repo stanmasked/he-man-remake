@@ -2,8 +2,9 @@
 
 The **Stage 055** host raster test renders a CLEAR badge only when the
 existing native C99 physics engine sets `player.completed` in response
-to `HM_EXIT`. This draft extends that evidence into a genuine
-Nintendo Switch NRO running in the pinned NeXium emulator.
+to `HM_EXIT`. Stage 056 extends that evidence into a genuine
+Nintendo Switch NRO running in the pinned NeXium emulator, and is
+**verified and merged** as [PR #57](https://github.com/stanmasked/he-man-remake/pull/57).
 
 ## Controlled guest experiment
 
@@ -18,7 +19,7 @@ so contact damage does not interfere.
 | --- | --- |
 | 30 | Capture before input; CLEAR must be absent |
 | 45 | Genuine injected D-pad Right press |
-| 60 | Intermediate original guest frame |
+| 60 | Intermediate original guest frame; CLEAR already present |
 | 80 | Player reached native HM_EXIT; CLEAR badge must be present |
 | 105 | Release D-pad Right |
 | 120 | Capture after release; CLEAR persists |
@@ -53,8 +54,21 @@ positive/hostile tests. Those mocks themselves are **not** guest
 evidence; only the separate `nexium-patched-exit-clear.yml` job's
 real NRO, frame captures and exact input trace can prove the result.
 
-This is stacked on Stage 055 while that stage's full regression suite
-runs. Merge the parent only after all of its CI checks pass, and merge
-this experimental stage only after its own current-head authentic
-NeXium proof and Python/native tests are successful. Original user IPA,
-extracted commercial game files, keys and firmware remain private.
+## Accepted evidence (20 October 2026)
+
+The exact PR #57 head `f5e2f31` completed **15/15 GitHub Actions
+workflows successfully**, including [actual guest CLEAR proof
+#39339811505](https://github.com/stanmasked/he-man-remake/actions/runs/39339811505),
+[post-checkpoint sword proof #39339811590](https://github.com/stanmasked/he-man-remake/actions/runs/39339811590)
+and [B-retry second victory #39339811866](https://github.com/stanmasked/he-man-remake/actions/runs/39339811866).
+The accepted guest snapshots show the world-X marker at
+125.5, 185.5, 265.5, 369.5 and 369.5 pixels for frames
+30, 60, 80, 120 and 300, respectively. CLEAR is absent at frame 30
+and visible in all later snapshots. HID presses/releases are verified
+from the native NeXium guest trace, not inferred from artificial PNGs.
+
+The result proves only an **independently authored, asset-free synthetic
+Switch homebrew scenario** in a pinned emulator. It does not prove parity
+with the original iOS title or execution on physical Nintendo Switch
+hardware. Original user IPA, commercial assets, keys, private reports
+and firmware remain outside the public repository.
