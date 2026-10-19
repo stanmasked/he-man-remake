@@ -218,6 +218,14 @@ int hm_raster_render(uint32_t *pixels, uint32_t width, uint32_t height,
              col<s->combat.enemy_hp ?
              UINT32_C(0xffe1c86d):UINT32_C(0xff493b51));
 
+    /* Durable player respawn indicator, independent of enemy motion,
+       sprite overlap, camera position and animation. Empty track when
+       no respawns occurred; bright green once the *native* counter rises.
+       The test reads RGB bytes at (522,62) from real guest PNG frames. */
+    rect(pixels,stride,512,48,26,26,UINT32_C(0xff283d51));
+    if (s->player.respawns > 0u)
+        rect(pixels,stride,516,52,18,18,UINT32_C(0xff42d58a));
+
     rect(pixels,stride,480,5,152,29,
          view->qa_state==1u ? UINT32_C(0xff347f5d) :
          view->qa_state==2u ? UINT32_C(0xffaf4e54) :
