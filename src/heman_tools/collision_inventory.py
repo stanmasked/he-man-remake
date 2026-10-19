@@ -99,7 +99,10 @@ def scan_local_ipa(ipa: Path, name: str, screen: str = "screen-med") -> dict:
 
 def private_output_path(path: Path) -> Path:
     """Require an ignored local_reports JSON path, not a tracked repository file."""
-    root = (Path.cwd() / "local_reports").resolve()
+    local_root = Path.cwd() / "local_reports"
+    if local_root.is_symlink():
+        raise ValueError("local_reports must not be a symbolic link")
+    root = local_root.resolve()
     dest = path.resolve()
     if dest == root or not dest.is_relative_to(root) or dest.suffix != ".json":
         raise ValueError("output must be .json beneath local_reports/")
