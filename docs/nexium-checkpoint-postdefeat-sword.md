@@ -32,11 +32,13 @@ through frame 130 → 1 HP by frame 140 → 0 HP by frame 160, remaining
 defeated at frame 185. Player HP remains 2 after the enemy is defeated.
 
 The timing is a **test hypothesis** until the pinned patched NeXium
-workflow provides real guest framebuffer evidence. Two genuine NeXium Stage 050 runs have shown 20 or 21 D-pad steps
-before release (world-x=90 or 92); both return exactly to world-x=90 on
-recovery at frame 123. The original checkpoint death→recovery transition
-on frames 122→123 is confirmed in both saved guest captures, but a new
-X-button attack victory is not confirmed until this stage's CI passes.
+workflow provides real guest framebuffer evidence. Three genuine NeXium Stage 050 runs have shown 20, 21 or 22 D-pad
+movement ticks (world x=90, 92 or 94) before defeat. They recover exactly
+at checkpoint world x=90, but the observed death/recovery frame can
+differ by one (122→123 or 121→122). The verifier accepts only a bounded,
+physically quantized rightward approach and requires exact recovery.
+The post-recovery X-button victory remains a test hypothesis until the
+stage's own genuine NeXium workflow passes.
 
 `.github/workflows/nexium-patched-checkpoint-sword.yml` cross-builds
 a genuine devkitPro NRO and runs the pinned NeXium Rust AArch64 backend,
