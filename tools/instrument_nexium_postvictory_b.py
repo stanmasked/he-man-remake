@@ -36,7 +36,9 @@ def instrument(source: str) -> str:
     output = output.replace(original, replacement)
 
     for indent in ("            ", "        "):
-        # Anchor at a line boundary: eight spaces must not falsely match\n        # a suffix of the twelve-space guest receiver branch.\n        anchor = "\n" + indent + replacement
+        # Anchor at a line boundary: eight spaces must not falsely match
+        # a suffix of the twelve-space guest receiver branch.
+        anchor = "\n" + indent + replacement
         if output.count(anchor) != 1:
             raise ValueError("Expected one pinned guest receiver per branch")
         code = (
