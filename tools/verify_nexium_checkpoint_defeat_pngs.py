@@ -92,7 +92,8 @@ def verify(folder: Path) -> dict:
     log = (folder / "raster-runner.log").read_text()
     log_lines = set(log.splitlines())
     for frame in FRAMES:
-        if f"HEMAN_GUEST_FRAME_PNG frame={frame} " not in log:
+        if not any(line.startswith(f"HEMAN_GUEST_FRAME_PNG frame={frame} ")
+                   for line in log_lines):
             raise ValueError(f"Missing actual guest capture log for {frame}")
     for frame, action in HID_EVENTS:
         if f"HEMAN_CHECKPOINT_DEFEAT_HID frame={frame} {action}" not in log_lines:
