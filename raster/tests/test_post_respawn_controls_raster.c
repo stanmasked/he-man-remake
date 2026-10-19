@@ -72,6 +72,13 @@ int main(void) {
     for (t = 1u; t <= 110u; ++t) {
         hm_input input = {0.0f, 0u, 0u};
         uint8_t sword = (uint8_t)(t == 77u || t == 95u);
+        /* Controls held during defeat recovery must not leak into
+           the newly initialized player or restarted encounter. */
+        if (t == 62u) {
+            input.axis = -1.0f;
+            input.jump = 1u;
+            sword = 1u;
+        }
         if (t >= 63u && t <= 74u) input.axis = 1.0f;
         if (t >= 75u && t <= 76u) input.axis = -1.0f;
         assert(hm_session_step(&w, &c, &s, input, sword,
@@ -90,6 +97,8 @@ int main(void) {
             assert(s.combat.player_hp == 3u);
             assert(s.combat.player_hits == 0u);
             assert(s.combat.frame == 0u);
+            assert(s.combat.sword_hits == 0u);
+            assert(s.facing_right == 1u);
             assert(s.player.respawns == 1u);
             assert(s.player.x == 50.0f);
             expect_pixels(&v, 3u, 2u);
