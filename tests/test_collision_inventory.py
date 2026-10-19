@@ -106,6 +106,16 @@ class CollisionInventoryTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 private_output_path(Path(name))
 
+    def test_symlinked_private_root_rejected(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "public").mkdir()
+            (root / "local_reports").symlink_to(root / "public", target_is_directory=True)
+            with patch("heman_tools.collision_inventory.Path.cwd", return_value=root):
+                with self.assertRaisesRegex(ValueError, "symbolic link"):
+                    private_output_path(root / "local_reports" / "report.json")
+
     def test_cli_writes_private_json(self):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "mock.ipa"
