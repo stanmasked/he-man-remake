@@ -183,3 +183,17 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_contact_recovery_raster.c" \
   -lm -o "$TMP/test_contact_recovery_raster"
 "$TMP/test_contact_recovery_raster"
+
+
+# Stage 043: prove the same C99 hero can move, face left and defeat the
+# contact enemy after genuine next-frame respawn; assert live HUD pixels.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/raster/raster_scene.c" \
+  "$ROOT/raster/tests/test_post_respawn_controls_raster.c" \
+  -lm -o "$TMP/test_post_respawn_controls_raster"
+"$TMP/test_post_respawn_controls_raster"
