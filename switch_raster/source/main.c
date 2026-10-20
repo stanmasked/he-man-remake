@@ -19,6 +19,11 @@
 #include "dash_hud.h"
 #include "stage_marker.h"
 #include "finale_overlay.h"
+#ifdef HM_THREE_ROOM_PROBE
+#include "heman_three_room_chain.h"
+#include "heman_synthetic_room3.h"
+#include "third_room_marker.h"
+#endif
 #endif
 #include "pause_overlay.h"
 #include "probe_selfcheck.h"
@@ -75,6 +80,9 @@ static hm_world make_world(void) {
 /* The exact room-2 tiles/events/combat now come from the shared C99
    fixture, which is exercised directly by host CI before NeXium. */
 static uint8_t second_cells[HM_ROOM2_CELLS];
+#ifdef HM_THREE_ROOM_PROBE
+static uint8_t third_cells[HM_ROOM3_CELLS];
+#endif
 #endif
 
 static hm_combat_config make_combat(void) {
@@ -130,6 +138,10 @@ int main(int argc, char **argv) {
 #ifdef HM_LEVEL_CHAIN_PROBE
     hm_world second_world;
     hm_combat_config second_combat;
+#ifdef HM_THREE_ROOM_PROBE
+    hm_world third_world;
+    hm_combat_config third_combat;
+#endif
     uint8_t stage=0u;
     hm_dash_state dash={0u,0u};
 #ifdef HM_AIR_SMASH_PROBE
@@ -149,6 +161,10 @@ int main(int argc, char **argv) {
 #ifdef HM_LEVEL_CHAIN_PROBE
     if(!hm_synthetic_room2_init(&second_world,&second_combat,
                                 second_cells,HM_ROOM2_CELLS))return 2;
+#ifdef HM_THREE_ROOM_PROBE
+    if(!hm_synthetic_room3_init(&third_world,&third_combat,
+                                third_cells,HM_ROOM3_CELLS))return 2;
+#endif
 #endif
     status=hm_session_init(&world,&combat,&game);
     if(status!=HM_SESSION_OK ||
@@ -190,12 +206,34 @@ int main(int argc, char **argv) {
            patrol, damage or checkpoint timer advances while paused.
            Plus remains the standard NRO exit button. */
 #ifdef HM_LEVEL_CHAIN_PROBE
+#ifdef HM_THREE_ROOM_PROBE
+        if(hm_three_room_continue_allowed(
+                &game,stage,paused,
+                (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                (uint8_t)((down&HidNpadButton_A)!=0u))) {
+            const hm_world *next_world =
+                stage==0u?&second_world:&third_world;
+            const hm_combat_config *next_combat =
+                stage==0u?&second_combat:&third_combat;
+            if(hm_three_room_try_advance(next_world,next_combat,
+                                     &game,&stage,1u)!=HM_CHAIN_ADVANCED) {
+                status=HM_SESSION_INVALID;
+                break;
+            }
+            world=*next_world;
+            combat=*next_combat;
+            dash.remaining=0u;
+            dash.recovery=0u;
+#ifdef HM_AIR_SMASH_PROBE
+            air_smash=(hm_air_smash_state){0};
+#endif
+            status=HM_SESSION_OK;
+        } else
+#else
         if(hm_chain_continue_edge_allowed(
                 &game,stage,paused,
                 (uint8_t)((down&HidNpadButton_Minus)!=0u),
                 (uint8_t)((down&HidNpadButton_A)!=0u))) {
-            /* The CLEAR → A edge changes rooms without advancing a
-               gameplay frame, so no hidden jump/attack leaks through. */
             if(hm_chain_try_advance(&second_world,&second_combat,
                                     &game,&stage,1u)!=HM_CHAIN_ADVANCED) {
                 status=HM_SESSION_INVALID;
@@ -211,8 +249,38 @@ int main(int argc, char **argv) {
             status=HM_SESSION_OK;
         } else
 #endif
+#endif
         {
 #ifdef HM_LEVEL_CHAIN_PROBE
+#ifdef HM_THREE_ROOM_PROBE
+            if(stage==1u) {
+                /* Room 2 is no longer terminal; A at its real CLEAR
+                   advances to room 3, so no second-room FINISH here. */
+                status=hm_dash_session_step(&world,&combat,&game,&paused,
+                     &dash,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZR)!=0u),
+                     1.0f/60.0f);
+            } else if(stage==2u) {
+#ifdef HM_AIR_SMASH_PROBE
+                status=hm_air_smash_step(&world,&combat,&game,&paused,
+                     &dash,&air_smash,1u,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZR)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZL)!=0u),
+                     1.0f/60.0f);
+#else
+                status=hm_finale_session_step(&world,&combat,&game,&paused,
+                     &dash,1u,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZR)!=0u),
+                     1.0f/60.0f);
+#endif
+            } else
+#else
             if(stage==1u) {
 #ifdef HM_AIR_SMASH_PROBE
                 status=hm_air_smash_step(&world,&combat,&game,&paused,
@@ -232,6 +300,7 @@ int main(int argc, char **argv) {
 #endif
             } else
 #endif
+#endif
             {
                 status=hm_paused_session_step(&world,&combat,&game,&paused,input,
                      (uint8_t)((down&HidNpadButton_X)!=0u),
@@ -248,17 +317,35 @@ int main(int argc, char **argv) {
            (paused && !hm_pause_overlay(pixels,HM_RASTER_WIDTH,
                      HM_RASTER_HEIGHT,stride/sizeof(uint32_t)))
 #ifdef HM_LEVEL_CHAIN_PROBE
+#ifdef HM_THREE_ROOM_PROBE
+           || !hm_three_room_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                                    stride/sizeof(uint32_t),stage)
+#else
            || !hm_stage_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                                stride/sizeof(uint32_t),stage)
-           || (stage==1u &&
+#endif
+           || (stage>=1u &&
                !hm_dash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                             stride/sizeof(uint32_t),&dash))
+#ifdef HM_THREE_ROOM_PROBE
+           || (stage==2u &&
+               !hm_finale_overlay(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                        stride/sizeof(uint32_t),1u,
+                        (uint8_t)(game.player.completed!=0u),paused))
+#else
            || (stage==1u &&
                !hm_finale_overlay(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                         stride/sizeof(uint32_t),stage,
                         (uint8_t)(game.player.completed!=0u),paused))
+#endif
 #ifdef HM_AIR_SMASH_PROBE
-           || (stage==1u &&
+           || (
+#ifdef HM_THREE_ROOM_PROBE
+               stage==2u
+#else
+               stage==1u
+#endif
+               &&
                !hm_air_smash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                         stride/sizeof(uint32_t),&air_smash))
 #endif
