@@ -24,7 +24,7 @@ int main(void) {
     assert(guard.pixels[4u*STRIDE+393u]==CANARY);
     assert(hm_stage_marker(guard.pixels,W,H,STRIDE,0u)==1);
     assert(guard.pixels[4u*STRIDE+393u]==UINT32_C(0xffe1c86d));
-    assert(guard.pixels[15u*STRIDE+404u]==UINT32_C(0xff354967));
+    assert(guard.pixels[10u*STRIDE+404u]==UINT32_C(0xff354967));
     assert(guard.pixels[9u*STRIDE+408u]==UINT32_C(0xfff1e6bf)); /* 1 top center */
     assert(guard.pixels[9u*STRIDE+404u]==UINT32_C(0xff354967));
     assert(hm_stage_marker(guard.pixels,W,H,STRIDE,1u)==1);
