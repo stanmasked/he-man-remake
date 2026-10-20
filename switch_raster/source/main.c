@@ -257,6 +257,11 @@ int main(int argc, char **argv) {
                !hm_finale_overlay(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                         stride/sizeof(uint32_t),stage,
                         (uint8_t)(game.player.completed!=0u),paused))
+#ifdef HM_AIR_SMASH_PROBE
+           || (stage==1u &&
+               !hm_air_smash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                        stride/sizeof(uint32_t),&air_smash))
+#endif
 #endif
            ) {
             if(pixels)framebufferEnd(&fb);
