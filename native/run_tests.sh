@@ -321,3 +321,28 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_dash_hud.c" \
   -lm -o "$TMP/test_dash_hud"
 "$TMP/test_dash_hud"
+
+
+# Stage 083: final synthetic second-room exit freezes native C99 session,
+# while B resets the room and pause/invalid inputs cannot leak a game tick.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_pause.c" \
+  "$ROOT/native/src/heman_dash.c" \
+  "$ROOT/native/src/heman_finale.c" \
+  "$ROOT/native/tests/test_finale.c" \
+  -lm -o "$TMP/test_finale"
+"$TMP/test_finale"
+
+# Draw actual FINISH status from native terminal state, without affecting
+# framebuffer row padding or claiming source-game victory semantics.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/raster" \
+  "$ROOT/raster/finale_overlay.c" \
+  "$ROOT/raster/tests/test_finale_overlay.c" \
+  -lm -o "$TMP/test_finale_overlay"
+"$TMP/test_finale_overlay"

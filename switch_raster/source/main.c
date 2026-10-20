@@ -11,8 +11,10 @@
 #include "heman_stage_chain.h"
 #include "heman_synthetic_room2.h"
 #include "heman_dash.h"
+#include "heman_finale.h"
 #include "dash_hud.h"
 #include "stage_marker.h"
+#include "finale_overlay.h"
 #endif
 #include "pause_overlay.h"
 #include "probe_selfcheck.h"
@@ -202,8 +204,9 @@ int main(int argc, char **argv) {
         {
 #ifdef HM_LEVEL_CHAIN_PROBE
             if(stage==1u) {
-                status=hm_dash_session_step(&world,&combat,&game,&paused,
-                     &dash,input,(uint8_t)((down&HidNpadButton_X)!=0u),
+                status=hm_finale_session_step(&world,&combat,&game,&paused,
+                     &dash,stage,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
                      (uint8_t)((down&HidNpadButton_Minus)!=0u),
                      (uint8_t)((down&HidNpadButton_ZR)!=0u),
                      1.0f/60.0f);
@@ -230,6 +233,10 @@ int main(int argc, char **argv) {
            || (stage==1u &&
                !hm_dash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                             stride/sizeof(uint32_t),&dash))
+           || (stage==1u &&
+               !hm_finale_overlay(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                        stride/sizeof(uint32_t),stage,
+                        (uint8_t)(game.player.completed!=0u),paused))
 #endif
            ) {
             if(pixels)framebufferEnd(&fb);

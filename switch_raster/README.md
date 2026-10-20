@@ -141,3 +141,46 @@ This is a new synthetic ability, **not** part of the iOS game's
 confirmed rules. Guest-level verification still requires a dedicated
 NeXium ZR press/capture run; host tests and NRO compilation alone do
 not prove controller behavior in the emulator or on hardware.
+
+
+## Stage 083: two-room synthetic victory and deliberate restart
+
+The optional `CHAIN_PROBE=1` Nintendo Switch graphical NRO now has a
+terminal **FINISH** state once room 2 earns its own genuine C99 `HM_EXIT`.
+A center-panel source-authored bitmap glyph overlay is displayed only
+after that event. It is not shown merely because the player reached room 2.
+
+At final completion, directional movement, A jump, X attack and ZR dash no
+longer advance the portable physics, combat, cooldowns or camera.
+**Minus** still toggles pause, taking precedence over simultaneous B.
+After resuming, pressing **B** explicitly retries the second room,
+resetting the player, HP, enemy and dash timers in one accepted transition.
+The first room's CLEAR to second-room A transition and the standard
+single-room NRO remain unchanged.
+
+The same native function used by the two-stage NRO is compiled and
+executed on host GCC/Clang. The test reaches final completion through
+a real native C99 `HM_EXIT` event, then verifies 90 frozen frames,
+pause precedence, invalid-input rollback, B restart, restored HP and
+genuine simulation progress after retry. The overlay has an independent
+pixel/color test including rejection-before-write and padding canaries.
+
+Source assets and original iOS physics are **not** represented. A host
+pass and NRO cross-compilation do not by themselves prove a real NeXium
+controller or screen capture.
+
+### Video reference research (not source-faithfulness proof)
+
+Public reference footage available as of October 2026:
+
+- iGamesView, 2012 iPhone/iPad gameplay:
+  https://www.youtube.com/watch?v=veD5dGUZ7cs
+- Publisher Chillingo, 2012 gameplay/promo:
+  https://www.youtube.com/watch?v=5ieLgWos3Fo
+- Independent guide (based on Android 1.0.3, possibly variant gameplay):
+  https://gamefaqs.gamespot.com/android/733964-he-man-the-most-powerful-game-in-the-universe/faqs/68021
+
+Use these for qualitative visual/level/ability references, not for
+fabricated original iOS input traces, proven collision hitboxes,
+original game timing or a video-copyright asset export. Our owned
+source IPA remains private and can differ from early published footage.
