@@ -6,6 +6,8 @@
 #include "heman_core.h"
 #include "heman_combat.h"
 #include "heman_session.h"
+#include "heman_pause.h"
+#include "pause_overlay.h"
 #include "probe_selfcheck.h"
 #include "session_selftest.h"
 #include "runtime_replay.h"
@@ -112,6 +114,7 @@ int main(int argc, char **argv) {
     PadState pad;
     Result rc;
     uint8_t qa_state=0u;
+    uint8_t paused=0u;
     (void)argc;(void)argv;
     status=hm_session_init(&world,&combat,&game);
     if(status!=HM_SESSION_OK ||
@@ -149,15 +152,21 @@ int main(int argc, char **argv) {
             qa_status=hm_replay_verify(&replay);
             qa_state=qa_status==HM_REPLAY_OK?1u:2u;
         }
-        status=hm_session_step(&world,&combat,&game,input,
-             (uint8_t)((down&HidNpadButton_X)!=0u),1.0f/60.0f);
+        /* Minus toggles an atomic pause adapter. No native physics, enemy
+           patrol, damage or checkpoint timer advances while paused.
+           Plus remains the standard NRO exit button. */
+        status=hm_paused_session_step(&world,&combat,&game,&paused,input,
+             (uint8_t)((down&HidNpadButton_X)!=0u),
+             (uint8_t)((down&HidNpadButton_Minus)!=0u),1.0f/60.0f);
         if(status!=HM_SESSION_OK)break;
         view.qa_state=qa_state;
         view.qa_fingerprint=qa_state==1u?replay.fingerprint:0u;
         pixels=(uint32_t*)framebufferBegin(&fb,&stride);
         if(!pixels || stride%sizeof(uint32_t)!=0u ||
            !hm_raster_render(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
-                             stride/sizeof(uint32_t),&view)) {
+                             stride/sizeof(uint32_t),&view) ||
+           (paused && !hm_pause_overlay(pixels,HM_RASTER_WIDTH,
+                     HM_RASTER_HEIGHT,stride/sizeof(uint32_t)))) {
             if(pixels)framebufferEnd(&fb);
             status=HM_SESSION_INVALID;
             break;
