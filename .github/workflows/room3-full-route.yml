@@ -1,0 +1,48 @@
+name: He-Man stage-3 full native controller route
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/room3-full-route.yml'
+      - 'native/src/**'
+      - 'native/include/**'
+      - 'native/tests/test_room3_full_route.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  run-real-room3-native-route:
+    name: Earn stage-3 CLEAR with ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-check fixture with unmodified C99 fixed-step engine
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            -I native/include \
+            native/src/heman_core.c \
+            native/src/heman_mask.c \
+            native/src/heman_combat.c \
+            native/src/heman_session.c \
+            native/src/heman_pause.c \
+            native/src/heman_dash.c \
+            native/src/heman_finale.c \
+            native/src/heman_air_smash.c \
+            native/src/heman_synthetic_room3.c \
+            native/tests/test_room3_full_route.c \
+            -lm -o /tmp/heman-room3-full-route
+          /tmp/heman-room3-full-route
+      - name: State guest-evidence boundary
+        run: |
+          echo 'PASS here proves source-authored native C99 route only.'
+          echo 'NeXium guest HID + PNG from unchanged AArch64 NRO remains required.'
