@@ -11,10 +11,10 @@ ROOT := $(abspath ..)
 TARGET := heman_raster_probe
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 SOURCES := source/main.c $(ROOT)/raster/raster_scene.c \
-           $(ROOT)/raster/pause_overlay.c \
+           $(ROOT)/raster/pause_overlay.c $(ROOT)/raster/stage_marker.c \
            $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c \
            $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c \
-           $(ROOT)/native/src/heman_pause.c \
+           $(ROOT)/native/src/heman_pause.c $(ROOT)/native/src/heman_stage_chain.c \
            $(ROOT)/switch/source/probe_view.c \
            $(ROOT)/switch/source/probe_selfcheck.c \
            $(ROOT)/switch/source/session_selftest.c \
@@ -28,6 +28,10 @@ CFLAGS += -DHM_ATTACK_PROBE=1
 endif
 ifeq ($(DAMAGE_PROBE),1)
 CFLAGS += -DHM_DAMAGE_PROBE=1
+endif
+# Opt-in two-room test campaign; base NRO stays one synthetic level.
+ifeq ($(CHAIN_PROBE),1)
+CFLAGS += -DHM_LEVEL_CHAIN_PROBE=1
 endif
 # Stage 049 test-only checkpoint guest NRO; normal graphics unchanged.
 ifeq ($(CHECKPOINT_PROBE),1)
