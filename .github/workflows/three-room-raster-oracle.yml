@@ -52,7 +52,7 @@ jobs:
             raster/air_smash_hud.c \
             native/tests/test_three_room_optical_oracle.c \
             -lm -o /tmp/heman-three-room-optical-oracle
-          /tmp/heman-three-room-hid-schedule
+          /tmp/heman-three-room-optical-oracle
       - name: Evidence limitations
         run: |
           echo 'This verifies source-authored C99 pixel samples, not NeXium frame_rx PNGs.'
