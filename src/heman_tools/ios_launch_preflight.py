@@ -199,18 +199,16 @@ def inspect_private_ipa_launch(ipa: Path) -> dict:
         raise ValueError("malformed orientation metadata")
 
     declared_min = metadata["minimum_ios_from_macho"]
-    consistent_min = (
-        declared_min is not None
-        and tuple(int(n) for n in minimum.split("."))
-        == tuple(int(n) for n in declared_min.split(".")))
+    consistent_min = False
     # Accept "4.3" and "4.3.0" as semantically equal.
     try:
         os_parts = tuple(int(p) for p in minimum.split("."))
         macho_parts = tuple(int(p) for p in declared_min.split(".")) \
             if declared_min is not None else ()
-        consistent_min = (os_parts + (0,) * (3 - len(os_parts))
-                          == macho_parts + (0,) * (3 - len(macho_parts))
-                          and 1 <= len(os_parts) <= 3)
+        consistent_min = (1 <= len(os_parts) <= 3
+                          and all(0 <= number <= 65535 for number in os_parts)
+                          and os_parts + (0,) * (3 - len(os_parts))
+                          == macho_parts + (0,) * (3 - len(macho_parts)))
     except (ValueError, AttributeError):
         consistent_min = False
 
