@@ -89,8 +89,12 @@ def verify(folder: Path) -> dict:
 
     if [stages[f] for f in FRAMES] != [1, 2, 2, 2, 2, 2, 2, 2, 2]:
         raise ValueError("No genuine first-room CLEAR/A transition into stage 2")
-    if not clear[75] or any(clear[f] for f in FRAMES if f != 75):
-        raise ValueError("Native first-room CLEAR not isolated from stage 2")
+    # The raster scene draws the original native CLEAR HUD for *any*
+    # completed room. Thus terminal stage-2 FINISH deliberately coexists
+    # with a top-right CLEAR badge; only pre-exit and post-B frames must
+    # lack that badge. This is independent of the center FINISH overlay.
+    if [f for f in FRAMES if clear[f]] != [75, 465, 490, 515]:
+        raise ValueError("Native CLEAR badges disagree with actual room exits")
     if heights[365] > heights[330] - 25:
         raise ValueError("Injected native A jump did not raise real world-Y indicator")
     if [finish[f] for f in FRAMES] != [
