@@ -1,5 +1,6 @@
 /* Portable two-level synthetic course regression, not original iOS levels. */
 #include "heman_stage_chain.h"
+#include "heman_synthetic_room2.h"
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -44,13 +45,15 @@ static hm_combat_config combat_fixture(unsigned which) {
     return c;
 }
 int main(void) {
-    hm_world first=world_fixture(0), second=world_fixture(1), bad;
-    hm_combat_config combat_first=combat_fixture(0),
-                     combat_second=combat_fixture(1);
+    hm_world first=world_fixture(0), second, bad;
+    hm_combat_config combat_first=combat_fixture(0), combat_second;
     hm_session game,snapshot;
+    uint8_t room2_tiles[HM_ROOM2_CELLS];
     hm_input right={1.0f,0u,0u};
     uint8_t stage=0u;
     unsigned i;
+    assert(hm_synthetic_room2_init(&second,&combat_second,
+                                   room2_tiles,HM_ROOM2_CELLS)==1);
     assert(hm_session_init(&first,&combat_first,&game)==HM_SESSION_OK);
     snapshot=game;
     /* Explicit C99 input policy: Minus wins over simultaneous A, and a
