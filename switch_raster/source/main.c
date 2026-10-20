@@ -202,9 +202,10 @@ int main(int argc, char **argv) {
            patrol, damage or checkpoint timer advances while paused.
            Plus remains the standard NRO exit button. */
 #ifdef HM_LEVEL_CHAIN_PROBE
-        if (!paused && !(down&HidNpadButton_Minus) &&
-            stage==0u && game.player.completed &&
-            (down&HidNpadButton_A)) {
+        if(hm_chain_continue_edge_allowed(
+                &game,stage,paused,
+                (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                (uint8_t)((down&HidNpadButton_A)!=0u))) {
             /* The CLEAR → A edge changes rooms without advancing a
                gameplay frame, so no hidden jump/attack leaks through. */
             if(hm_chain_try_advance(&second_world,&second_combat,
