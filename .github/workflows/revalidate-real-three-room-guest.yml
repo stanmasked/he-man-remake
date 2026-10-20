@@ -1,0 +1,94 @@
+name: He-Man replay exact authentic NeXium guest archive
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/revalidate-real-three-room-guest.yml'
+      - 'tools/verify_nexium_three_room_pngs.py'
+      - 'tools/verify_nexium_hid_publication.py'
+      - 'tools/verify_nexium_guest_pngs.py'
+      - 'tools/instrument_nexium_three_room.py'
+      - 'tools/instrument_nexium_frames.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  revalidate-saved-real-guest:
+    name: Verify original pinned NeXium frame_rx PNGs, NPAD publication and NRO SHA
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact PNG reader
+        run: python -m pip install 'Pillow==11.3.0'
+      - name: Download authentic immutable same-repository NeXium artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: heman-patched-nexium-three-room-logs
+          run-id: 39515325336
+          repository: stanmasked/he-man-remake
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: boot-evidence
+      - name: Confirm original run, full pixel frame set and unchanged NRO digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          root=Path('boot-evidence')
+          assert root.is_dir(), "Real NeXium artifact not downloaded"
+          before=(root/'guest-nro-before.sha256').read_text().strip().split()
+          after=(root/'guest-nro-after.sha256').read_text().strip().split()
+          if len(before)!=2 or len(after)!=2:
+              raise ValueError("Malformed original guest SHA256 receipts")
+          if before[0]!=after[0]:
+              raise ValueError("Guest NRO digest changed during NeXium emulation")
+          expected='cfdd2fe65a5406d33de3eb499076c3389b8f32c83c2f4975e42e14426200d977'
+          if before[0]!=expected:
+              raise ValueError("Artifact guest SHA does not match original devkitA64 build")
+          if not before[1].endswith('/nros/heman_three_room_probe.nro'):
+              raise ValueError("Original NRO receipt is for the wrong file")
+          if after[1]!='nros/heman_three_room_probe.nro':
+              raise ValueError("Final NRO receipt is for the wrong file")
+          images=sorted(root.glob('raster-frame-????.png'))
+          if len(images)!=18:
+              raise ValueError(f"Expected exactly 18 original frame_rx PNGs; found {len(images)}")
+          log=(root/'raster-runner.log').read_text()
+          if 'Production runner complete: frames=6193' not in log:
+              raise ValueError("Original NeXium runner completion evidence missing")
+          out=root/'original-guest-frame-manifest.txt'
+          out.write_text(''.join(
+              f'{hashlib.sha256(img.read_bytes()).hexdigest()}  {img.name}\n'
+              for img in images
+          ))
+          print('PASS: immutable original GitHub artifact run=39515325336,'
+                ' 18 genuine PNGs, NRO unchanged SHA256='+expected)
+          PY
+      - name: Rerun exact pinned kernel NPAD shared-memory verification
+        run: |
+          set -euo pipefail
+          python tools/verify_nexium_hid_publication.py \
+            boot-evidence/raster-stdout.log \
+            | tee boot-evidence/archived-guest-hid-verification.txt
+      - name: Rerun unchanged production optical verifier over ALL real guest PNGs
+        run: |
+          set -euo pipefail
+          python tools/verify_nexium_three_room_pngs.py boot-evidence \
+            | tee boot-evidence/archived-guest-optical-verification.txt
+      - name: Upload independent archival revalidation receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage101-archived-genuine-guest-validation
+          path: |
+            boot-evidence/original-guest-frame-manifest.txt
+            boot-evidence/archived-guest-hid-verification.txt
+            boot-evidence/archived-guest-optical-verification.txt
+          if-no-files-found: warn
+          retention-days: 7
