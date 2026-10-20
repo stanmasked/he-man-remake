@@ -53,7 +53,7 @@ No original IPA or extracted copyrighted resource may be committed, uploaded as 
 - [x] Validate B/manual replay after victory through original C99 engine and both native compilers: [PR #53](https://github.com/stanmasked/he-man-remake/pull/53).
 - [x] Prove real NeXium **B-retry then second two-X victory** using authentic emulated framebuffer captures: [PR #54](https://github.com/stanmasked/he-man-remake/pull/54).
 - [x] Draw independent **CLEAR** HUD only after native `HM_EXIT` completion and test source RGBA pixels under GCC/Clang; all prior NeXium regressions green: [PR #55](https://github.com/stanmasked/he-man-remake/pull/55).
-- [ ] Obtain separate **genuine NeXium guest PNG** proof of native `HM_EXIT` activation and the new CLEAR badge by injected real D-pad movement (host coverage alone does not count).
+- [x] Confirm **genuine NeXium guest PNG** evidence for native `HM_EXIT` and CLEAR after real D-pad movement: [PR #57](https://github.com/stanmasked/he-man-remake/pull/57), [successful run #39339811505](https://github.com/stanmasked/he-man-remake/actions/runs/39339811505). Marker world-X progresses 125.5→185.5→265.5→369.5 px and remains stationary after release; source-authored CLEAR is absent before input and present at frames 60/80/120/300. The exact head passed 15/15 workflows.
 - [ ] Replace synthetic world geometry with *private* verified level/collision reconstruction from user's own IPA, without committing extracted commercial resources.
 - [ ] Reproduce original iOS gameplay rules (enemy AI, damage, level triggers, camera, physics) based on private comparative traces rather than synthetic assumptions.
 - [ ] Implement real content pipeline, animation, sound, menu, save/continue and complete multi-level campaign.
