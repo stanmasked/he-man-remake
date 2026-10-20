@@ -14,6 +14,7 @@ import zipfile
 from .lvl import LevelFormatError
 from .objects import ParsedLevel, parse_level_objects
 from .shapes import Shape, parse_shape
+from .affine_shape_geometry import hypothetical_geometry_report
 
 _LEVEL_ROOT = "Payload/MOTU.app/screen-med/levels/"
 _SHAPE_ROOT = "Payload/MOTU.app/screen-med/geometry/"
@@ -76,7 +77,37 @@ def candidate_crossrefs(level: ParsedLevel,
     }
 
 
-def inspect_private_ipa(ipa: Path, level_name: str) -> dict:
+
+def annotate_single_candidate_geometry(level: ParsedLevel,
+                                       shapes: dict[str, Shape],
+                                       report: dict) -> dict:
+    """Attach *hypothetical* envelopes only for unique exact text candidates.
+
+    This optional step is withheld for zero/multiple candidates and never
+    asserts that the matching source object actually owns the shape.
+    """
+    by_index = {obj.index: obj for obj in level.objects}
+    if len(by_index) != len(level.objects) or report["level"] != level.level_name:
+        raise ValueError("inconsistent candidate/object identity")
+    for record in report["shapes"]:
+        record["hypothetical_geometry"] = None
+        if record["candidate_status"] != "one_candidate_only":
+            continue
+        matched = record["candidate_objects"]
+        if len(matched) != 1:
+            raise ValueError("invalid unique candidate record")
+        index = matched[0]["object_index"]
+        if index not in by_index or record["shape"] not in shapes:
+            raise ValueError("candidate not present in decoded data")
+        record["hypothetical_geometry"] = hypothetical_geometry_report(
+            shapes[record["shape"]], by_index[index].matrix)
+    report["hypothetical_geometry_enabled"] = True
+    report["ownership_confirmed"] = False
+    return report
+
+
+def inspect_private_ipa(ipa: Path, level_name: str, *,
+                        hypothetical_bounds: bool = False) -> dict:
     """Read one level and bounded .shape definitions without extracting files."""
     if (not isinstance(level_name, str) or
             len(level_name) <= 4 or not level_name.endswith(".lvl") or
@@ -107,7 +138,11 @@ def inspect_private_ipa(ipa: Path, level_name: str) -> dict:
             if info.file_size > _MAX_SHAPE:
                 raise LevelFormatError("oversized .shape entry")
             shapes[name] = parse_shape(archive.read(info))
-    return candidate_crossrefs(parsed, shapes)
+
+    report = candidate_crossrefs(parsed, shapes)
+    if hypothetical_bounds:
+        annotate_single_candidate_geometry(parsed, shapes, report)
+    return report
 
 
 def private_report_path(path: Path) -> Path:
@@ -128,9 +163,12 @@ def main(argv=None) -> int:
     parser.add_argument("--ipa", type=Path, required=True)
     parser.add_argument("--level", default="MULevel1-1.lvl")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--hypothetical-bounds", action="store_true",
+                        help="unverified AABBs for unique exact text candidates only")
     args = parser.parse_args(argv)
     report_path = private_report_path(args.out)
-    report = inspect_private_ipa(args.ipa, args.level)
+    report = inspect_private_ipa(args.ipa, args.level,
+                                 hypothetical_bounds=args.hypothetical_bounds)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n",
                            encoding="utf-8")
