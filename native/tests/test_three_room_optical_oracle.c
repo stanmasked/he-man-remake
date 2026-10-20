@@ -175,7 +175,7 @@ static int oracle(unsigned f,const hm_world *w,
 static unsigned buttons_at(unsigned f, unsigned old) {
     switch(f) {
         case 45u:case 110u:case 530u: return R;
-        case 78u:case 95u:case 500u:case 515u:
+        case 78u:case 95u:case 470u:case 515u:
         case 1080u:case 1143u: return 0u;
         case 90u:case 510u:case 1140u: return
             f==1140u?B:A;
