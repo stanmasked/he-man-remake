@@ -11,7 +11,8 @@ import zipfile
 from heman_tools.lvl import LevelFormatError
 from heman_tools.objects import parse_level_objects
 from heman_tools.shape_object_candidates import (
-    candidate_crossrefs, inspect_private_ipa, main, private_report_path,
+    annotate_single_candidate_geometry, candidate_crossrefs,
+    inspect_private_ipa, main, private_report_path,
 )
 from heman_tools.shapes import parse_shape
 from test_objects import example_level, example_object
@@ -79,6 +80,65 @@ class ShapeObjectCandidatesTests(unittest.TestCase):
         self.assertEqual(report["status_counts"]["one_candidate_only"], 1)
         self.assertEqual(len(report["shapes"][0]["candidate_objects"]), 1)
         self.assertEqual(len(report["shapes"][0]["candidate_objects"][0]["evidence"]), 4)
+
+    def test_optin_single_polygon_hypothetical_bounds(self):
+        level = parsed([example_object(name="Stone", x=100, y=50)])
+        shapes = {"Stone.shape": parse_shape(polygon())}
+        report = candidate_crossrefs(level, shapes)
+        self.assertNotIn("hypothetical_geometry", report["shapes"][0])
+        annotate_single_candidate_geometry(level, shapes, report)
+        entry = report["shapes"][0]["hypothetical_geometry"]
+        self.assertEqual(entry["hypothetical_aabb"], (100, 50, 102, 53))
+        self.assertFalse(entry["association_confirmed"])
+        self.assertFalse(entry["physical_collision_confirmed"])
+        self.assertFalse(report["ownership_confirmed"])
+
+    def test_optin_circle_affine_mapped_to_ellipse(self):
+        level = parsed([example_object(name="Bridge", x=100, y=50)])
+        shapes = {"Unknown.shape": parse_shape(circle(reference="Bridge"))}
+        report = annotate_single_candidate_geometry(
+            level, shapes, candidate_crossrefs(level, shapes))
+        box = report["shapes"][0]["hypothetical_geometry"]["hypothetical_aabb"]
+        self.assertEqual(box, (98, 44, 108, 54))
+
+    def test_optin_ambiguous_never_assigns_bounds(self):
+        level = parsed([example_object(name="Stone"),
+                        example_object(name="Stone", x=2)])
+        shapes = {"Stone.shape": parse_shape(polygon())}
+        report = annotate_single_candidate_geometry(
+            level, shapes, candidate_crossrefs(level, shapes))
+        self.assertIsNone(report["shapes"][0]["hypothetical_geometry"])
+
+    def test_optin_no_match_never_assigns_bounds(self):
+        level = parsed([example_object(name="NotStone")])
+        shapes = {"Stone.shape": parse_shape(polygon())}
+        report = annotate_single_candidate_geometry(
+            level, shapes, candidate_crossrefs(level, shapes))
+        self.assertIsNone(report["shapes"][0]["hypothetical_geometry"])
+
+    def test_optin_cli_private_json(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "synthetic.ipa"
+            with zipfile.ZipFile(ipa, "w") as archive:
+                archive.writestr(LEVEL_PATH, example_level([
+                    example_object(name="Stone", x=10, y=20)]))
+                archive.writestr(GEOM_ROOT + "Stone.shape", polygon())
+            destination = (Path.cwd() / "local_reports" /
+                           "synthetic-hypothetical-geometry-test.json")
+            try:
+                self.assertEqual(main(["--ipa", str(ipa),
+                                       "--level", "Synthetic.lvl",
+                                       "--out", str(destination),
+                                       "--hypothetical-bounds"]), 0)
+                report = json.loads(destination.read_text(encoding="utf-8"))
+                self.assertFalse(report["ownership_confirmed"])
+                self.assertEqual(
+                    report["shapes"][0]["hypothetical_geometry"]["hypothetical_aabb"],
+                    [10, 20, 12, 23])
+                self.assertNotIn("vertices", json.dumps(report))
+                self.assertNotIn("matrix", json.dumps(report))
+            finally:
+                destination.unlink(missing_ok=True)
 
     def test_archive_read_only(self):
         with TemporaryDirectory() as directory:
