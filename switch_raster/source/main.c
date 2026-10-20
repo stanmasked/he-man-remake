@@ -10,6 +10,8 @@
 #ifdef HM_LEVEL_CHAIN_PROBE
 #include "heman_stage_chain.h"
 #include "heman_synthetic_room2.h"
+#include "heman_dash.h"
+#include "dash_hud.h"
 #include "stage_marker.h"
 #endif
 #include "pause_overlay.h"
@@ -123,6 +125,7 @@ int main(int argc, char **argv) {
     hm_world second_world;
     hm_combat_config second_combat;
     uint8_t stage=0u;
+    hm_dash_state dash={0u,0u};
 #endif
     hm_raster_view view;
     hm_replay_report replay={0};
@@ -191,13 +194,26 @@ int main(int argc, char **argv) {
             }
             world=second_world;
             combat=second_combat;
+            dash.remaining=0u;
+            dash.recovery=0u;
             status=HM_SESSION_OK;
         } else
 #endif
         {
-            status=hm_paused_session_step(&world,&combat,&game,&paused,input,
-                 (uint8_t)((down&HidNpadButton_X)!=0u),
-                 (uint8_t)((down&HidNpadButton_Minus)!=0u),1.0f/60.0f);
+#ifdef HM_LEVEL_CHAIN_PROBE
+            if(stage==1u) {
+                status=hm_dash_session_step(&world,&combat,&game,&paused,
+                     &dash,input,(uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZR)!=0u),
+                     1.0f/60.0f);
+            } else
+#endif
+            {
+                status=hm_paused_session_step(&world,&combat,&game,&paused,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),1.0f/60.0f);
+            }
         }
         if(status!=HM_SESSION_OK)break;
         view.qa_state=qa_state;
@@ -211,6 +227,9 @@ int main(int argc, char **argv) {
 #ifdef HM_LEVEL_CHAIN_PROBE
            || !hm_stage_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                                stride/sizeof(uint32_t),stage)
+           || (stage==1u &&
+               !hm_dash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                            stride/sizeof(uint32_t),&dash))
 #endif
            ) {
             if(pixels)framebufferEnd(&fb);
