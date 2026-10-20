@@ -116,7 +116,7 @@ class AirSmashGuestContractTests(TestCase):
         modified = instrument(SOURCE)
         self.assertEqual(modified.count("HEMAN_SMASH_HID frame="), 2)
         self.assertEqual(modified.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
-        self.assertIn('144 => "buttons=DRIGHT,ZL"', modified)
+        self.assertIn('144 | 150 => "buttons=DRIGHT,ZL"', modified)
         self.assertIn('175 => "buttons=MINUS"', modified)
         with self.assertRaises(ValueError):
             instrument(modified)
