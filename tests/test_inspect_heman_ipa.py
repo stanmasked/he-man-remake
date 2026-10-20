@@ -54,6 +54,63 @@ class LocalIPAInspectorTests(unittest.TestCase):
         self.assertNotIn("synthetic-level", str(report))
         self.assertNotIn("sample.lvl", str(report))
 
+    def test_extension_pair_stats_reconcile_with_global_totals(self) -> None:
+        self.build()
+        report = inspect_ipa(self.ipa, check_crc=True)
+        self.assertEqual(report["schema_version"], 2)
+        by_ext = report["mirror_analysis"]["by_extension"]
+        level = by_ext[".lvl"]
+        self.assertEqual(level["paired"], 1)
+        self.assertEqual(level["matching_size_and_crc"], 1)
+        self.assertEqual(level["different_size_or_crc"], 0)
+        image = by_ext[".png"]
+        self.assertEqual(image["paired"], 1)
+        self.assertEqual(image["matching_size_and_crc"], 0)
+        self.assertEqual(image["different_size_or_crc"], 1)
+        self.assertEqual(sum(v["paired"] for v in by_ext.values()),
+                         report["mirror_analysis"]["common_relative_paths"])
+        self.assertEqual(sum(v["matching_size_and_crc"] for v in by_ext.values()),
+                         report["mirror_analysis"]["matching_size_and_crc"])
+
+    def test_orphans_are_counted_without_names(self) -> None:
+        self.build(extra={
+            self.bundle + "screen-med/maps/medium-only.map": b"med",
+            self.bundle + "screen-xlarge/maps/large-only.map": b"big",
+            self.bundle + "screen-med/maps/same.map": b"same",
+            self.bundle + "screen-xlarge/maps/same.map": b"same",
+        })
+        report = inspect_ipa(self.ipa)
+        m = report["mirror_analysis"]["by_extension"][".map"]
+        self.assertEqual((m["screen-med"], m["screen-xlarge"]), (2, 2))
+        self.assertEqual(m["paired"], 1)
+        self.assertEqual(m["matching_size_and_crc"], 1)
+        self.assertEqual(m["only_in_screen-med"], 1)
+        self.assertEqual(m["only_in_screen-xlarge"], 1)
+        output = str(report)
+        self.assertNotIn("medium-only", output)
+        self.assertNotIn("large-only", output)
+        self.assertNotIn("same.map", output)
+
+    def test_same_basename_in_different_directories_not_paired(self) -> None:
+        self.build(extra={
+            self.bundle + "screen-med/maps/common.tileset": b"x",
+            self.bundle + "screen-xlarge/other/common.tileset": b"x",
+        })
+        m = inspect_ipa(self.ipa)["mirror_analysis"]["by_extension"][".tileset"]
+        self.assertEqual(m["paired"], 0)
+        self.assertEqual(m["only_in_screen-med"], 1)
+        self.assertEqual(m["only_in_screen-xlarge"], 1)
+
+    def test_nonmatching_paired_tile_variants(self) -> None:
+        self.build(extra={
+            self.bundle + "screen-med/tiles/shared.tileset": b"x" * 4,
+            self.bundle + "screen-xlarge/tiles/shared.tileset": b"x" * 8,
+        })
+        m = inspect_ipa(self.ipa)["mirror_analysis"]["by_extension"][".tileset"]
+        self.assertEqual(m["paired"], 1)
+        self.assertEqual(m["matching_size_and_crc"], 0)
+        self.assertEqual(m["different_size_or_crc"], 1)
+
     def test_missing_bundle_rejected(self) -> None:
         with zipfile.ZipFile(self.ipa, "w") as z:
             z.writestr("Info.plist", b"invalid")
