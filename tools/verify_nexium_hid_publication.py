@@ -74,8 +74,7 @@ def read_publications(log: str) -> list[dict]:
         if last_sample is not None and sample <= last_sample:
             raise ValueError("Guest HID sampling number did not increase")
         last_sample = sample
-        if int(groups["mapped"], 16) == 0:
-            raise ValueError("Kernel HID was not mapped into shared memory")
+        mapped = int(groups["mapped"], 16) != 0
         injected = groups["injected"]
         matched = BUTTON.search(injected)
         if injected != "None" and not matched:
@@ -89,6 +88,13 @@ def read_publications(log: str) -> list[dict]:
             raise ValueError("Malformed shared-memory NPAD layout") from e
         if len(layouts) != 7:
             raise ValueError("Pinned NeXium must report all seven NPAD layouts")
+        if not mapped:
+            # Pinned kernel can publish an initial neutral state before
+            # the guest has mapped NPAD shared memory. It proves nothing.
+            # Never accept an un-mapped button or mid-run unmapping.
+            if mask != 0 or records or any(layouts):
+                raise ValueError("Kernel HID was not mapped into shared memory")
+            continue
         if mask != 0 and mask not in layouts:
             raise ValueError(
                 f"Injected HID 0x{mask:x} never reached a real NPAD layout"
@@ -97,7 +103,7 @@ def read_publications(log: str) -> list[dict]:
             raise ValueError("NPAD buttons remained pressed after release")
         records.append({
             "sample": sample, "buttons": mask,
-            "mapped": int(groups["mapped"], 16) != 0,
+            "mapped": mapped,
         })
     return records
 
