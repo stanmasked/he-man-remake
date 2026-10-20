@@ -29,11 +29,22 @@ hm_session_result hm_finale_session_step(
     /* The ordinary second-room dash path remains source-identical until
        the *actual* native exit event sets completed. A deliberate B reset
        also returns to the ordinary adapter, including while paused. */
-    if (!session->player.completed ||
-        (!toggle_pause && movement.reset && !*paused))
+    if (!session->player.completed)
         return hm_dash_session_step(world, combat, session, paused, dash,
                                     movement, attack_pressed, toggle_pause,
                                     start_dash, dt);
+    if (!toggle_pause && movement.reset && !*paused) {
+        /* Reuse the real native reset transaction. Cancel any outstanding
+           boost only AFTER that reset successfully commits. */
+        hm_session_result result = hm_dash_session_step(
+            world, combat, session, paused, dash, movement,
+            attack_pressed, 0u, start_dash, dt);
+        if (result == HM_SESSION_OK) {
+            dash->remaining = 0u;
+            dash->recovery = 0u;
+        }
+        return result;
+    }
 
     /* At FINAL CLEAR, Minus toggles pause but does not consume a game frame.
        While paused, B cannot restart; resuming takes one button-edge frame. */
