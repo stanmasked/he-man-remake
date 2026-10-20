@@ -6,6 +6,7 @@ level-map ownership, scale, or original gameplay behavior.
 from __future__ import annotations
 import argparse
 import json
+import stat
 from pathlib import Path
 import struct
 import zipfile
@@ -44,6 +45,8 @@ def compare_pair(ipa: Path, level="MULevel1-1.lvl",
                 entry = by_name.get(path)
                 if (entry is None or entry.is_dir() or entry.flag_bits & 1
                         or not 4 <= entry.file_size <= LIMIT):
+                    raise ValueError("missing, encrypted or oversized resource pair")
+                if stat.S_IFMT(entry.external_attr >> 16) == stat.S_IFLNK:
                     raise ValueError("missing, encrypted or oversized resource pair")
                 block = archive.read(entry)
                 if len(block) != entry.file_size:
