@@ -50,7 +50,7 @@ def _parse_capture(capture: object, platform: str) -> dict:
     identity = _identity(capture.get("capture_id"), "capture_id")
     anchor = _identity(capture.get("stationary_anchor_id"), "anchor ID")
     method = capture.get("evidence_kind")
-    if method not in CAPTURE_TYPES:
+    if not isinstance(method, str) or method not in CAPTURE_TYPES:
         raise ValueError("capture evidence_kind must be explicitly labeled")
     scale = _positive_number(capture.get("pixels_per_unit"),
                              "pixels_per_unit", upper=10_000)
@@ -74,7 +74,7 @@ def _parse_capture(capture: object, platform: str) -> dict:
         if type(jump) is not bool:
             raise ValueError("jump input must be an explicit boolean")
         contact = record.get("contact")
-        if contact not in CONTACTS:
+        if not isinstance(contact, str) or contact not in CONTACTS:
             raise ValueError("unsupported contact observation")
         feet = _xy(record.get("feet_screen_xy"), "feet_screen_xy")
         anchor_pos = _xy(record.get("anchor_screen_xy"), "anchor_screen_xy")
