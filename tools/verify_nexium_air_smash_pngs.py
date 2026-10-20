@@ -11,7 +11,26 @@ import json
 from pathlib import Path
 
 from instrument_nexium_air_smash import FRAMES, HID_EVENTS
-from verify_nexium_guest_pngs import describe
+# Keep Pillow optional for offline/mock-only Python CI. The guest
+# workflow installs Pillow before using verify(); this helper uses the
+# same independently authored magenta world-X marker as other probes.
+# Avoid importing verify_nexium_guest_pngs at module load: it requires PIL.
+def describe(rgb):
+    if rgb.size != (640, 360):
+        raise ValueError("Unexpected guest framebuffer size")
+    magenta = []
+    pixel = rgb.load()
+    for y in range(44, 68):
+        for x in range(10, 467):
+            r, g, b = pixel[x, y]
+            if r >= 210 and g <= 55 and b >= 210:
+                magenta.append(x)
+    if len(magenta) < 100:
+        raise ValueError("No synthetic guest magenta world-X marker")
+    colors = len(set(rgb.resize((128, 72)).getdata()))
+    if colors < 8:
+        raise ValueError("Missing source-authored gameplay color diversity")
+    return len(magenta), colors, sum(magenta) / len(magenta)
 
 # NRO renderer packs color as little-endian 0xAABBGGRR; these are RGBA RGB.
 READY = (216, 224, 110)    # 0xff6ee0d8
