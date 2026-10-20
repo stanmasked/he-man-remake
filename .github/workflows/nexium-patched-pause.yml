@@ -4,10 +4,8 @@ on:
     paths:
       - '.github/workflows/nexium-patched-pause.yml'
       - 'tools/instrument_nexium_pause.py'
-      - 'tools/instrument_nexium_hid.py'
       - 'tools/verify_nexium_pause_pngs.py'
       - 'tests/test_nexium_pause.py'
-      - 'tests/test_nexium_exit_clear.py'
       - 'tools/instrument_nexium_frames.py'
       - 'tools/verify_nexium_guest_pngs.py'
       - 'patches/nexium-nro-segment-file-origin.patch'
@@ -191,7 +189,7 @@ jobs:
           print("Runner guest frames:", int(frames.group(1)) if frames else "unknown")
           print("PASS: patched NeXium executed actual homebrew CPU instructions")
           PY
-      - name: Verify native HM_EXIT completion badge from original guest PNGs
+      - name: Verify native Minus pause freezes guest state and resumes by real PNGs
         shell: bash
         run: |
           set -euo pipefail
