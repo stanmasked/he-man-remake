@@ -17,7 +17,7 @@ FRAMES = (
 )
 # First-room native exit 75 and transition A90; actual room-2 jump A350
 # over the x570 hazard, earning room-2 CLEAR near frame465. Fresh A510
-# enters room 3. Walk to real x678 hazard, checkpoint respawn, then A948
+# enters room 3. Walk to real x678 hazard, checkpoint respawn, then A957
 # is the hypothesized landing-safe jump leading to x842 native exit.
 # B1140 is only issued after final FINISH has been sampled. These input
 # frames are a HYPOTHESIS until NeXium records real guest PNG/HID results.
@@ -33,8 +33,8 @@ HID_EVENTS = (
     (510, "buttons=A"),
     (515, "buttons="),
     (530, "buttons=DRIGHT"),
-    (948, "buttons=DRIGHT,A"),
-    (951, "buttons=DRIGHT"),
+    (957, "buttons=DRIGHT,A"),
+    (960, "buttons=DRIGHT"),
     (1080, "buttons="),
     (1140, "buttons=B"),
     (1143, "buttons="),
