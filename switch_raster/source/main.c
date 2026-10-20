@@ -9,6 +9,7 @@
 #include "heman_pause.h"
 #ifdef HM_LEVEL_CHAIN_PROBE
 #include "heman_stage_chain.h"
+#include "heman_synthetic_room2.h"
 #include "stage_marker.h"
 #endif
 #include "pause_overlay.h"
@@ -63,29 +64,9 @@ static hm_world make_world(void) {
 }
 
 #ifdef HM_LEVEL_CHAIN_PROBE
-/* Independent second exercise room, with a different ground elevation,
-   short platforms and its own checkpoints/enemy. No iOS geometry. */
-static uint8_t second_cells[W*H];
-static const hm_event second_events[]={
-    {HM_PICKUP,170.0f,267.0f,8.0f},
-    {HM_CHECKPOINT,330.0f,273.0f,8.0f},
-    {HM_HAZARD,570.0f,273.0f,8.0f},
-    {HM_EXIT,735.0f,273.0f,8.0f}
-};
-static hm_world make_second_world(void) {
-    hm_world result=make_world();
-    uint32_t x;
-    memset(second_cells,0,sizeof(second_cells));
-    for(x=0u;x<W;++x)second_cells[18u*W+x]=1u;
-    for(x=9u;x<13u;++x)second_cells[13u*W+x]=1u;
-    for(x=23u;x<28u;++x)second_cells[15u*W+x]=1u;
-    result.solid=second_cells;
-    result.spawn_x=48.0f;
-    result.spawn_feet_y=288.0f;
-    result.events=second_events;
-    result.event_count=(uint32_t)(sizeof(second_events)/sizeof(second_events[0]));
-    return result;
-}
+/* The exact room-2 tiles/events/combat now come from the shared C99
+   fixture, which is exercised directly by host CI before NeXium. */
+static uint8_t second_cells[HM_ROOM2_CELLS];
 #endif
 
 static hm_combat_config make_combat(void) {
@@ -132,24 +113,15 @@ static hm_combat_config make_combat(void) {
     return c;
 }
 
-#ifdef HM_LEVEL_CHAIN_PROBE
-static hm_combat_config make_second_combat(void) {
-    hm_combat_config c=make_combat();
-    c.enemy_feet_y=288.0f;
-    c.patrol_left=230.0f;
-    c.patrol_right=320.0f;
-    c.enemy_start_x=275.0f;
-    return c;
-}
-#endif
+
 
 int main(int argc, char **argv) {
     hm_world world=make_world();
     hm_combat_config combat=make_combat();
     hm_session game;
 #ifdef HM_LEVEL_CHAIN_PROBE
-    hm_world second_world=make_second_world();
-    hm_combat_config second_combat=make_second_combat();
+    hm_world second_world;
+    hm_combat_config second_combat;
     uint8_t stage=0u;
 #endif
     hm_raster_view view;
@@ -162,6 +134,10 @@ int main(int argc, char **argv) {
     uint8_t qa_state=0u;
     uint8_t paused=0u;
     (void)argc;(void)argv;
+#ifdef HM_LEVEL_CHAIN_PROBE
+    if(!hm_synthetic_room2_init(&second_world,&second_combat,
+                                second_cells,HM_ROOM2_CELLS))return 2;
+#endif
     status=hm_session_init(&world,&combat,&game);
     if(status!=HM_SESSION_OK ||
        hm_probe_boot_selfcheck()!=HM_PROBE_CHECK_OK ||

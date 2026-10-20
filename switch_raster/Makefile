@@ -15,6 +15,7 @@ SOURCES := source/main.c $(ROOT)/raster/raster_scene.c \
            $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c \
            $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c \
            $(ROOT)/native/src/heman_pause.c $(ROOT)/native/src/heman_stage_chain.c \
+           $(ROOT)/native/src/heman_synthetic_room2.c \
            $(ROOT)/switch/source/probe_view.c \
            $(ROOT)/switch/source/probe_selfcheck.c \
            $(ROOT)/switch/source/session_selftest.c \

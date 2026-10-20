@@ -272,6 +272,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_combat.c" \
   "$ROOT/native/src/heman_session.c" \
   "$ROOT/native/src/heman_stage_chain.c" \
+  "$ROOT/native/src/heman_synthetic_room2.c" \
   "$ROOT/native/tests/test_stage_chain.c" \
   -lm -o "$TMP/test_stage_chain"
 "$TMP/test_stage_chain"
@@ -283,3 +284,17 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_stage_marker.c" \
   -lm -o "$TMP/test_stage_marker"
 "$TMP/test_stage_marker"
+
+# Stage 068: assert the EXACT shared source-authored stage-2 geometry used
+# by the Switch NRO, and exercise its pickup/checkpoint/hazard/exit events
+# through the actual native world simulation (no replica fixture).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_synthetic_room2.c" \
+  "$ROOT/native/tests/test_synthetic_room2.c" \
+  -lm -o "$TMP/test_synthetic_room2"
+"$TMP/test_synthetic_room2"
