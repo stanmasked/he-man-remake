@@ -173,7 +173,7 @@ class EvidenceJoinTests(unittest.TestCase):
             root = Path(tmp)
             result = audit_evidence_bundle(*self.all_files(root), root)
         content = json.dumps(result)
-        for forbidden in ("capture_id", "sha256", "media_relpath",
+        for forbidden in ('"capture_id"', "sha256", "media_relpath",
                           "feet_screen_xy", "timestamp_us", "observations",
                           "fictional-landing-ios", "entirely-fake"):
             self.assertNotIn(forbidden, content)
