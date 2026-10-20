@@ -298,3 +298,26 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_synthetic_room2.c" \
   -lm -o "$TMP/test_synthetic_room2"
 "$TMP/test_synthetic_room2"
+
+# Stage 069: optional room-2 ZR dash uses real C99 physics and a genuine
+# frame-based recharge; toggling Minus cannot spend dash/recovery frames.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_pause.c" \
+  "$ROOT/native/src/heman_dash.c" \
+  "$ROOT/native/src/heman_synthetic_room2.c" \
+  "$ROOT/native/tests/test_dash.c" \
+  -lm -o "$TMP/test_dash"
+"$TMP/test_dash"
+
+# Pixel-accurate ZR HUD proof for ready, active, recovery and padding.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/raster" -I"$ROOT/native/include" \
+  "$ROOT/raster/dash_hud.c" \
+  "$ROOT/raster/tests/test_dash_hud.c" \
+  -lm -o "$TMP/test_dash_hud"
+"$TMP/test_dash_hud"
