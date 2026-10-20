@@ -14,6 +14,7 @@
 #include "heman_finale.h"
 #ifdef HM_AIR_SMASH_PROBE
 #include "heman_air_smash.h"
+#include "air_smash_hud.h"
 #endif
 #include "dash_hud.h"
 #include "stage_marker.h"
