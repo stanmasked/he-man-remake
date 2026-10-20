@@ -13,7 +13,7 @@ patched. In particular, this test is NOT a game screenshot generator.
 - **Stage 2:** D-pad Right, fresh A350 jump past real x570 hazard, native
   x735 CLEAR; fresh A510 advances to stage 3. No premature FINISH allowed.
 - **Stage 3:** D-pad Right from x48, trigger authored x434 checkpoint and
-  x678 hazard; verify source-native respawn badge, try real A957 jump to
+  x678 hazard; verify source-native respawn badge, try real A952 jump to
   avoid the hazard, and earn native x842 CLEAR/FINISH. Final B1140 must
   reset the *third* room and clear the on-screen FINISH and respawn badge.
 - The script samples stage digits 1/2/3 via **all 15 native glyph cells**,
