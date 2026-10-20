@@ -1,0 +1,83 @@
+name: He-Man source C99 RGB to Python optical parser bridge
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/three-room-source-rgb-bridge.yml'
+      - 'native/src/**'
+      - 'native/include/**'
+      - 'native/tests/test_three_room_optical_oracle.c'
+      - 'tools/instrument_nexium_three_room.py'
+      - 'tools/verify_source_raster_bridge.py'
+      - 'tools/verify_nexium_three_room_pngs.py'
+      - 'tools/verify_nexium_guest_pngs.py'
+      - 'raster/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate-exact-guest-hid:
+    name: Verify real C99 host RGB with Python pixel reader on ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install optical reader dependency
+        run: python -m pip install 'Pillow==11.3.0'
+      - name: Compile actual authored game adapters and follow identical guest button edges
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            -I native/include -I raster \
+            native/src/heman_core.c \
+            native/src/heman_mask.c \
+            native/src/heman_combat.c \
+            native/src/heman_session.c \
+            native/src/heman_pause.c \
+            native/src/heman_dash.c \
+            native/src/heman_finale.c \
+            native/src/heman_air_smash.c \
+            native/src/heman_stage_chain.c \
+            native/src/heman_three_room_chain.c \
+            native/src/heman_synthetic_room2.c \
+            native/src/heman_synthetic_room3.c \
+            raster/raster_scene.c \
+            raster/stage_marker.c \
+            raster/third_room_marker.c \
+            raster/dash_hud.c \
+            raster/finale_overlay.c \
+            raster/air_smash_hud.c \
+            native/tests/test_three_room_optical_oracle.c \
+            -lm -o /tmp/heman-three-room-optical-oracle
+          mkdir -p /tmp/heman-source-rgb
+          /tmp/heman-three-room-optical-oracle /tmp/heman-source-rgb
+          python tools/verify_source_raster_bridge.py /tmp/heman-source-rgb
+          python - <<'PY'
+          from pathlib import Path
+          file=Path('/tmp/heman-source-rgb/source-frame-1045.rgb')
+          raw=bytearray(file.read_bytes())
+          at=(155*640+258)*3
+          raw[at:at+3]=bytes((0,0,0))
+          file.write_bytes(raw)
+          print('INJECT NEGATIVE SOURCE-ONLY TEST: tamper host FINISH glyph')
+          PY
+          if python tools/verify_source_raster_bridge.py /tmp/heman-source-rgb; then
+            echo 'ERROR: modified source raster was not rejected' >&2
+            exit 1
+          fi
+          echo 'PASS: actual source RGB bridge rejected tampered FINISH glyph'
+      - name: Evidence limitations
+        run: |
+          echo 'This verifies independent HOST RGB bytes, not NeXium guest PNGs or guest HID logs.'
+          echo 'No physics, map, guest RAM or image bytes may be changed to force green.'
