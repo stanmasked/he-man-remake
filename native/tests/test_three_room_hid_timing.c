@@ -89,7 +89,8 @@ int main(void) {
     assert(hm_session_init(&world,&combat,&game)==HM_SESSION_OK);
     for(frame=1u;frame<=1190u;++frame) {
         const unsigned before=held;
-        const unsigned now=buttons_at(frame,before);\n        unsigned down;
+        const unsigned now=buttons_at(frame,before);
+        unsigned down;
         hm_session_result result;
         hm_input input;
         held=now;
