@@ -90,3 +90,25 @@ a separate NeXium controller/HUD test.
 Both rooms are completely synthetic and bear **no** relationship to
 the content, artwork, collision mapping, plot or rules of the original
 commercial iOS game. No original IPA or extracted resource is shipped.
+
+## Shared second-room geometry — Stage 068
+
+The optional `CHAIN_PROBE=1` game now sources its **actual**
+`48 × 24` tile grid, four event definitions and the second-room enemy
+configuration from `native/src/heman_synthetic_room2.c`. This is the same
+C99 function invoked by the host tests — **not** a separately invented
+test copy. All tile rows (floor 18, raised platforms 13 and 15) and
+pickup/checkpoint/hazard/exit coordinates therefore have one authority.
+
+The builder checks arguments and the native physics/combat validators
+before committing the world, combat configuration or tile memory.
+`native/tests/test_synthetic_room2.c` verifies exact cells and event
+types, unchanged output on invalid arguments, deterministic repetition,
+and **real native simulation** reaching the pickup, checkpoint, hazard,
+and final exit. CI tests this under GCC and Clang, while the existing
+actual NeXium PNG progression workflow still validates entrance from
+the first room into this scene.
+
+The ordinary one-room NRO, existing controls and the commercial game's
+source data are not modified by this internal refactor. Full
+original-game content and physics fidelity remain unverified.
