@@ -132,6 +132,7 @@ static int oracle(unsigned f,const hm_world *w,
     view.world=w;view.combat=c;view.game=g;
     if(!hm_raster_render(raster,RW,RH,RW,&view) ||
        !hm_three_room_marker(raster,RW,RH,RW,(uint8_t)stage) ||
+       (stage==2u && !hm_three_room_progress(raster,RW,RH,RW,g->player.x)) ||
        (stage>=1u && !hm_dash_hud(raster,RW,RH,RW,dash)) ||
        (stage==2u &&
            !hm_finale_overlay(raster,RW,RH,RW,1u,
@@ -189,6 +190,23 @@ static int oracle(unsigned f,const hm_world *w,
     if(cyan!=9u) {
         fprintf(stderr,"Stage093 world-Y cyan marker=%u at %u\n",cyan,f);
         return 0;
+    }
+    /* Unclamped source world-X cursor samples prove progress even when
+       the legacy magenta HUD saturated at x210. Source-only oracle. */
+    {
+        unsigned bright=0u,xx,yy;
+        const unsigned expected=70u+(unsigned)(g->player.x*0.5f+0.5f);
+        for(yy=330u;yy<340u;++yy)
+            for(xx=70u;xx<530u;++xx)
+                if(PIXEL(xx,yy)==UINT32_C(0xffb2f82a))++bright;
+        if((stage==2u && (bright!=40u ||
+            PIXEL(expected+1u,335u)!=UINT32_C(0xffb2f82a))) ||
+           (stage<2u && bright!=0u)) {
+            fprintf(stderr,"Stage096 source progress marker failed "
+                           "frame=%u stage=%u count=%u x=%.2f\n",
+                           f,stage,bright,g->player.x);
+            return 0;
+        }
     }
     if(f==1080u) {
         memcpy(frozen_raster,raster,sizeof(raster));

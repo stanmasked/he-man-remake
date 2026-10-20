@@ -14,7 +14,8 @@ from pathlib import Path
 from instrument_nexium_three_room import FRAMES
 from verify_nexium_guest_pngs import describe
 from verify_nexium_three_room_pngs import (
-    _digit, _overlay, _world_y,
+    _digit, _overlay, _world_y, _progress_world_x,
+    WORLD_X_SAMPLE_BOUNDS,
     CLEAR_BORDER, CLEAR_LETTER,
     EXPECTED_CLEAR, EXPECTED_FINISH, EXPECTED_STAGES,
     RETRY_GREEN,
@@ -55,8 +56,10 @@ def verify(directory: Path) -> dict:
         clear_letter = img.getpixel((553, 53)) == CLEAR_LETTER
         if clear_border != clear_letter:
             raise ValueError(f"Partial C99-rendered CLEAR at {frame}")
+        stage = _digit(img)
         values[frame] = {
-            "stage": _digit(img),
+            "stage": stage,
+            "full_world_x": _progress_world_x(img, stage),
             "clear": clear_border,
             "finish": _overlay(img),
             "world_x": round(world_x, 2),
@@ -85,6 +88,14 @@ def verify(directory: Path) -> dict:
         raise ValueError("Host native third room D-pad movement absent")
     if values[970]["world_y"] > values[945]["world_y"] - 25:
         raise ValueError("Host source renderer cannot depict third room A jump")
+    for frame, (lo, hi) in WORLD_X_SAMPLE_BOUNDS.items():
+        x = values[frame]["full_world_x"]
+        if x is None or not lo <= x <= hi:
+            raise ValueError(f"Source/reader world-X parity failed at {frame}: {x}")
+    if values[820]["full_world_x"] - values[850]["full_world_x"] < 100:
+        raise ValueError("Source native hazard/respawn world-X jump missing")
+    if values[1045]["full_world_x"] - values[970]["full_world_x"] < 70:
+        raise ValueError("Source native exit traverse world-X missing")
     if freeze[1080] != freeze[1120]:
         raise ValueError("Host real RGB source pixels changed after FINISH")
     if abs(values[1190]["world_x"] - values[1170]["world_x"]) > 6:

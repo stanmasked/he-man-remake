@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from instrument_nexium_three_room import FRAMES, HID_EVENTS, instrument
 from verify_nexium_three_room_pngs import (
     verify, DIGITS, WHITE, FACE, GOLD, CLEAR_BORDER, CLEAR_LETTER,
-    RETRY_GREEN, CYAN_HEIGHT,
+    RETRY_GREEN, CYAN_HEIGHT, PROGRESS_COLOR,
 )
 from test_nexium_hid_instrument import SOURCE
 
@@ -23,6 +23,7 @@ class FakeRGB:
     def __init__(self, stage, clear, finish, respawn, y, x, payload):
         self.stage, self.clear, self.finish = stage, clear, finish
         self.respawn, self.y, self.x, self.payload = respawn, y, x, payload
+        self.progress = None
 
     def getpixel(self, xy):
         if xy == (393, 4):
@@ -45,6 +46,9 @@ class FakeRGB:
             return RETRY_GREEN if self.finish else (0, 0, 0)
         if xy == (522, 62):
             return RETRY_GREEN if self.respawn else (0, 0, 0)
+        if 70 <= x < 530 and 330 <= y < 340:
+            left = 70 + int(self.progress / 2 + 0.5) if self.progress is not None else -1
+            return PROGRESS_COLOR if left <= x < left + 4 else (0, 0, 0)
         if x == 476 and 80 <= y < 340:
             return CYAN_HEIGHT if self.y <= y < self.y + 9 else (0, 0, 0)
         raise AssertionError(f"unhandled pixel {xy}")
@@ -85,6 +89,13 @@ class ThirdRoomMockContractTests(unittest.TestCase):
             x = 245 if f == 75 else 121 if f in (105, 535, 1170, 1190) else 445
             payload = b"stage-3-frozen" if f in (1080, 1120) else bytes([idx + 1])
             self.frames[f] = FakeRGB(stage, clear, finish, respawn, y, x, payload)
+            if stage == 3:
+                self.frames[f].progress = {
+                    535: 60, 650: 290, 820: 630, 850: 460,
+                    930: 620, 945: 650, 970: 700,
+                    1045: 828, 1080: 828, 1120: 828,
+                    1170: 48, 1190: 48,
+                }[f]
             (self.folder / f"raster-frame-{f:04}.png").write_bytes(b"fake")
         self.log = self.folder / "raster-runner.log"
         self.log.write_text("\n".join([
@@ -128,6 +139,21 @@ class ThirdRoomMockContractTests(unittest.TestCase):
     def test_stage_three_must_appear(self):
         self.frames[535].stage = 2
         with self.assertRaisesRegex(ValueError, "three-stage"):
+            self.run_check()
+
+    def test_corrupted_unclamped_world_x_rejected(self):
+        self.frames[820].progress = 290
+        with self.assertRaisesRegex(ValueError, "world-X"):
+            self.run_check()
+
+    def test_forged_progress_cursor_missing_rejected(self):
+        self.frames[1045].progress = None
+        with self.assertRaisesRegex(ValueError, "world-X"):
+            self.run_check()
+
+    def test_world_x_hud_must_not_appear_on_earlier_stages(self):
+        self.frames[365].progress = 560
+        with self.assertRaisesRegex(ValueError, "leaked"):
             self.run_check()
 
     def test_corrupt_third_stage_glyph_rejected(self):

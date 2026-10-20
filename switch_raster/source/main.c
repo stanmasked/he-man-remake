@@ -320,6 +320,10 @@ int main(int argc, char **argv) {
 #ifdef HM_THREE_ROOM_PROBE
            || !hm_three_room_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                                     stride/sizeof(uint32_t),stage)
+           || (stage==2u &&
+               !hm_three_room_progress(pixels,HM_RASTER_WIDTH,
+                         HM_RASTER_HEIGHT,stride/sizeof(uint32_t),
+                         game.player.x))
 #else
            || !hm_stage_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                                stride/sizeof(uint32_t),stage)
