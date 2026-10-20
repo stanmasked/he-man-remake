@@ -78,6 +78,24 @@ def verify(folder: Path) -> dict:
     from verify_nexium_guest_pngs import describe
 
     lines = (folder / "raster-runner.log").read_text().splitlines()
+    expected_hid = [
+        f"HEMAN_THREE_HID frame={frame} {action}"
+        for frame, action in HID_EVENTS
+    ]
+    observed_hid = [line for line in lines
+                    if line.startswith("HEMAN_THREE_HID frame=")]
+    if observed_hid != expected_hid:
+        raise ValueError("Missing, duplicated or extra real guest HID transcript")
+    observed_png = [line for line in lines
+                    if line.startswith("HEMAN_GUEST_FRAME_PNG frame=")]
+    expected_headers = [
+        f"HEMAN_GUEST_FRAME_PNG frame={frame} dimensions=640x360 path="
+        for frame in FRAMES
+    ]
+    if len(observed_png) != len(FRAMES) or any(
+            not line.startswith(prefix)
+            for line, prefix in zip(observed_png, expected_headers)):
+        raise ValueError("Missing/duplicated/unexpected guest PNG attestation")
     if "Production runner complete" not in "\n".join(lines):
         raise ValueError("Pinned real NeXium production runner never completed")
     for frame, action in HID_EVENTS:
@@ -150,7 +168,7 @@ def verify(folder: Path) -> dict:
         raise ValueError("Real stage-3 A jump did not move the world-Y marker")
     if frozen[1080] != frozen[1120]:
         raise ValueError("Game advanced after source-native third-stage FINISH")
-    if values[1190]["world_x_marker"] - values[1170]["world_x_marker"] > 6:
+    if abs(values[1190]["world_x_marker"] - values[1170]["world_x_marker"]) > 6:
         raise ValueError("Stage 3 drifted after native B restart")
     if values[1170]["world_x_marker"] > 150:
         raise ValueError("Stage-3 B failed to restore the real starting position")
