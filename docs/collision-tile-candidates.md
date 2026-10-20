@@ -21,10 +21,27 @@ PYTHONPATH=src python -m heman_tools.collision_inventory \
   --map MUMap1-1.map \
   --out local_reports/level1-collision-inventory.json
 
+# Compare screen-med and screen-xlarge data (private structural parity check).
+PYTHONPATH=src python -m heman_tools.collision_inventory \
+  --ipa /private/He-Man-v2.0.0.ipa \
+  --map MUMap1-1.map \
+  --compare-screens \
+  --out local_reports/level1-screen-parity.json
+
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
 The output path must be a JSON file beneath the current `local_reports/` directory (ignored by Git); the command prints only the number of candidate cells. The program does not upload the IPA or any extracted bytes, and GitHub CI tests use an entirely fabricated multilayer map stored in a temporary fabricated IPA.
+
+## Cross-screen verification
+
+The optional `--compare-screens` mode checks the same named map in both
+resource packs. It records two distinct results: **exact original map byte
+equality** and equality of derived candidate statistics. The byte check is
+stricter because distinct layouts can coincidentally have the same aggregate
+statistics. A mismatch is recorded as evidence of uncertainty, not silently
+normalized. Missing or duplicated archive entries are rejected; no original
+map bytes, raw grids or original art are written to the report.
 
 ## Evidence still required
 
