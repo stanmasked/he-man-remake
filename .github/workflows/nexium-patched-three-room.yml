@@ -99,6 +99,7 @@ jobs:
           git -C /tmp/nexium-upstream fetch --depth 1 origin b6149f647f1b0824e450555beb6cfc16b6f0e075
           git -C /tmp/nexium-upstream checkout -q --detach FETCH_HEAD
           git -C /tmp/nexium-upstream submodule update --init --depth 1
+          mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
           # Verify the real pinned kernel knows the expected NPAD button bits,
           # HID 25ms polling and exact [hid-publish] event format BEFORE build.
           python3 "$GITHUB_WORKSPACE/tools/check_pinned_nexium_hid_source.py" \
@@ -106,7 +107,6 @@ jobs:
             tee "$GITHUB_WORKSPACE/boot-evidence/pinned-kernel-hid-source.json"
           git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
-          mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
           python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_three_room.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
           # The new PNGs are guest frame_rx output, not Xvfb splash screenshots.
       - name: Compile genuine patched upstream debug_boot program
