@@ -372,3 +372,17 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_air_smash_hud.c" \
   -lm -o "$TMP/test_air_smash_hud"
 "$TMP/test_air_smash_hud"
+
+
+# Stage 088: isolated third training room. The current real Switch course
+# remains two rooms until a separate opt-in stage-chain integration.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_synthetic_room3.c" \
+  "$ROOT/native/tests/test_synthetic_room3.c" \
+  -lm -o "$TMP/test_synthetic_room3"
+"$TMP/test_synthetic_room3"
