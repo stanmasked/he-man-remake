@@ -1,5 +1,15 @@
 #include "heman_stage_chain.h"
 
+int hm_chain_continue_edge_allowed(const hm_session *session, uint8_t stage,
+                                   uint8_t paused, uint8_t minus_edge,
+                                   uint8_t a_edge) {
+    /* The two buttons may be asserted together in one real HID snapshot.
+       Pausing must win, so no stage progress is consumed by that edge. */
+    return session != 0 && stage == 0u && paused == 0u &&
+           minus_edge == 0u && a_edge == 1u &&
+           session->player.completed == 1u;
+}
+
 hm_chain_result hm_chain_try_advance(
     const hm_world *next_world, const hm_combat_config *next_combat,
     hm_session *session, uint8_t *stage, uint8_t continue_pressed) {
