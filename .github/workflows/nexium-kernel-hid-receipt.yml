@@ -1,0 +1,34 @@
+name: He-Man pinned NeXium kernel HID trace validation contract
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nexium-patched-three-room.yml'
+      - '.github/workflows/nexium-kernel-hid-receipt.yml'
+      - 'tools/verify_nexium_hid_publication.py'
+      - 'tools/instrument_nexium_three_room.py'
+      - 'tests/test_nexium_hid_publication.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-log-parser-regression:
+    name: Reject unsampled guest A/B presses on Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Run fail-closed simulated kernel log mutation tests
+        run: python -m unittest discover -s tests -p test_nexium_hid_publication.py -v
+      - name: Evidence limitation
+        run: |
+          echo 'These tests use simulated source-format trace records only.'
+          echo 'Only the separate NeXium guest run can produce authentic kernel traces.'
