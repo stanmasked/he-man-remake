@@ -109,6 +109,36 @@ int main(void) {
     assert(player.completed==1u);
     assert(hm_step(&world,&player,idle,1.0f/60.0f)==HM_OK);
 
+    /* The Switch uses the SAME native session+combat engine as this test:
+       both a real sword attack and the one-shot pickup heal must work on
+       canonical second-room coordinates, not a separate fake level. */
+    assert(hm_session_init(&world,&combat,&game)==HM_SESSION_OK);
+    game.player.x=260.0f;
+    game.player.feet_y=288.0f;
+    assert(hm_session_step(&world,&combat,&game,idle,1u,
+                           1.0f/60.0f)==HM_SESSION_OK);
+    assert(game.combat.enemy_hp==1u && game.combat.sword_hits==1u);
+    for(frame=0u;frame<15u;++frame)
+        assert(hm_session_step(&world,&combat,&game,idle,0u,
+                               1.0f/60.0f)==HM_SESSION_OK);
+    assert(hm_session_step(&world,&combat,&game,idle,1u,
+                           1.0f/60.0f)==HM_SESSION_OK);
+    assert(game.combat.enemy_hp==0u && game.combat.sword_hits==2u);
+    assert(hm_session_init(&world,&combat,&game)==HM_SESSION_OK);
+    game.player.x=154.0f;
+    game.player.feet_y=288.0f;
+    game.combat.player_hp=2u;
+    for(frame=0u;frame<10u && !(game.player.picked & 1u);++frame)
+        assert(hm_session_step(&world,&combat,&game,right,0u,
+                               1.0f/60.0f)==HM_SESSION_OK);
+    assert((game.player.picked & 1u)!=0u);
+    assert(game.combat.player_hp==3u);
+    game.combat.player_hp=2u;
+    for(frame=0u;frame<12u;++frame)
+        assert(hm_session_step(&world,&combat,&game,idle,0u,
+                               1.0f/60.0f)==HM_SESSION_OK);
+    assert(game.combat.player_hp==2u); /* no repeated pickup healing */
+
     /* Re-running the builder is deterministic and unrelated to current
        gameplay progress or the visible stage-1 world pointer. */
     memset(other,0xff,sizeof(other));
