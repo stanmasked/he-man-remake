@@ -6,6 +6,7 @@ proprietary source bytes. Blank forms MUST fail the Stage 076/077 validators.
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -30,7 +31,7 @@ def blank_scenario(scenario_id: str) -> dict:
             "evidence_kind": None,
             "stationary_anchor_id": None,
             "pixels_per_unit": None,
-            "observations": [dict(row) for row in rows],
+            "observations": deepcopy(rows),
         }
     return {
         "template_only": True,
