@@ -28,7 +28,7 @@ class FakeFrame:
 
     def getpixel(self, xy):
         if xy == (404, 9):
-            return STAGE_ONE if self.stage == 1 else STAGE_TWO
+            return STAGE_ONE if self.stage == 1 else STAGE_TWO if self.stage == 2 else (0, 0, 0)
         if xy == (408, 9):
             return STAGE_TWO
         if xy == (437, 16):
@@ -133,6 +133,20 @@ class DashGuestContractTests(unittest.TestCase):
                   f"{self.root / 'raster-frame-0125.png'}\n")
         self.log.write_text(self.log.read_text() + marker)
         with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.run_verifier()
+
+    def test_malformed_duplicate_png_dimensions_rejected(self):
+        self.log.write_text(
+            self.log.read_text() +
+            f"HEMAN_GUEST_FRAME_PNG frame=125 dimensions=320x180 "
+            f"path={self.root / 'raster-frame-0125.png'}\n"
+        )
+        with self.assertRaisesRegex(ValueError, "duplicate/malformed"):
+            self.run_verifier()
+
+    def test_unknown_stage_pixel_rejected(self):
+        self.frames[125].stage = 0
+        with self.assertRaisesRegex(ValueError, "unknown stage indicator"):
             self.run_verifier()
 
     def test_png_from_different_run_rejected(self):
