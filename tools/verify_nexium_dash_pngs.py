@@ -35,10 +35,16 @@ def verify(folder: Path) -> dict:
     hashes = {}
     for frame in FRAMES:
         prefix = f"HEMAN_GUEST_FRAME_PNG frame={frame} dimensions=640x360 path="
-        captures = [line[len(prefix):] for line in logs
-                    if line.startswith(prefix)]
-        if len(captures) != 1:
-            raise ValueError(f"Missing authentic NeXium frame or duplicate {frame}")
+        # Inspect every attestation for this frame, including records with
+        # unexpected dimensions. Otherwise an additional malformed capture
+        # could be ignored while a valid-looking one satisfies the gate.
+        frame_prefix = f"HEMAN_GUEST_FRAME_PNG frame={frame} "
+        records = [line for line in logs if line.startswith(frame_prefix)]
+        if len(records) != 1 or not records[0].startswith(prefix):
+            raise ValueError(
+                f"Missing authentic NeXium frame or duplicate/malformed {frame}"
+            )
+        captures = [records[0][len(prefix):]]
         filename = folder / f"raster-frame-{frame:04}.png"
         if not filename.is_file():
             raise FileNotFoundError(filename)
@@ -57,7 +63,10 @@ def verify(folder: Path) -> dict:
         marker_count, diversity, world_x = describe(rgb)
         if marker_count != 192 or diversity < 8:
             raise ValueError(f"Guest frame {frame} lacks native player X marker")
-        stages[frame] = 1 if rgb.getpixel((404, 9)) == STAGE_ONE else 2
+        stage_color = rgb.getpixel((404, 9))
+        if stage_color not in (STAGE_ONE, STAGE_TWO):
+            raise ValueError(f"Guest frame {frame} has unknown stage indicator")
+        stages[frame] = 1 if stage_color == STAGE_ONE else 2
         if rgb.getpixel((408, 9)) != STAGE_TWO:
             raise ValueError(f"Guest frame {frame} lost source-only stage indicator")
         xs[frame] = round(world_x, 2)
