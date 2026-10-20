@@ -17,7 +17,7 @@ HID_EVENTS = (
     (95, "buttons="),
     (110, "buttons=DRIGHT"),
     (120, "buttons=DRIGHT,ZR"),
-    (123, "buttons=DRIGHT"),
+    (128, "buttons=DRIGHT"),
     (165, "buttons="),
 )
 
@@ -38,7 +38,7 @@ def instrument(source: str) -> str:
             f"if matches!(frames, {schedule}) {{",
             '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
             "    let action = match frames {",
-            '        45 | 110 | 123 => "buttons=DRIGHT",',
+            '        45 | 110 | 128 => "buttons=DRIGHT",',
             '        120 => "buttons=DRIGHT,ZR",',
             '        90 => "buttons=A",',
             '        78 | 95 | 165 => "buttons=",',
