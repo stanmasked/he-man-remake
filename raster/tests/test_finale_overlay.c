@@ -30,6 +30,13 @@ int main(void) {
     assert(g.pixels[130u*STRIDE+218u]==UINT32_C(0xff1b2c46));
     assert(g.pixels[155u*STRIDE+258u]==UINT32_C(0xfff1e6bf));
     assert(g.pixels[201u*STRIDE+254u]==UINT32_C(0xff42d58a));
+    /* The native FINISH panel includes a deliberate B retry keycap. */
+    assert(g.pixels[210u*STRIDE+311u]==UINT32_C(0xff42d58a));
+    assert(g.pixels[212u*STRIDE+313u]==UINT32_C(0xff1b2c46));
+    assert(g.pixels[213u*STRIDE+315u]==UINT32_C(0xfff1e6bf));
+    assert(g.pixels[215u*STRIDE+322u]==UINT32_C(0xfff1e6bf));
+    assert(g.pixels[218u*STRIDE+322u]==UINT32_C(0xfff1e6bf));
+    assert(g.pixels[223u*STRIDE+311u]==UINT32_C(0xff1b2c46));
     assert(g.pixels[110u*STRIDE+200u]==SENTINEL);
     for(y=0u;y<H;++y) {
         assert(g.pixels[y*STRIDE+640u]==SENTINEL);

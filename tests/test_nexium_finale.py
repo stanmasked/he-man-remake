@@ -42,6 +42,10 @@ class FakeRGB:
             return FINISH_GLYPH if self.finish else (0, 0, 0)
         if xy == (254, 201):
             return FINISH_UNDERLINE if self.finish else (0, 0, 0)
+        if xy == (311, 210):
+            return FINISH_UNDERLINE if self.finish else (0, 0, 0)
+        if xy in ((315, 213), (322, 218)):
+            return FINISH_GLYPH if self.finish else (0, 0, 0)
         if xy[0] == 476:
             return CYAN_HEIGHT if self.height <= xy[1] < self.height + 9 else (0, 0, 0)
         raise AssertionError(f"unexpected pixel {xy}")
@@ -177,6 +181,20 @@ class FinaleGuestSyntheticContractTests(unittest.TestCase):
         self.frames[465].getpixel = lambda p: (
             (0, 0, 0) if p == (254, 201) else old(p))
         with self.assertRaisesRegex(ValueError, "Partially drawn FINISH"):
+            self.run_checker()
+
+    def test_finish_without_retry_hint_is_rejected(self):
+        old = self.frames[465].getpixel
+        self.frames[465].getpixel = lambda p: (
+            (0, 0, 0) if p == (311, 210) else old(p))
+        with self.assertRaisesRegex(ValueError, "B retry prompt"):
+            self.run_checker()
+
+    def test_early_retry_hint_is_rejected(self):
+        old = self.frames[330].getpixel
+        self.frames[330].getpixel = lambda p: (
+            FINISH_UNDERLINE if p == (311, 210) else old(p))
+        with self.assertRaisesRegex(ValueError, "B retry prompt"):
             self.run_checker()
 
     def test_finishing_does_not_hide_emulator_motion(self):
