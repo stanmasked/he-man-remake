@@ -108,6 +108,22 @@ class ContactScenarioTests(unittest.TestCase):
                 self.assertEqual([i for i, (_, jump)
                                   in enumerate(controls) if jump], [frame])
 
+    def test_nonstring_scenario_id_rejected_without_type_error(self):
+        for bad in (["landing"], {"name": "landing"}, None, 5, True):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "unsupported"):
+                scripted_controls(bad)
+                # If scripted input rejects this identifier, the report must too.
+
+    def test_nonstring_single_and_suite_identifier_rejected(self):
+        data = artificial_trace("landing")
+        data["scenario_id"] = ["landing"]
+        with self.assertRaisesRegex(ValueError, "unsupported"):
+            validate_scenario_trace(data)
+        suite = artificial_suite()
+        suite["traces"][0]["scenario_id"] = ["landing"]
+        with self.assertRaisesRegex(ValueError, "each required scenario"):
+            validate_scenario_suite(suite)
+
     def test_unsupported_protocol_rejected(self):
         with self.assertRaisesRegex(ValueError, "unsupported"):
             scripted_controls("fake-level")
