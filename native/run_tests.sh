@@ -272,6 +272,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_combat.c" \
   "$ROOT/native/src/heman_session.c" \
   "$ROOT/native/src/heman_stage_chain.c" \
+  "$ROOT/native/src/heman_synthetic_room2.c" \
   "$ROOT/native/tests/test_stage_chain.c" \
   -lm -o "$TMP/test_stage_chain"
 "$TMP/test_stage_chain"
