@@ -212,8 +212,12 @@ jobs:
         run: |
           set -euo pipefail
           sha256sum nros/heman_three_room_probe.nro > boot-evidence/guest-nro-after.sha256
-          sed "s@.*/nros/@nros/@" boot-evidence/guest-nro-before.sha256 > boot-evidence/nro-before-normalized.sha256
-          diff -u boot-evidence/nro-before-normalized.sha256 boot-evidence/guest-nro-after.sha256
+          # Before stores an absolute path; after stores a relative path.
+          # Hash the real guest NRO at both ends and compare only digests.
+          # The previous greedy sed swallowed the digest along with the path.
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          test "$(awk '{print $1}' boot-evidence/guest-nro-before.sha256)" = \
+               "$(awk '{print $1}' boot-evidence/guest-nro-after.sha256)"
           python3 tools/verify_nexium_three_room_pngs.py boot-evidence | tee boot-evidence/guest-three-room-report.json
           sha256sum nros/heman_three_room_probe.nro boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frame-sha256.txt
       - name: Upload logs and guest PNGs even on failure
