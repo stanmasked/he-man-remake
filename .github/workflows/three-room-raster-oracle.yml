@@ -1,0 +1,59 @@
+name: He-Man third-room raster oracle at NeXium proof frames
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/three-room-raster-oracle.yml'
+      - 'native/src/**'
+      - 'native/include/**'
+      - 'native/tests/test_three_room_optical_oracle.c'
+      - 'tools/instrument_nexium_three_room.py'
+      - 'raster/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate-exact-guest-hid:
+    name: Render 18 actual C99 frame receipts with ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual authored game adapters and follow identical guest button edges
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            -I native/include -I raster \
+            native/src/heman_core.c \
+            native/src/heman_mask.c \
+            native/src/heman_combat.c \
+            native/src/heman_session.c \
+            native/src/heman_pause.c \
+            native/src/heman_dash.c \
+            native/src/heman_finale.c \
+            native/src/heman_air_smash.c \
+            native/src/heman_stage_chain.c \
+            native/src/heman_three_room_chain.c \
+            native/src/heman_synthetic_room2.c \
+            native/src/heman_synthetic_room3.c \
+            raster/raster_scene.c \
+            raster/stage_marker.c \
+            raster/third_room_marker.c \
+            raster/dash_hud.c \
+            raster/finale_overlay.c \
+            raster/air_smash_hud.c \
+            native/tests/test_three_room_optical_oracle.c \
+            -lm -o /tmp/heman-three-room-optical-oracle
+          /tmp/heman-three-room-hid-schedule
+      - name: Evidence limitations
+        run: |
+          echo 'This verifies source-authored C99 pixel samples, not NeXium frame_rx PNGs.'
+          echo 'No physics, map, guest RAM or image bytes may be changed to force green.'
