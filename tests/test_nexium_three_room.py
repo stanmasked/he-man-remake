@@ -113,7 +113,7 @@ class ThirdRoomMockContractTests(unittest.TestCase):
         source = instrument(SOURCE)
         self.assertEqual(source.count("HEMAN_THREE_HID frame="), 2)
         self.assertEqual(source.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
-        self.assertIn('957 => "buttons=DRIGHT,A"', source)
+        self.assertIn('952 => "buttons=DRIGHT,A"', source)
         self.assertIn('1140 => "buttons=B"', source)
         with self.assertRaises(ValueError):
             instrument(source)
