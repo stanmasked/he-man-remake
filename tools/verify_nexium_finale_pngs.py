@@ -77,8 +77,12 @@ def verify(folder: Path) -> dict:
         has_border = rgb.getpixel((208, 120)) == FINISH_BORDER
         has_glyph = rgb.getpixel((258, 155)) == FINISH_GLYPH
         has_underline = rgb.getpixel((254, 201)) == FINISH_UNDERLINE
-        if len(set((has_border, has_glyph, has_underline))) != 1:
-            raise ValueError(f"Partially drawn FINISH panel at frame {frame}")
+        has_retry_prompt = (
+            rgb.getpixel((311, 210)) == FINISH_UNDERLINE
+            and rgb.getpixel((315, 213)) == FINISH_GLYPH
+            and rgb.getpixel((322, 218)) == FINISH_GLYPH)
+        if len(set((has_border, has_glyph, has_underline, has_retry_prompt))) != 1:
+            raise ValueError(f"Partially drawn FINISH or B retry prompt at frame {frame}")
         finish[frame] = has_border
         heights[frame] = _height_marker(rgb)
         xs[frame] = round(world_x, 2)
