@@ -46,7 +46,8 @@ hm_session_result hm_air_smash_step(
        while paused or toggling. The native pause/finale code still runs. */
     activate = (uint8_t)(stage == 1u && start_smash &&
                !*paused && !toggle_pause && !movement.reset &&
-               !was_completed && was_airborne && !ability->armed &&
+               !was_completed && was_airborne &&
+               session->player.frame > 0u && !ability->armed &&
                ability->cooldown == 0u && session->combat.player_hp > 0u);
     if (activate) {
         next.armed = 1u;
