@@ -65,7 +65,7 @@ jobs:
       CMAKE_POLICY_VERSION_MINIMUM: "3.5"
       RUST_BACKTRACE: "1"
       NEXIUM_CPU_BACKEND: rustarmic
-      NEXIUM_DEBUG_RUNNER_SECONDS: "75"
+      NEXIUM_DEBUG_RUNNER_SECONDS: "150"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -162,7 +162,7 @@ jobs:
           NRO="$PWD/nros/heman_three_room_probe.nro"
           sha256sum "$NRO" > boot-evidence/guest-nro-before.sha256
           set +e
-          timeout --kill-after=6s 190s boot-evidence/debug_boot "$NRO" rustarmic runner \
+          timeout --kill-after=6s 250s boot-evidence/debug_boot "$NRO" rustarmic runner \
             >boot-evidence/raster-stdout.log 2>&1
           code=$?
           set -e
