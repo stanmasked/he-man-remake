@@ -106,12 +106,11 @@ class HostOnlyHidPublicationTests(unittest.TestCase):
 
     def test_unmapping_after_active_input_rejected(self):
         trace = make_trace()
-        trace = trace.replace("npad=[0, 0, 0, 0, 0, 0, 0]", "npad=[0, 0, 0, 0, 0, 0, 0]")
         lines = trace.splitlines()
         # Frame 78 is the neutral release after real DRIGHT.
         lines[2] = lines[2].replace("mapped=0x101000", "mapped=0x0")
         with self.assertRaisesRegex(ValueError, "not mapped"):
-            verify("\\n".join(lines) + "\\n")
+            verify("\n".join(lines) + "\n")
 
     def test_injected_buttons_not_written_to_npad_rejected(self):
         text = make_trace()
