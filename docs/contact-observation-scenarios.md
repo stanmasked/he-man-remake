@@ -77,3 +77,25 @@ authenticate captures or landmark identity. Report fields always retain:
 The prior eight-category manual evidence gate remains mandatory before
 original collision surfaces could be used in the Nintendo Switch engine.
 No gameplay/runtime code is modified by this stage.
+
+
+## Blank, non-evidentiary worksheets from this repository
+
+The source-controlled generator creates worksheets with exactly the logical
+input schedule above, but **no recorded contacts or coordinates**. It does not
+read the original IPA and cannot create real captures:
+
+```sh
+PYTHONPATH=src python -m heman_tools.contact_worksheets \
+  --scenario landing --out local_reports/BLANK-landing.json
+PYTHONPATH=src python -m heman_tools.contact_worksheets \
+  --suite --out local_reports/BLANK-five-scenarios.json
+```
+
+The generator refuses to overwrite existing files and enforces the ignored
+`local_reports/` directory. Blank placeholders are JSON `null`, and the
+validators **must reject** them until independently recorded values replace
+the placeholders. In the five-scenario suite, a total of 650 frames per
+platform (1,300 total) have an input schedule but no measured coordinates,
+landmark identities, physical scale or contact labels. Never represent blank
+sheets or fabricated test fixtures as original iOS observations.
