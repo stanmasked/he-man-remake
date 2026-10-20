@@ -34,12 +34,13 @@ hm_session_result hm_finale_session_step(
                                     movement, attack_pressed, toggle_pause,
                                     start_dash, dt);
     if (!toggle_pause && movement.reset && !*paused) {
-        /* Reuse the real native reset transaction. Cancel any outstanding
-           boost only AFTER that reset successfully commits. */
-        hm_session_result result = hm_dash_session_step(
-            world, combat, session, paused, dash, movement,
-            attack_pressed, 0u, start_dash, dt);
+        /* Normal B respawn preserves HM_EXIT completion, so a deliberate
+           *new run* must initialize a fresh native gameplay session.
+           Commit new state and both dash counters only on success. */
+        hm_session fresh;
+        hm_session_result result = hm_session_init(world, combat, &fresh);
         if (result == HM_SESSION_OK) {
+            *session = fresh;
             dash->remaining = 0u;
             dash->recovery = 0u;
         }
