@@ -71,7 +71,8 @@ sh native/run_tests.sh clang
 
 This variant starts with an opt-in short first room, whose normal C99
 `HM_EXIT` event shows **CLEAR** when reached. **Press A after CLEAR**
-to load the second room. The transition is not automatic. It atomically
+to load the second room. The transition is not automatic. A simultaneous **Minus + A** input
+prioritizes pause instead of changing rooms. It atomically
 resets the world, checkpoint, player/monster HP, camera and timers.
 Room 2 has a separate source-authored ground/platform layout, own
 checkpoints, hazard and exit. Stage 2 is terminal: pressing A there
