@@ -18,7 +18,9 @@ The new checker uses the preexisting `level_map_links.audit_local_ipa`
 parser twice, once per screen variant. It requires exactly one typed
 `mapFileName` candidate per object, the same object-index/class/resource
 and parsed layer structure in both packs, and a unique layer literally named
-`collision` for the primary map. It detects missing or ambiguous direct
+`collision` for the primary map. In addition, it reuses the Stage 072
+exact-byte checker for the level plus **both** selected map files; matching
+layer counts with different underlying map data are rejected. It detects missing or ambiguous direct
 references, unexpected collision layers on overlays, duplicate object
 identities and contradictory source-physics claims.
 
