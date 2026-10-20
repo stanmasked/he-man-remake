@@ -1,0 +1,52 @@
+name: He-Man native preflight for real NeXium three-stage HID
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/three-room-hid-schedule.yml'
+      - 'native/src/**'
+      - 'native/include/**'
+      - 'native/tests/test_three_room_hid_timing.c'
+      - 'tools/instrument_nexium_three_room.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  simulate-exact-guest-hid:
+    name: Preflight 1190 real C99 frames with ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile actual authored game adapters and follow identical guest button edges
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+            -I native/include \
+            native/src/heman_core.c \
+            native/src/heman_mask.c \
+            native/src/heman_combat.c \
+            native/src/heman_session.c \
+            native/src/heman_pause.c \
+            native/src/heman_dash.c \
+            native/src/heman_finale.c \
+            native/src/heman_air_smash.c \
+            native/src/heman_stage_chain.c \
+            native/src/heman_three_room_chain.c \
+            native/src/heman_synthetic_room2.c \
+            native/src/heman_synthetic_room3.c \
+            native/tests/test_three_room_hid_timing.c \
+            -lm -o /tmp/heman-three-room-hid-schedule
+          /tmp/heman-three-room-hid-schedule
+      - name: Evidence limitations
+        run: |
+          echo 'This is a strict native preflight, not evidence of NeXium guest execution.'
+          echo 'No physics, map, guest RAM or image bytes may be changed to force green.'
