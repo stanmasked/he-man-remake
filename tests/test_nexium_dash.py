@@ -71,7 +71,8 @@ class DashGuestContractTests(unittest.TestCase):
                 b"test-only-not-a-real-neXium-png")
         self.log = self.root / "raster-runner.log"
         self.log.write_text("\n".join([
-            f"HEMAN_GUEST_FRAME_PNG frame={f} dimensions=640x360 path=fake"
+            f"HEMAN_GUEST_FRAME_PNG frame={f} dimensions=640x360 "
+            f"path={self.root / f'raster-frame-{f:04}.png'}"
             for f in FRAMES
         ] + [f"HEMAN_DASH_HID frame={f} {state}"
              for f,state in HID_EVENTS])+"\n")
@@ -112,6 +113,34 @@ class DashGuestContractTests(unittest.TestCase):
             "HEMAN_DASH_HID frame=120 buttons=DRIGHT,ZR",
             "HEMAN_DASH_HID frame=120 buttons=DRIGHT"))
         with self.assertRaisesRegex(ValueError, "Missing real ZR"):
+            self.run_verifier()
+
+    def test_duplicate_zr_hid_event_rejected(self):
+        self.log.write_text(self.log.read_text() +
+                            "HEMAN_DASH_HID frame=120 buttons=DRIGHT,ZR\n")
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.run_verifier()
+
+    def test_conflicting_hid_event_same_frame_rejected(self):
+        self.log.write_text(self.log.read_text() +
+                            "HEMAN_DASH_HID frame=120 buttons=DRIGHT\n")
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.run_verifier()
+
+    def test_duplicate_png_attestation_rejected(self):
+        marker = (f"HEMAN_GUEST_FRAME_PNG frame=125 "
+                  f"dimensions=640x360 path="
+                  f"{self.root / 'raster-frame-0125.png'}\n")
+        self.log.write_text(self.log.read_text() + marker)
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.run_verifier()
+
+    def test_png_from_different_run_rejected(self):
+        expected = str(self.root / "raster-frame-0125.png")
+        self.log.write_text(self.log.read_text().replace(
+            f"path={expected}",
+            "path=/tmp/another-run/raster-frame-0125.png"))
+        with self.assertRaisesRegex(ValueError, "capture path mismatch"):
             self.run_verifier()
 
     def test_quoted_log_marker_rejected(self):
