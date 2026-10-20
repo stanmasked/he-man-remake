@@ -107,8 +107,39 @@ def inspect_ipa(source: Path, *, check_crc: bool = False) -> dict:
                 and a[name].CRC == b[name].CRC
                 for name in common
             )
+            # Aggregate paired files by extension without recording paths or
+            # original bytes. Exact relative paths (not mere basenames) are
+            # required for a match; CRC32 is a fast comparison, not a hash
+            # attestation of authentic game behavior.
+            extensions_a = {}
+            extensions_b = {}
+            for name in a:
+                ext = PurePosixPath(name).suffix.lower() or "(none)"
+                extensions_a.setdefault(ext, set()).add(name)
+            for name in b:
+                ext = PurePosixPath(name).suffix.lower() or "(none)"
+                extensions_b.setdefault(ext, set()).add(name)
+            extension_parity = {}
+            for ext in sorted(set(extensions_a) | set(extensions_b)):
+                names_a = extensions_a.get(ext, set())
+                names_b = extensions_b.get(ext, set())
+                paired = names_a & names_b
+                equal = sum(
+                    a[name].file_size == b[name].file_size
+                    and a[name].CRC == b[name].CRC
+                    for name in paired
+                )
+                extension_parity[ext] = {
+                    VARIANTS[0]: len(names_a),
+                    VARIANTS[1]: len(names_b),
+                    "paired": len(paired),
+                    "matching_size_and_crc": equal,
+                    "different_size_or_crc": len(paired) - equal,
+                    "only_in_" + VARIANTS[0]: len(names_a - names_b),
+                    "only_in_" + VARIANTS[1]: len(names_b - names_a),
+                }
             return {
-                "schema_version": 1,
+                "schema_version": 2,
                 "application": {
                     "bundle_identifier": str(info.get("CFBundleIdentifier", "")),
                     "bundle_version": str(info.get("CFBundleVersion", "")),
@@ -127,6 +158,7 @@ def inspect_ipa(source: Path, *, check_crc: bool = False) -> dict:
                 "mirror_analysis": {
                     "common_relative_paths": len(common),
                     "matching_size_and_crc": matching,
+                    "by_extension": extension_parity,
                     "variant_only_counts": {
                         VARIANTS[0]: len(set(a) - set(b)),
                         VARIANTS[1]: len(set(b) - set(a)),

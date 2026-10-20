@@ -12,8 +12,18 @@ The script reads the IPA as a ZIP; it does not extract files, connect to a
 network, or copy images, scripts, level binaries, sound, or any other original
 assets into this repository. Output contains only aggregate counts, bundle
 version, basic supported device metadata, and relative-path parity statistics
-between the two built-in resolution variants. A matching size + CRC32 is an
-inventory indicator, **not** proof that runtime assets are interchangeable.
+between the two built-in resolution variants. The schema v2 report adds
+`mirror_analysis.by_extension` with paired counts, matching size/CRC32,
+differing pairs, and files exclusive to each screen pack. No original
+resource paths, basenames or file contents appear in these counts.
+A matching size + CRC32 is an inventory indicator, **not** cryptographic
+proof of byte identity or proof that runtime assets are interchangeable.
+
+For a private original release examined locally, the format-oriented findings
+are that most level/map/geometry pairs have matching metadata while tile
+atlases and textures commonly differ by resolution. **Do not infer** that
+tile pixel dimensions, collision semantics or coordinate scales are identical
+from those aggregates; those require separate evidence.
 
 Keep both the original IPA and JSON report **outside** the repository.
 The existing `.gitignore` deliberately excludes `*.ipa` and
