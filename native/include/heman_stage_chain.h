@@ -15,6 +15,12 @@ typedef enum {
 
 /* stage: 0 first room, 1 final room. All failed or ignored calls leave
    both stage and gameplay session unchanged byte-for-byte. */
+/* Confirm button-edge priority on the opt-in stage path. Pause always wins
+   when Minus and A arrive in the same HID update. Never mutates state. */
+int hm_chain_continue_edge_allowed(const hm_session *session, uint8_t stage,
+                                   uint8_t paused, uint8_t minus_edge,
+                                   uint8_t a_edge);
+
 hm_chain_result hm_chain_try_advance(
     const hm_world *next_world, const hm_combat_config *next_combat,
     hm_session *session, uint8_t *stage, uint8_t continue_pressed);
