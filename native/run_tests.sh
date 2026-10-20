@@ -240,3 +240,25 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_checkpoint_postdefeat_sword_raster.c" \
   -lm -o "$TMP/test_checkpoint_postdefeat_sword_raster"
 "$TMP/test_checkpoint_postdefeat_sword_raster"
+
+# Stage 066: portable Minus-button pause adapter. Pause/resume must freeze
+# real native physics, combat timers and events without breaking rollback.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_pause.c" \
+  "$ROOT/native/tests/test_pause.c" \
+  -lm -o "$TMP/test_pause"
+"$TMP/test_pause"
+
+# The PAUSED overlay is independent of existing raster_scene rendering.
+# Check deterministic pixels and row padding using standalone C99.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/raster" \
+  "$ROOT/raster/pause_overlay.c" \
+  "$ROOT/raster/tests/test_pause_overlay.c" \
+  -lm -o "$TMP/test_pause_overlay"
+"$TMP/test_pause_overlay"
