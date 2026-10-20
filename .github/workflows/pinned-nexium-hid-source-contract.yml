@@ -1,0 +1,35 @@
+name: He-Man pinned NeXium HID source-contract regression
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/pinned-nexium-hid-source-contract.yml'
+      - '.github/workflows/nexium-patched-three-room.yml'
+      - 'tools/check_pinned_nexium_hid_source.py'
+      - 'tools/verify_nexium_hid_publication.py'
+      - 'tests/test_pinned_nexium_hid_source.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-source-contract:
+    name: Reject pinned HID source contract drift (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Test strict upstream Rust source contract checker
+        run: python -m unittest discover -s tests -p test_pinned_nexium_hid_source.py -v
+      - name: Explicit evidence limitation
+        run: |
+          echo 'Standalone unit tests use simulated upstream Rust fragments.'
+          echo 'The authentic pinned upstream Rust source is validated separately'
+          echo 'in the guest workflow after the exact upstream Git checkout.'
