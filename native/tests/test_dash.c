@@ -105,6 +105,8 @@ int main(void) {
                                 right,0u,0u,0u,1.0f/60.0f)==HM_SESSION_OK);
     assert(dash.remaining==0u);
     assert(game.player.respawns>=1u);
+    /* The preceding B-cancellation test deliberately sets reset=1. */
+    right.reset=0u;
     /* Airborne ZR cannot initiate a new dash. Jump is driven by the real
        second-room platform physics, not by forging a grounded flag. */
     {
