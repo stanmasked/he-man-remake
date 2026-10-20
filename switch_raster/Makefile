@@ -13,6 +13,7 @@ ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 SOURCES := source/main.c $(ROOT)/raster/raster_scene.c \
            $(ROOT)/raster/pause_overlay.c $(ROOT)/raster/stage_marker.c \
            $(ROOT)/raster/dash_hud.c $(ROOT)/raster/finale_overlay.c \
+           $(ROOT)/raster/air_smash_hud.c \
            $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c \
            $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c \
            $(ROOT)/native/src/heman_pause.c $(ROOT)/native/src/heman_stage_chain.c \
