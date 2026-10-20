@@ -33,6 +33,13 @@ EXPECTED_STAGES = (
 )
 EXPECTED_CLEAR = frozenset((75, 465, 505, 1045, 1080, 1120))
 EXPECTED_FINISH = frozenset((1045, 1080, 1120))
+WORLD_X_SAMPLE_BOUNDS = {
+    535: (45, 100), 650: (265, 325), 820: (600, 665),
+    850: (435, 495), 930: (585, 652), 945: (615, 679),
+    970: (670, 744), 1045: (814, 868),
+    1080: (814, 868), 1120: (814, 868),
+    1170: (45, 85), 1190: (45, 85),
+}
 
 
 def _digit(rgb) -> int:
@@ -197,14 +204,7 @@ def verify(folder: Path) -> dict:
     # Critical optical evidence beyond the old x210-saturated magenta HUD:
     # actual world-X advances through checkpoint x434, hazard x678, exit x842.
     # Ranges tolerate a few guest-vs-host frame scheduling differences.
-    bounds = {
-        535: (45, 100), 650: (265, 325), 820: (600, 665),
-        850: (435, 495), 930: (585, 652), 945: (615, 679),
-        970: (670, 744), 1045: (814, 868),
-        1080: (814, 868), 1120: (814, 868),
-        1170: (45, 85), 1190: (45, 85),
-    }
-    for frame, (lo, hi) in bounds.items():
+    for frame, (lo, hi) in WORLD_X_SAMPLE_BOUNDS.items():
         x = values[frame]["full_world_x"]
         if x is None or not lo <= x <= hi:
             raise ValueError(f"Native source world-X guest cursor wrong at {frame}: {x}")
