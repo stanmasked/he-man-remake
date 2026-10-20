@@ -12,6 +12,10 @@
 #include "heman_synthetic_room2.h"
 #include "heman_dash.h"
 #include "heman_finale.h"
+#ifdef HM_AIR_SMASH_PROBE
+#include "heman_air_smash.h"
+#include "air_smash_hud.h"
+#endif
 #include "dash_hud.h"
 #include "stage_marker.h"
 #include "finale_overlay.h"
@@ -128,6 +132,9 @@ int main(int argc, char **argv) {
     hm_combat_config second_combat;
     uint8_t stage=0u;
     hm_dash_state dash={0u,0u};
+#ifdef HM_AIR_SMASH_PROBE
+    hm_air_smash_state air_smash={0};
+#endif
 #endif
     hm_raster_view view;
     hm_replay_report replay={0};
@@ -198,18 +205,31 @@ int main(int argc, char **argv) {
             combat=second_combat;
             dash.remaining=0u;
             dash.recovery=0u;
+#ifdef HM_AIR_SMASH_PROBE
+            air_smash=(hm_air_smash_state){0};
+#endif
             status=HM_SESSION_OK;
         } else
 #endif
         {
 #ifdef HM_LEVEL_CHAIN_PROBE
             if(stage==1u) {
+#ifdef HM_AIR_SMASH_PROBE
+                status=hm_air_smash_step(&world,&combat,&game,&paused,
+                     &dash,&air_smash,stage,input,
+                     (uint8_t)((down&HidNpadButton_X)!=0u),
+                     (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZR)!=0u),
+                     (uint8_t)((down&HidNpadButton_ZL)!=0u),
+                     1.0f/60.0f);
+#else
                 status=hm_finale_session_step(&world,&combat,&game,&paused,
                      &dash,stage,input,
                      (uint8_t)((down&HidNpadButton_X)!=0u),
                      (uint8_t)((down&HidNpadButton_Minus)!=0u),
                      (uint8_t)((down&HidNpadButton_ZR)!=0u),
                      1.0f/60.0f);
+#endif
             } else
 #endif
             {
@@ -237,6 +257,11 @@ int main(int argc, char **argv) {
                !hm_finale_overlay(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                         stride/sizeof(uint32_t),stage,
                         (uint8_t)(game.player.completed!=0u),paused))
+#ifdef HM_AIR_SMASH_PROBE
+           || (stage==1u &&
+               !hm_air_smash_hud(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                        stride/sizeof(uint32_t),&air_smash))
+#endif
 #endif
            ) {
             if(pixels)framebufferEnd(&fb);

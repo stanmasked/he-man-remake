@@ -346,3 +346,29 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_finale_overlay.c" \
   -lm -o "$TMP/test_finale_overlay"
 "$TMP/test_finale_overlay"
+
+
+# Stage 086: opt-in ZL landing strike, genuinely simulated by the same
+# portable physics/combat/finale state machines as the Switch prototype.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_pause.c" \
+  "$ROOT/native/src/heman_dash.c" \
+  "$ROOT/native/src/heman_finale.c" \
+  "$ROOT/native/src/heman_air_smash.c" \
+  "$ROOT/native/tests/test_air_smash.c" \
+  -lm -o "$TMP/test_air_smash"
+"$TMP/test_air_smash"
+
+
+# Stage 086 opt-in Aerial Smash HUD status/pixel and stride integrity.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/raster/air_smash_hud.c" \
+  "$ROOT/raster/tests/test_air_smash_hud.c" \
+  -lm -o "$TMP/test_air_smash_hud"
+"$TMP/test_air_smash_hud"

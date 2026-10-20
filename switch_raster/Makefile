@@ -13,10 +13,12 @@ ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 SOURCES := source/main.c $(ROOT)/raster/raster_scene.c \
            $(ROOT)/raster/pause_overlay.c $(ROOT)/raster/stage_marker.c \
            $(ROOT)/raster/dash_hud.c $(ROOT)/raster/finale_overlay.c \
+           $(ROOT)/raster/air_smash_hud.c \
            $(ROOT)/native/src/heman_core.c $(ROOT)/native/src/heman_mask.c \
            $(ROOT)/native/src/heman_combat.c $(ROOT)/native/src/heman_session.c \
            $(ROOT)/native/src/heman_pause.c $(ROOT)/native/src/heman_stage_chain.c \
            $(ROOT)/native/src/heman_dash.c $(ROOT)/native/src/heman_finale.c \
+           $(ROOT)/native/src/heman_air_smash.c \
            $(ROOT)/native/src/heman_synthetic_room2.c \
            $(ROOT)/switch/source/probe_view.c \
            $(ROOT)/switch/source/probe_selfcheck.c \
@@ -35,6 +37,15 @@ endif
 # Opt-in two-room test campaign; base NRO stays one synthetic level.
 ifeq ($(CHAIN_PROBE),1)
 CFLAGS += -DHM_LEVEL_CHAIN_PROBE=1
+endif
+# Separate opt-in second-room ZL strike. Normal NRO and existing
+# NeXium A/X/B/ZR scripts preserve their previous input mappings.
+ifeq ($(AIR_SMASH_PROBE),1)
+ifeq ($(CHAIN_PROBE),1)
+CFLAGS += -DHM_AIR_SMASH_PROBE=1
+else
+$(error AIR_SMASH_PROBE requires CHAIN_PROBE=1)
+endif
 endif
 # Stage 049 test-only checkpoint guest NRO; normal graphics unchanged.
 ifeq ($(CHECKPOINT_PROBE),1)
