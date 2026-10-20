@@ -203,7 +203,7 @@ static int oracle(unsigned f,const hm_world *w,
             PIXEL(expected+1u,335u)!=UINT32_C(0xffb2f82a))) ||
            (stage<2u && bright!=0u)) {
             fprintf(stderr,"Stage096 source progress marker failed "
-                           "frame=%u stage=%u count=%u x=%.2f\\n",
+                           "frame=%u stage=%u count=%u x=%.2f\n",
                            f,stage,bright,g->player.x);
             return 0;
         }
