@@ -64,6 +64,7 @@ static hm_combat_config first_combat(void) {
 #define RW 640u
 #define RH 360u
 #define PIXEL(x,y) raster[(unsigned)(y)*RW+(unsigned)(x)]
+static uint32_t raster[RW*RH];
 /* Test-only independent host RGB stream, never a guest PNG/attestation.
  * Pixel bytes follow the renderer's little-endian ABGR uint32 layout.
  * Files cannot be accepted as authentic NeXium frame_rx output.
@@ -98,7 +99,6 @@ static int write_source_rgb(unsigned frame) {
 }
 
 
-static uint32_t raster[RW*RH];
 static uint32_t frozen_raster[RW*RH];
 static int have_frozen=0;
 static const unsigned sample_frames[]={
