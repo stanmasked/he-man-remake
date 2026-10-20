@@ -105,6 +105,59 @@ int main(void) {
                                 right,0u,0u,0u,1.0f/60.0f)==HM_SESSION_OK);
     assert(dash.remaining==0u);
     assert(game.player.respawns>=1u);
+    /* Airborne ZR cannot initiate a new dash. Jump is driven by the real
+       second-room platform physics, not by forging a grounded flag. */
+    {
+        hm_world air_world,wall_world;
+        hm_combat_config air_combat,wall_combat;
+        hm_session air_game,wall_game;
+        hm_dash_state air_dash={0u,0u},wall_dash={0u,0u};
+        hm_input jump_right={1.0f,1u,0u};
+        uint8_t air_paused=0u,wall_paused=0u;
+        uint8_t air_cells[HM_ROOM2_CELLS],wall_cells[HM_ROOM2_CELLS];
+        float airborne_x;
+        assert(hm_synthetic_room2_init(&air_world,&air_combat,
+                                       air_cells,HM_ROOM2_CELLS)==1);
+        assert(hm_session_init(&air_world,&air_combat,&air_game)
+               ==HM_SESSION_OK);
+        assert(hm_dash_session_step(&air_world,&air_combat,&air_game,
+                                    &air_paused,&air_dash,idle,0u,0u,0u,
+                                    1.0f/60.0f)==HM_SESSION_OK);
+        assert(air_game.player.grounded==1u);
+        assert(hm_dash_session_step(&air_world,&air_combat,&air_game,
+                                    &air_paused,&air_dash,jump_right,
+                                    0u,0u,0u,1.0f/60.0f)==HM_SESSION_OK);
+        assert(air_game.player.grounded==0u);
+        airborne_x=air_game.player.x;
+        assert(hm_dash_session_step(&air_world,&air_combat,&air_game,
+                                    &air_paused,&air_dash,right,0u,0u,1u,
+                                    1.0f/60.0f)==HM_SESSION_OK);
+        assert(air_dash.remaining==0u && air_dash.recovery==0u);
+        assert(fabsf(air_game.player.x-airborne_x-2.0f)<0.01f);
+
+        /* A synthetic solid pillar immediately to the right of spawn
+           must stop a dash at its left edge despite doubled speed.
+           This exercises hm_step's REAL swept collision, not a mock. */
+        assert(hm_synthetic_room2_init(&wall_world,&wall_combat,
+                                       wall_cells,HM_ROOM2_CELLS)==1);
+        wall_cells[17u*HM_ROOM2_COLUMNS+4u]=1u;
+        assert(hm_session_init(&wall_world,&wall_combat,&wall_game)
+               ==HM_SESSION_OK);
+        assert(hm_dash_session_step(&wall_world,&wall_combat,&wall_game,
+                                    &wall_paused,&wall_dash,idle,0u,0u,0u,
+                                    1.0f/60.0f)==HM_SESSION_OK);
+        assert(wall_game.player.grounded==1u);
+        for(i=0u;i<8u;++i)
+            assert(hm_dash_session_step(&wall_world,&wall_combat,&wall_game,
+                                        &wall_paused,&wall_dash,right,0u,0u,
+                                        (uint8_t)(i==0u),1.0f/60.0f)
+                   ==HM_SESSION_OK);
+        assert(wall_game.player.x>50.0f);
+        assert(wall_game.player.x<=59.01f);
+        assert(wall_game.player.wall_hit==1u);
+        assert(wall_dash.remaining==4u && wall_dash.recovery==73u);
+    }
+
     puts("PASS: actual second-room ZR dash, 60Hz, cooldown, Minus freeze, rollback");
     return 0;
 }
