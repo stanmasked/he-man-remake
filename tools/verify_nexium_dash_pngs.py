@@ -19,21 +19,35 @@ def verify(folder: Path) -> dict:
     from PIL import Image
     from verify_nexium_guest_pngs import describe
 
-    logs = set((folder / "raster-runner.log").read_text().splitlines())
+    # Keep multiplicity: set() would silently accept combined run logs with
+    # repeated HID events or replayed screenshot attestations.
+    logs = (folder / "raster-runner.log").read_text().splitlines()
     for frame, event in HID_EVENTS:
-        if f"HEMAN_DASH_HID frame={frame} {event}" not in logs:
-            raise ValueError(f"Missing real ZR/Right HID event at frame {frame}")
+        prefix = f"HEMAN_DASH_HID frame={frame} "
+        matches = [line for line in logs if line.startswith(prefix)]
+        if matches != [prefix + event]:
+            raise ValueError(
+                f"Missing real ZR/Right HID event or duplicate at frame {frame}"
+            )
     xs = {}
     stages = {}
     gauges = {}
     hashes = {}
     for frame in FRAMES:
         prefix = f"HEMAN_GUEST_FRAME_PNG frame={frame} dimensions=640x360 path="
-        if not any(line.startswith(prefix) for line in logs):
-            raise ValueError(f"Missing authentic NeXium frame {frame}")
+        captures = [line[len(prefix):] for line in logs
+                    if line.startswith(prefix)]
+        if len(captures) != 1:
+            raise ValueError(f"Missing authentic NeXium frame or duplicate {frame}")
         filename = folder / f"raster-frame-{frame:04}.png"
         if not filename.is_file():
             raise FileNotFoundError(filename)
+        # The guest recorder emits absolute capture paths. A same-name stale
+        # file from another run cannot satisfy the current guest attestation.
+        captured_path = Path(captures[0])
+        if (not captured_path.is_absolute()
+                or captured_path.resolve() != filename.resolve()):
+            raise ValueError(f"Guest frame {frame} capture path mismatch")
         with Image.open(filename) as opened:
             if opened.format != "PNG":
                 raise ValueError(f"Guest frame {frame} is not PNG")
