@@ -43,5 +43,15 @@ int hm_finale_overlay(uint32_t *pixels, uint32_t width, uint32_t height,
                          155u+row*6u, 5u, 6u, LETTER);
     /* Simple bright underline leaves an obvious optical victory receipt. */
     fill(pixels, stride, 254u, 201u, 132u, 5u, ACCENT);
+    /* A literal B-button prompt in the same independent bitmap.
+       White 3x5 glyph within a green keycap, not a commercial asset. */
+    fill(pixels, stride, 311u, 210u, 18u, 13u, ACCENT);
+    fill(pixels, stride, 313u, 212u, 14u, 9u, FACE);
+    fill(pixels, stride, 315u, 213u, 2u, 7u, LETTER);
+    fill(pixels, stride, 317u, 213u, 5u, 2u, LETTER);
+    fill(pixels, stride, 322u, 215u, 2u, 2u, LETTER);
+    fill(pixels, stride, 317u, 216u, 5u, 2u, LETTER);
+    fill(pixels, stride, 322u, 218u, 2u, 2u, LETTER);
+    fill(pixels, stride, 317u, 219u, 5u, 1u, LETTER);
     return 1;
 }
