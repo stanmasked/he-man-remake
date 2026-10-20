@@ -73,7 +73,7 @@ class FinaleGuestSyntheticContractTests(unittest.TestCase):
             is_frozen = frame in (490, 515)
             self.frames[frame] = FakeRGB(
                 1 if frame == 75 else 2,
-                frame == 75,
+                frame in (75, 465, 490, 515),
                 frame in (465, 490, 515),
                 240 if frame == 365 else 310,
                 (245.5 if frame == 75 else
@@ -157,6 +157,16 @@ class FinaleGuestSyntheticContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "FINISH/B restart"):
             self.run_checker()
 
+    def test_stage_two_finishing_requires_original_clear_hud(self):
+        self.frames[465].clear = False
+        with self.assertRaisesRegex(ValueError, "Native CLEAR badges"):
+            self.run_checker()
+
+    def test_stage_two_pre_exit_clear_rejected(self):
+        self.frames[330].clear = True
+        with self.assertRaisesRegex(ValueError, "Native CLEAR badges"):
+            self.run_checker()
+
     def test_early_fake_finish_rejected(self):
         self.frames[330].finish = True
         with self.assertRaisesRegex(ValueError, "FINISH/B restart"):
@@ -191,7 +201,7 @@ class FinaleGuestSyntheticContractTests(unittest.TestCase):
 
     def test_first_room_CLEAR_never_substitutes_for_finale(self):
         self.frames[75].clear = False
-        with self.assertRaisesRegex(ValueError, "first-room CLEAR"):
+        with self.assertRaisesRegex(ValueError, "Native CLEAR badges"):
             self.run_checker()
 
     def test_stage_label_must_stay_two_during_retry(self):
