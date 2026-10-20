@@ -126,6 +126,22 @@ class ContactTraceAuditTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "contact observation"):
             compare_contact_traces(data)
 
+    def test_unhashable_contact_label_rejected_as_invalid(self):
+        for bad in (["floor"], {"kind": "floor"}, 5, None):
+            data = fabricated_trace()
+            data["candidate"]["observations"][2]["contact"] = bad
+            with self.subTest(bad=bad), self.assertRaisesRegex(
+                    ValueError, "unsupported contact observation"):
+                compare_contact_traces(data)
+
+    def test_unhashable_evidence_kind_rejected_as_invalid(self):
+        for bad in (["synthetic"], {"kind": "synthetic"}, True, None):
+            data = fabricated_trace()
+            data["reference"]["evidence_kind"] = bad
+            with self.subTest(bad=bad), self.assertRaisesRegex(
+                    ValueError, "evidence_kind"):
+                compare_contact_traces(data)
+
     def test_false_claim_of_observation_type_not_accepted(self):
         data = fabricated_trace()
         data["reference"]["evidence_kind"] = "authenticated_original"
