@@ -1,0 +1,44 @@
+name: He-Man third-room HUD bounds and stable-stage memory sentinels
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/three-room-progress-memory-guards.yml'
+      - 'qa/heman_three_room_progress_sentinels.c'
+      - 'raster/third_room_marker.c'
+      - 'raster/third_room_marker.h'
+      - 'raster/stage_marker.c'
+      - 'raster/stage_marker.h'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-pixel-sentinels:
+    name: Exact HUD framebuffer canaries with ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Exercise all x0..900 cursor positions and padded framebuffer strides
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I raster qa/heman_three_room_progress_sentinels.c \
+            raster/third_room_marker.c raster/stage_marker.c \
+            -lm -o /tmp/heman-stage097-hud-guards
+          /tmp/heman-stage097-hud-guards
+      - name: Evidence limitations
+        run: |
+          echo 'This is only source-native bounds and two-room regression evidence.'
+          echo 'It neither launches NeXium nor claims genuine 640x360 guest screenshots.'
