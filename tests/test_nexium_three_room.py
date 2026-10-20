@@ -137,7 +137,12 @@ class ThirdRoomMockContractTests(unittest.TestCase):
         self.assertFalse(output["original_ios_physics_fidelity_verified"])
 
     def test_stage_three_must_appear(self):
+        # Mutate the whole fake frame consistently: if stage 3 is absent,
+        # its optional full world-X HUD must also be absent. A mismatched
+        # stage2 badge + stage3 cursor is covered by the separate
+        # test_world_x_hud_must_not_appear_on_earlier_stages regression.
         self.frames[535].stage = 2
+        self.frames[535].progress = None
         with self.assertRaisesRegex(ValueError, "three-stage"):
             self.run_check()
 
