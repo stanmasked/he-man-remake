@@ -49,8 +49,12 @@ int main(void) {
     uint8_t paused=0u,old_pause;
     unsigned i;
     assert(hm_session_init(&w,&c,&s)==HM_SESSION_OK);
-    assert(step(&w,&c,&s,&paused,&dash,&ability,idle,0u,0u,1u)==HM_SESSION_OK);
+    /* Fresh spawn starts with grounded=0 pending its first physics step.
+       This is not permission for an aerial strike before any real jump. */
+    assert(s.player.frame==0u && s.player.grounded==0u);
+    assert(step(&w,&c,&s,&paused,&dash,&ability,idle,0u,1u,1u)==HM_SESSION_OK);
     assert(s.player.grounded==1u);
+    assert(ability.armed==0u && ability.cooldown==0u);
     /* Pressing ZL while grounded must not arm or bypass normal combat. */
     assert(step(&w,&c,&s,&paused,&dash,&ability,idle,0u,1u,1u)==HM_SESSION_OK);
     assert(ability.armed==0u && ability.impacts==0u);
