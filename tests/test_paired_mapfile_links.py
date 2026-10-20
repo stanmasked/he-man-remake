@@ -137,6 +137,33 @@ class PairedMapfileLinkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid map-object"):
             self.evaluate()
 
+    def test_cross_pack_overlay_bytes_change_but_layers_look_identical(self):
+        with TemporaryDirectory() as tmp:
+            ipa = Path(tmp) / "synthetic-divergent.ipa"
+            with zipfile.ZipFile(ipa, "w") as archive:
+                for screen in ("screen-med", "screen-xlarge"):
+                    root = f"Payload/MOTU.app/{screen}/"
+                    objects = [
+                        map_object(name="floor", props=(
+                            ("mapFileName", "string", "Floor"),)),
+                        map_object("LevelTileMapOverlay", name="overlay", props=(
+                            ("mapFileName", "string", "Floor.overlay"),)),
+                    ]
+                    archive.writestr(root + "levels/Fictional.lvl",
+                                     example_level(objects, name="Fictional.lvl"))
+                    archive.writestr(root + "maps/Floor.map", sample())
+                    overlay = (sample(layer(name="overlay"))
+                               if screen == "screen-med" else
+                               sample(layer(name="overlay",
+                                            ids=(2, 2, 65535, 4, 5, 6))))
+                    archive.writestr(root + "maps/Floor.overlay.map", overlay)
+            result = audit_private_ipa(ipa, "Fictional.lvl")
+            self.assertFalse(result["cross_pack_candidate_consistency"])
+            self.assertFalse(result["cross_pack_selected_bytes_identical"])
+            self.assertIn("cross_pack_level_or_referenced_map_bytes_differ",
+                          result["structural_blockers"])
+            self.assertFalse(result["runtime_map_binding_verified"])
+
     def test_real_synthetic_archive_decoding_without_original_assets(self):
         with TemporaryDirectory() as tmp:
             ipa = Path(tmp) / "made-up.ipa"
@@ -155,6 +182,7 @@ class PairedMapfileLinkTests(unittest.TestCase):
                                      sample(layer(name="overlay")))
             result = audit_private_ipa(ipa, "Fictional.lvl")
             self.assertTrue(result["cross_pack_candidate_consistency"])
+            self.assertTrue(result["cross_pack_selected_bytes_identical"])
             self.assertFalse(result["runtime_map_binding_verified"])
             self.assertNotIn("tile_ids", str(result))
 
