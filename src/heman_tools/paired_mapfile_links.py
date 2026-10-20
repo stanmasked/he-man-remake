@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 
 from .level_map_links import _private_report_path, audit_local_ipa
+from .first_level_pair_audit import compare_pair
 
 SCREENS = ("screen-med", "screen-xlarge")
 CLASSES = ("LevelTileMap", "LevelTileMapOverlay")
@@ -141,10 +142,27 @@ def audit_paired_reports(medium: dict, xlarge: dict) -> dict:
 
 
 def audit_private_ipa(ipa: Path, level: str = "MULevel1-1.lvl") -> dict:
-    return audit_paired_reports(
+    report = audit_paired_reports(
         audit_local_ipa(ipa, level, screen=SCREENS[0]),
         audit_local_ipa(ipa, level, screen=SCREENS[1]),
     )
+    # Structural equivalence alone cannot establish matching file contents.
+    # Reuse Stage 072's exact-byte reader on every explicitly linked map,
+    # including overlays (not just the primary candidate). No bytes or hashes
+    # are added to the private report.
+    report["cross_pack_selected_bytes_identical"] = False
+    if report["cross_pack_candidate_consistency"]:
+        same = True
+        for item in report["candidate_links"].values():
+            paired = compare_pair(ipa, level, item["map_filename"])
+            if not paired["cross_pack_bytes_identical"]:
+                same = False
+        report["cross_pack_selected_bytes_identical"] = same
+        if not same:
+            report["cross_pack_candidate_consistency"] = False
+            report["structural_blockers"].append(
+                "cross_pack_level_or_referenced_map_bytes_differ")
+    return report
 
 
 def main(argv=None) -> int:
