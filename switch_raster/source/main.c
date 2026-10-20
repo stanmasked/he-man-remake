@@ -7,6 +7,10 @@
 #include "heman_combat.h"
 #include "heman_session.h"
 #include "heman_pause.h"
+#ifdef HM_LEVEL_CHAIN_PROBE
+#include "heman_stage_chain.h"
+#include "stage_marker.h"
+#endif
 #include "pause_overlay.h"
 #include "probe_selfcheck.h"
 #include "session_selftest.h"
@@ -18,7 +22,7 @@
 static uint8_t cells[W*H];
 /* Opt-in test-only checkpoint near initial spawn for real NeXium HID
    travel and native B-button respawn. All gameplay rules are unchanged. */
-#if defined(HM_EXIT_PROBE)
+#if defined(HM_EXIT_PROBE) || defined(HM_LEVEL_CHAIN_PROBE)
 /* Test-only native exit within D-pad travel from spawn x=50.
    Unmodified world event processing drives player.completed. */
 static const hm_event events[] = {
@@ -57,6 +61,32 @@ static hm_world make_world(void) {
     w.event_count=(uint32_t)(sizeof(events)/sizeof(events[0]));
     return w;
 }
+
+#ifdef HM_LEVEL_CHAIN_PROBE
+/* Independent second exercise room, with a different ground elevation,
+   short platforms and its own checkpoints/enemy. No iOS geometry. */
+static uint8_t second_cells[W*H];
+static const hm_event second_events[]={
+    {HM_PICKUP,170.0f,267.0f,8.0f},
+    {HM_CHECKPOINT,330.0f,273.0f,8.0f},
+    {HM_HAZARD,570.0f,273.0f,8.0f},
+    {HM_EXIT,735.0f,273.0f,8.0f}
+};
+static hm_world make_second_world(void) {
+    hm_world result=make_world();
+    uint32_t x;
+    memset(second_cells,0,sizeof(second_cells));
+    for(x=0u;x<W;++x)second_cells[18u*W+x]=1u;
+    for(x=9u;x<13u;++x)second_cells[13u*W+x]=1u;
+    for(x=23u;x<28u;++x)second_cells[15u*W+x]=1u;
+    result.solid=second_cells;
+    result.spawn_x=48.0f;
+    result.spawn_feet_y=288.0f;
+    result.events=second_events;
+    result.event_count=(uint32_t)(sizeof(second_events)/sizeof(second_events[0]));
+    return result;
+}
+#endif
 
 static hm_combat_config make_combat(void) {
     hm_combat_config c;
@@ -102,10 +132,26 @@ static hm_combat_config make_combat(void) {
     return c;
 }
 
+#ifdef HM_LEVEL_CHAIN_PROBE
+static hm_combat_config make_second_combat(void) {
+    hm_combat_config c=make_combat();
+    c.enemy_feet_y=288.0f;
+    c.patrol_left=230.0f;
+    c.patrol_right=320.0f;
+    c.enemy_start_x=275.0f;
+    return c;
+}
+#endif
+
 int main(int argc, char **argv) {
     hm_world world=make_world();
     hm_combat_config combat=make_combat();
     hm_session game;
+#ifdef HM_LEVEL_CHAIN_PROBE
+    hm_world second_world=make_second_world();
+    hm_combat_config second_combat=make_second_combat();
+    uint8_t stage=0u;
+#endif
     hm_raster_view view;
     hm_replay_report replay={0};
     hm_session_result status;
@@ -155,9 +201,28 @@ int main(int argc, char **argv) {
         /* Minus toggles an atomic pause adapter. No native physics, enemy
            patrol, damage or checkpoint timer advances while paused.
            Plus remains the standard NRO exit button. */
-        status=hm_paused_session_step(&world,&combat,&game,&paused,input,
-             (uint8_t)((down&HidNpadButton_X)!=0u),
-             (uint8_t)((down&HidNpadButton_Minus)!=0u),1.0f/60.0f);
+#ifdef HM_LEVEL_CHAIN_PROBE
+        if(hm_chain_continue_edge_allowed(
+                &game,stage,paused,
+                (uint8_t)((down&HidNpadButton_Minus)!=0u),
+                (uint8_t)((down&HidNpadButton_A)!=0u))) {
+            /* The CLEAR → A edge changes rooms without advancing a
+               gameplay frame, so no hidden jump/attack leaks through. */
+            if(hm_chain_try_advance(&second_world,&second_combat,
+                                    &game,&stage,1u)!=HM_CHAIN_ADVANCED) {
+                status=HM_SESSION_INVALID;
+                break;
+            }
+            world=second_world;
+            combat=second_combat;
+            status=HM_SESSION_OK;
+        } else
+#endif
+        {
+            status=hm_paused_session_step(&world,&combat,&game,&paused,input,
+                 (uint8_t)((down&HidNpadButton_X)!=0u),
+                 (uint8_t)((down&HidNpadButton_Minus)!=0u),1.0f/60.0f);
+        }
         if(status!=HM_SESSION_OK)break;
         view.qa_state=qa_state;
         view.qa_fingerprint=qa_state==1u?replay.fingerprint:0u;
@@ -166,7 +231,12 @@ int main(int argc, char **argv) {
            !hm_raster_render(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
                              stride/sizeof(uint32_t),&view) ||
            (paused && !hm_pause_overlay(pixels,HM_RASTER_WIDTH,
-                     HM_RASTER_HEIGHT,stride/sizeof(uint32_t)))) {
+                     HM_RASTER_HEIGHT,stride/sizeof(uint32_t)))
+#ifdef HM_LEVEL_CHAIN_PROBE
+           || !hm_stage_marker(pixels,HM_RASTER_WIDTH,HM_RASTER_HEIGHT,
+                               stride/sizeof(uint32_t),stage)
+#endif
+           ) {
             if(pixels)framebufferEnd(&fb);
             status=HM_SESSION_INVALID;
             break;

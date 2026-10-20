@@ -56,3 +56,37 @@ NRO remains the baseline if a graphics regression is found.
 
 This is a development prototype: there is no original He-Man level
 reconstruction, character sprites, soundtrack, UI or verified framerate.
+
+## Optional two-room prototype (Stage 067)
+
+The standard `heman_raster_probe.nro` retains its verified **single**
+synthetic scene. To test one more independently authored area and a real
+in-engine completion-to-next-room transition:
+
+```sh
+make -C switch_raster clean all TARGET=heman_two_stage_probe CHAIN_PROBE=1
+sh native/run_tests.sh gcc
+sh native/run_tests.sh clang
+```
+
+This variant starts with an opt-in short first room, whose normal C99
+`HM_EXIT` event shows **CLEAR** when reached. **Press A after CLEAR**
+to load the second room. The transition is not automatic. A simultaneous **Minus + A** input
+prioritizes pause instead of changing rooms. It atomically
+resets the world, checkpoint, player/monster HP, camera and timers.
+Room 2 has a separate source-authored ground/platform layout, own
+checkpoints, hazard and exit. Stage 2 is terminal: pressing A there
+does not silently restart the course. A small top-right stage marker
+reads **1** or **2**. Minus pause, B retry, sword attack and the
+other baseline controls remain available.
+
+This feature has its own optional AArch64 NRO CI build in
+`.github/workflows/switch-two-stage.yml`, plus independent C99 tests
+for earned completion, input gating, failed-stage rollback and a stage
+HUD pixel/padding audit. A compiled NRO is **not** proof of emulator
+or physical-console execution; real two-room progression still needs
+a separate NeXium controller/HUD test.
+
+Both rooms are completely synthetic and bear **no** relationship to
+the content, artwork, collision mapping, plot or rules of the original
+commercial iOS game. No original IPA or extracted resource is shipped.

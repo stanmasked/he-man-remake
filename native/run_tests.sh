@@ -262,3 +262,24 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/raster/tests/test_pause_overlay.c" \
   -lm -o "$TMP/test_pause_overlay"
 "$TMP/test_pause_overlay"
+
+# Stage 067: actual C99 HM_EXIT then explicit A transition to a second
+# independently written room, with atomic rollback and final-level guard.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_stage_chain.c" \
+  "$ROOT/native/tests/test_stage_chain.c" \
+  -lm -o "$TMP/test_stage_chain"
+"$TMP/test_stage_chain"
+
+# Minimal source-only stage number indicator with stride canaries.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/raster" \
+  "$ROOT/raster/stage_marker.c" \
+  "$ROOT/raster/tests/test_stage_marker.c" \
+  -lm -o "$TMP/test_stage_marker"
+"$TMP/test_stage_marker"
