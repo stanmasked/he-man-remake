@@ -13,7 +13,10 @@ This is a **second, separate** homebrew build. It keeps the proven
   pickup circles, checkpoint flag, hazard and exit arch.
 - Shared `hm_session` C99 physics/combat state from the text probe.
 - Left/Right moves, A jumps, X attacks, B resets, Y runs the same
-  180-frame reproducible synthetic replay, Plus exits.
+  180-frame reproducible synthetic replay, **Minus toggles PAUSED**,
+  Plus exits. While paused, actual C99 player/enemy simulation and all
+  timers, hazards and checkpoints are frozen; toggling consumes the
+  button-edge frame to avoid accidental moves or attacks on resume.
 - Red HP bars, gold enemy HP bars and an 8-hex-digit QA fingerprint on
   the upper right. The QA indicator is blue when idle, green after PASS,
   and red after FAIL.
@@ -35,6 +38,10 @@ make -C switch_raster clean all
 The build creates `switch_raster/heman_raster_probe.nro`. The separate
 **He-Man synthetic Switch raster build** GitHub Actions workflow checks
 its AArch64 ELF and NRO header and publishes an NRO artifact.
+
+GCC and Clang additionally run `native/tests/test_pause.c` and
+`raster/tests/test_pause_overlay.c` to verify the actual state freeze,
+strict input rejection, PAUSED source pixels and stride padding.
 
 GCC and Clang run `raster/tests/test_raster_scene.c` on the host. The
 test verifies pixel determinism, actor movement changing rendered pixels,
