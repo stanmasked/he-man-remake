@@ -64,6 +64,40 @@ static hm_combat_config first_combat(void) {
 #define RW 640u
 #define RH 360u
 #define PIXEL(x,y) raster[(unsigned)(y)*RW+(unsigned)(x)]
+/* Test-only independent host RGB stream, never a guest PNG/attestation.
+ * Pixel bytes follow the renderer's little-endian ABGR uint32 layout.
+ * Files cannot be accepted as authentic NeXium frame_rx output.
+ */
+static const char *source_rgb_directory;
+static int write_source_rgb(unsigned frame) {
+    char path[512];
+    unsigned y,x;
+    unsigned char row[RW*3u];
+    FILE *fp;
+    int count;
+    if(!source_rgb_directory)return 1;
+    count=snprintf(path,sizeof(path),"%s/source-frame-%04u.rgb",
+                   source_rgb_directory,frame);
+    if(count<0||(unsigned)count>=sizeof(path))return 0;
+    fp=fopen(path,"wb");
+    if(!fp)return 0;
+    for(y=0u;y<RH;++y) {
+        for(x=0u;x<RW;++x) {
+            uint32_t pixel=raster[y*RW+x];
+            row[x*3u]=(unsigned char)(pixel&UINT32_C(0xff));
+            row[x*3u+1u]=(unsigned char)((pixel>>8)&UINT32_C(0xff));
+            row[x*3u+2u]=(unsigned char)((pixel>>16)&UINT32_C(0xff));
+        }
+        if(fwrite(row,1u,sizeof(row),fp)!=sizeof(row)){
+            fclose(fp);
+            return 0;
+        }
+    }
+    if(fclose(fp)!=0)return 0;
+    return 1;
+}
+
+
 static uint32_t raster[RW*RH];
 static uint32_t frozen_raster[RW*RH];
 static int have_frozen=0;
@@ -165,6 +199,10 @@ static int oracle(unsigned f,const hm_world *w,
         fprintf(stderr,"Stage093 native FINISH raster was not frozen\n");
         return 0;
     }
+    if(!write_source_rgb(f)){
+        fprintf(stderr,"Stage094 could not export independent source RGB %u\n",f);
+        return 0;
+    }
     printf("Stage093 optical oracle: frame=%u stage=%u CLEAR=%d FINISH=%d "
            "respawn=%d x=%.2f foot=%.2f (host C99, not guest)\n",
            f,stage,expected_clear,expected_finish,expected_respawn,
@@ -191,7 +229,8 @@ static void failure(unsigned f,const hm_session *s,unsigned stage,
         f,stage,s->player.x,s->player.feet_y,s->player.completed,
         s->player.hazards,s->player.respawns,s->combat.player_hp,why);
 }
-int main(void) {
+int main(int argc,char **argv) {
+    source_rgb_directory=argc>1?argv[1]:NULL;
     hm_world world=first_world(),w2,w3;
     hm_combat_config combat=first_combat(),c2,c3;
     hm_session game,final_copy;
