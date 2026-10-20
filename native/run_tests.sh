@@ -363,3 +363,12 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_air_smash.c" \
   -lm -o "$TMP/test_air_smash"
 "$TMP/test_air_smash"
+
+
+# Stage 086 opt-in Aerial Smash HUD status/pixel and stride integrity.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/raster" \
+  "$ROOT/raster/air_smash_hud.c" \
+  "$ROOT/raster/tests/test_air_smash_hud.c" \
+  -lm -o "$TMP/test_air_smash_hud"
+"$TMP/test_air_smash_hud"
