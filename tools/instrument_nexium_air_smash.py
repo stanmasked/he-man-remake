@@ -9,7 +9,7 @@ import argparse
 from pathlib import Path
 from instrument_nexium_frames import instrument as add_guest_pngs
 
-FRAMES = (75, 105, 125, 143, 145, 148, 152, 158, 183, 193, 211, 231, 245)
+FRAMES = (75, 105, 125, 143, 145, 146, 147, 148, 150, 152, 158, 183, 193, 211, 231, 245)
 # First-room Right->native CLEAR->A. New room: Right, native A jump,
 # then ZL while airborne. Test a rejected second ZL while cooling, and
 # Minus pause/resume, then natural B respawn. Timings are EXPERIMENTAL;
