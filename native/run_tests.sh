@@ -386,3 +386,27 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_synthetic_room3.c" \
   -lm -o "$TMP/test_synthetic_room3"
 "$TMP/test_synthetic_room3"
+
+
+# Stage 089: native transactional 0→1→2 session chain with true engine
+# CLEAR/A events, including a real third room and no duplicate stage.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_combat.c" \
+  "$ROOT/native/src/heman_session.c" \
+  "$ROOT/native/src/heman_three_room_chain.c" \
+  "$ROOT/native/src/heman_synthetic_room3.c" \
+  "$ROOT/native/tests/test_three_room_chain.c" \
+  -lm -o "$TMP/test_three_room_chain"
+"$TMP/test_three_room_chain"
+
+# Source-authored stage-3 badge, with legacy stage-1/2 pixels untouched.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/raster" \
+  "$ROOT/raster/stage_marker.c" \
+  "$ROOT/raster/third_room_marker.c" \
+  "$ROOT/raster/tests/test_third_room_marker.c" \
+  -lm -o "$TMP/test_third_room_marker"
+"$TMP/test_third_room_marker"
