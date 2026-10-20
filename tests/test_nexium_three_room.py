@@ -203,6 +203,24 @@ class ThirdRoomMockContractTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.run_check()
 
+    def test_unexpected_old_guest_png_record_rejected(self):
+        self.log.write_text(self.log.read_text() +
+            "HEMAN_GUEST_FRAME_PNG frame=1300 dimensions=640x360 "
+            "path=/tmp/previous-run/raster-frame-1300.png\n")
+        with self.assertRaisesRegex(ValueError, "unexpected guest PNG"):
+            self.run_check()
+
+    def test_extra_unscheduled_hid_edge_rejected(self):
+        self.log.write_text(self.log.read_text() +
+                            "HEMAN_THREE_HID frame=1200 buttons=A\n")
+        with self.assertRaisesRegex(ValueError, "guest HID"):
+            self.run_check()
+
+    def test_leftward_drift_after_B_rejected(self):
+        self.frames[1190].x = self.frames[1170].x - 25
+        with self.assertRaisesRegex(ValueError, "drifted"):
+            self.run_check()
+
     def test_missing_real_runner_completion_rejected(self):
         self.log.write_text(self.log.read_text().replace(
             "Production runner complete: frames=1205", "guest interrupted"))
