@@ -90,7 +90,7 @@ def describe_scenarios() -> dict:
 
 def scripted_controls(scenario_id: str) -> tuple[tuple[int, bool], ...]:
     """Generate frame-addressed logical controls, independent of button layout."""
-    if scenario_id not in SCENARIOS:
+    if type(scenario_id) is not str or scenario_id not in SCENARIOS:
         raise ValueError("unsupported contact observation scenario")
     protocol = SCENARIOS[scenario_id]
     script = [(0, False) for _ in range(protocol["frames"])]
@@ -121,7 +121,7 @@ def validate_scenario_trace(data: dict, *,
     if not isinstance(data, dict):
         raise ValueError("expected paired-capture report")
     scenario_id = data.get("scenario_id")
-    if scenario_id not in SCENARIOS:
+    if type(scenario_id) is not str or scenario_id not in SCENARIOS:
         raise ValueError("unsupported contact observation scenario")
     if data.get("fps") != FPS or type(data.get("fps")) is not int:
         raise ValueError("capture FPS differs from provisional protocol")
@@ -191,7 +191,9 @@ def validate_scenario_suite(data: dict, *,
     if any(not isinstance(trace, dict) for trace in traces):
         raise ValueError("invalid suite trace item")
     names = [trace.get("scenario_id") for trace in traces]
-    if len(set(names)) != len(SCENARIOS) or set(names) != set(SCENARIOS):
+    if (any(type(name) is not str for name in names)
+            or len(set(names)) != len(SCENARIOS)
+            or set(names) != set(SCENARIOS)):
         raise ValueError("suite must include each required scenario once")
     reports = {}
     capture_ids = set()
