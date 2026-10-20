@@ -8,36 +8,30 @@
 
 #define COLS 32u
 #define ROWS 20u
-static uint8_t solid_first[COLS*ROWS], solid_second[COLS*ROWS];
-static const hm_event exit_first[]={{HM_EXIT, 50.0f, 224.0f, 9.0f}};
-static const hm_event exit_second[]={{HM_EXIT, 190.0f, 240.0f, 8.0f}};
+static uint8_t solid_first[COLS*ROWS];
+static const hm_event exit_first[]={{HM_EXIT,50.0f,224.0f,9.0f}};
 
-static hm_world world_fixture(unsigned which) {
+static hm_world first_world_fixture(void) {
     hm_world w;
-    uint8_t *solid = which ? solid_second : solid_first;
-    unsigned x, floor_row=which?15u:14u;
+    unsigned x;
     memset(&w,0,sizeof(w));
-    memset(solid,0,COLS*ROWS);
-    for(x=0u;x<COLS;++x)solid[floor_row*COLS+x]=1u;
-    w.solid=solid;w.columns=COLS;w.rows=ROWS;w.tile_size=16u;
-    w.spawn_x=which?64.0f:32.0f;
-    w.spawn_feet_y=which?240.0f:224.0f;
+    memset(solid_first,0,sizeof(solid_first));
+    for(x=0u;x<COLS;++x)solid_first[14u*COLS+x]=1u;
+    w.solid=solid_first;w.columns=COLS;w.rows=ROWS;w.tile_size=16u;
+    w.spawn_x=32.0f;w.spawn_feet_y=224.0f;
     w.actor_half_width=5.0f;w.actor_height=22.0f;
     w.speed=120.0f;w.gravity=1200.0f;w.jump_speed=420.0f;
     w.terminal_speed=1400.0f;
     w.viewport_width=320.0f;w.viewport_height=240.0f;
     w.death_margin=96.0f;
-    w.events=which?exit_second:exit_first;
-    w.event_count=1u;
+    w.events=exit_first;w.event_count=1u;
     return w;
 }
-static hm_combat_config combat_fixture(unsigned which) {
+static hm_combat_config first_combat_fixture(void) {
     hm_combat_config c;
     memset(&c,0,sizeof(c));
-    c.patrol_left=which?140.0f:100.0f;
-    c.patrol_right=which?200.0f:180.0f;
-    c.enemy_start_x=which?170.0f:140.0f;
-    c.enemy_feet_y=which?240.0f:224.0f;
+    c.patrol_left=100.0f;c.patrol_right=180.0f;
+    c.enemy_start_x=140.0f;c.enemy_feet_y=224.0f;
     c.enemy_speed=30.0f;c.sword_reach=30.0f;
     c.contact_range=8.0f;c.enemy_initial_hp=2u;
     c.player_initial_hp=3u;c.sword_cooldown_frames=12u;
@@ -45,8 +39,8 @@ static hm_combat_config combat_fixture(unsigned which) {
     return c;
 }
 int main(void) {
-    hm_world first=world_fixture(0), second, bad;
-    hm_combat_config combat_first=combat_fixture(0), combat_second;
+    hm_world first=first_world_fixture(), second, bad;
+    hm_combat_config combat_first=first_combat_fixture(), combat_second;
     hm_session game,snapshot;
     uint8_t room2_tiles[HM_ROOM2_CELLS];
     hm_input right={1.0f,0u,0u};
