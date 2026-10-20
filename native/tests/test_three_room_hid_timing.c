@@ -54,7 +54,7 @@ static hm_combat_config first_combat(void) {
    Subsequent guest-versus-host comparisons may reveal one-frame offset. */
 static unsigned buttons_at(unsigned f, unsigned old) {
     switch(f) {
-        case 45u:case 110u:case 530u:case 960u: return R;
+        case 45u:case 110u:case 530u: return R;
         case 78u:case 95u:case 500u:case 515u:
         case 1080u:case 1143u: return 0u;
         case 90u:case 510u:case 1140u: return
