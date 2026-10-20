@@ -53,6 +53,12 @@ int main(void) {
     unsigned i;
     assert(hm_session_init(&first,&combat_first,&game)==HM_SESSION_OK);
     snapshot=game;
+    /* Explicit C99 input policy: Minus wins over simultaneous A, and a
+       paused or non-CLEAR room must not transition on A alone. */
+    assert(!hm_chain_continue_edge_allowed(&game,stage,0u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,0u,1u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,1u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(NULL,stage,0u,0u,1u));
     /* A before clearing cannot skip the first room. */
     assert(hm_chain_try_advance(&second,&combat_second,&game,&stage,1u)
            ==HM_CHAIN_NOT_READY);
@@ -63,6 +69,13 @@ int main(void) {
                                1.0f/60.0f)==HM_SESSION_OK);
     assert(game.player.completed==1u);
     assert(game.player.frame>0u);
+    assert(hm_chain_continue_edge_allowed(&game,stage,0u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,0u,1u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,1u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,0u,0u,0u));
+    assert(!hm_chain_continue_edge_allowed(&game,1u,0u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,2u,0u,0u,1u));
+    assert(!hm_chain_continue_edge_allowed(&game,stage,2u,0u,1u));
     snapshot=game;
     assert(hm_chain_try_advance(&second,&combat_second,&game,&stage,0u)
            ==HM_CHAIN_NOT_READY);
