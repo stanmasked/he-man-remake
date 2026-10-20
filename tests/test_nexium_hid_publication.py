@@ -91,9 +91,27 @@ class HostOnlyHidPublicationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Malformed pinned NeXium"):
             verify(make_trace().replace("npad=[", "memory=[", 1))
 
-    def test_missing_shared_memory_mapping_rejected(self):
+    def test_unmapped_active_input_rejected(self):
+        # Startup neutral samples may precede NPAD mapping; the first
+        # scripted DRIGHT event must always reach mapped shared memory.
+        trace = make_trace(neutral_prefix=False)
         with self.assertRaisesRegex(ValueError, "not mapped"):
-            verify(make_trace().replace("mapped=0x101000", "mapped=0x0", 1))
+            verify(trace.replace("mapped=0x101000", "mapped=0x0", 1))
+
+    def test_unmapped_initial_neutral_is_ignored_not_counted_as_proof(self):
+        trace = make_trace()
+        trace = trace.replace("mapped=0x101000", "mapped=0x0", 1)
+        got = verify(trace)
+        self.assertEqual(got["real_kernel_button_transitions"], 16)
+
+    def test_unmapping_after_active_input_rejected(self):
+        trace = make_trace()
+        trace = trace.replace("npad=[0, 0, 0, 0, 0, 0, 0]", "npad=[0, 0, 0, 0, 0, 0, 0]")
+        lines = trace.splitlines()
+        # Frame 78 is the neutral release after real DRIGHT.
+        lines[2] = lines[2].replace("mapped=0x101000", "mapped=0x0")
+        with self.assertRaisesRegex(ValueError, "not mapped"):
+            verify("\\n".join(lines) + "\\n")
 
     def test_injected_buttons_not_written_to_npad_rejected(self):
         text = make_trace()
