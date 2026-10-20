@@ -20,6 +20,7 @@ CLEAR_BORDER = (80, 105, 33)
 CLEAR_LETTER = (134, 212, 240)
 RETRY_GREEN = (138, 213, 66)
 CYAN_HEIGHT = (0, 255, 255)
+PROGRESS_COLOR = (42, 248, 178)  # world-x 0..900 source-only third-room HUD
 
 DIGITS = {
     1: "010110010010111",
@@ -57,6 +58,31 @@ def _world_y(rgb) -> int:
     if len(cells) != 9 or cells[-1] - cells[0] != 8:
         raise ValueError("Missing unique real guest world-Y HUD ruler")
     return cells[0]
+
+
+
+def _progress_world_x(rgb, stage: int) -> int | None:
+    """Read stage-3 *real source player.x* without legacy x210 clamping.
+
+    The opt-in NRO draws a 4x10 uniquely colored cursor; the third room
+    marker moves with native physics and cannot be set by the verifier.
+    Never treat a host-generated sample as a guest attestation.
+    """
+    xs = []
+    for x in range(70, 530):
+        for y in range(330, 340):
+            if rgb.getpixel((x, y)) == PROGRESS_COLOR:
+                xs.append(x)
+    if stage != 3:
+        if xs:
+            raise ValueError("Third-room progress HUD leaked into stage 1/2")
+        return None
+    if len(xs) != 40:
+        raise ValueError("Missing real source world-X third-room HUD cursor")
+    unique = sorted(set(xs))
+    if len(unique) != 4 or unique[-1] - unique[0] != 3:
+        raise ValueError("Broken third-room world-X cursor geometry")
+    return 2 * (unique[0] - 70)
 
 
 def _overlay(rgb) -> bool:
@@ -135,8 +161,10 @@ def verify(folder: Path) -> dict:
         bytes_rgb = rgb.tobytes()
         if frame in (1080, 1120):
             frozen[frame] = bytes_rgb
+        stage = _digit(rgb)
         values[frame] = {
-            "stage": _digit(rgb),
+            "stage": stage,
+            "full_world_x": _progress_world_x(rgb, stage),
             "clear": clear[0],
             "finish": _overlay(rgb),
             "world_x_marker": round(world_x, 2),
@@ -166,6 +194,24 @@ def verify(folder: Path) -> dict:
         raise ValueError("Native hazard state did not persist or reset after B")
     if values[970]["world_y_marker"] > values[945]["world_y_marker"] - 25:
         raise ValueError("Real stage-3 A jump did not move the world-Y marker")
+    # Critical optical evidence beyond the old x210-saturated magenta HUD:
+    # actual world-X advances through checkpoint x434, hazard x678, exit x842.
+    # Ranges tolerate a few guest-vs-host frame scheduling differences.
+    bounds = {
+        535: (45, 100), 650: (265, 325), 820: (600, 665),
+        850: (435, 495), 930: (585, 652), 945: (615, 679),
+        970: (670, 744), 1045: (814, 868),
+        1080: (814, 868), 1120: (814, 868),
+        1170: (45, 85), 1190: (45, 85),
+    }
+    for frame, (lo, hi) in bounds.items():
+        x = values[frame]["full_world_x"]
+        if x is None or not lo <= x <= hi:
+            raise ValueError(f"Native source world-X guest cursor wrong at {frame}: {x}")
+    if values[820]["full_world_x"] - values[850]["full_world_x"] < 100:
+        raise ValueError("Native third-room hazard did not reset real world-X")
+    if values[1045]["full_world_x"] - values[970]["full_world_x"] < 70:
+        raise ValueError("No native traversal from jump through third-room exit")
     if frozen[1080] != frozen[1120]:
         raise ValueError("Game advanced after source-native third-stage FINISH")
     if abs(values[1190]["world_x_marker"] - values[1170]["world_x_marker"]) > 6:
@@ -183,6 +229,10 @@ def verify(folder: Path) -> dict:
         "finish_samples": sorted(EXPECTED_FINISH),
         "genuine_stage3_hazard_respawn_seen": True,
         "genuine_stage3_jump_seen": True,
+        "real_guest_unclamped_world_x": {
+            str(f): values[f]["full_world_x"] for f in FRAMES
+            if values[f]["stage"] == 3
+        },
         "native_stage3_FINISH_frozen": True,
         "genuine_B_retry_stage3_seen": True,
         "original_ios_physics_fidelity_verified": False,
