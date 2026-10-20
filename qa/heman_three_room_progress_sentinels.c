@@ -84,9 +84,9 @@ static int check_progress(const guarded *frame, float x) {
                 col >= 68u && col < 572u)
                 expected = FACE;
             if (row >= 327u && row < 330u &&
-                (col >= 287u && col < 289u ||
-                 col >= 409u && col < 411u ||
-                 col >= 491u && col < 493u))
+                ((col >= 287u && col < 289u) ||
+                 (col >= 409u && col < 411u) ||
+                 (col >= 491u && col < 493u)))
                 expected = WHITE;
             if (row >= 330u && row < 340u &&
                 col >= cursor && col < cursor + 4u)
