@@ -1,0 +1,39 @@
+name: He-Man three-room guest/native HID parity gate
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/three-room-hid-parity.yml'
+      - '.github/workflows/nexium-patched-three-room.yml'
+      - 'tools/verify_three_room_hid_parity.py'
+      - 'tools/instrument_nexium_three_room.py'
+      - 'tools/verify_nexium_three_room_pngs.py'
+      - 'native/tests/test_three_room_hid_timing.c'
+      - 'native/tests/test_three_room_optical_oracle.c'
+      - 'tests/test_three_room_hid_parity.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strict-three-room-hid-contract:
+    name: Ensure NeXium and both native C99 programs use identical controller frames (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Compare all source controller presses/releases with real guest injector
+        run: python tools/verify_three_room_hid_parity.py
+      - name: Verify fail-closed detection of dangerous input drift
+        run: python -m unittest discover -s tests -p test_three_room_hid_parity.py -v
+      - name: Explicitly distinguish preflight from live NeXium evidence
+        run: |
+          echo 'PASS means that source files agree on the same input schedule.'
+          echo 'It does not attest an AArch64 guest CPU run, actual frame_rx PNGs, or original iOS fidelity.'
