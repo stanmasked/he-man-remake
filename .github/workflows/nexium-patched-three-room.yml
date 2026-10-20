@@ -29,7 +29,7 @@ permissions:
 jobs:
   build-genuine-nros:
     name: Cross-build real asset-free guest files
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
       image: devkitpro/devkita64:latest
