@@ -112,3 +112,32 @@ the first room into this scene.
 The ordinary one-room NRO, existing controls and the commercial game's
 source data are not modified by this internal refactor. Full
 original-game content and physics fidelity remain unverified.
+
+## Experimental second-room ZR dash — Stage 069
+
+In the optional two-room build only, **ZR + Left/Right** starts a
+12-game-frame speed burst if the character is grounded, alive and
+the ability has recovered. The existing native full-body collision
+checks still determine the actual movement: dashing cannot pass through
+solid tiles. The burst uses a copy of the same C99 world with double
+horizontal speed (240 px/s vs 120 px/s) and **never changes the stored
+world or enemy configuration**. The action has an 80-frame lockout
+counted from its initial press, so it cannot be spammed. A fresh ZR
+press is needed after recovery. An orange ZR HUD meter indicates an
+active burst; cyan is ready and grey is recovering.
+
+**Minus** toggles pause with priority over simultaneous ZR, freezing
+both the simulated gameplay and dash/recovery counters. Resuming
+consumes the button edge without a phantom dash. B resets the character
+and cancels an active dash. Stage 1, the single-scene NRO, and all
+original baseline controls are unchanged.
+
+`native/tests/test_dash.c` compares actual native C99 movement at
+60 Hz against non-dashing movement and checks cooldown, pause and
+input-error rollback. `raster/tests/test_dash_hud.c` checks
+deterministic UI pixels and stride padding under both host compilers.
+
+This is a new synthetic ability, **not** part of the iOS game's
+confirmed rules. Guest-level verification still requires a dedicated
+NeXium ZR press/capture run; host tests and NRO compilation alone do
+not prove controller behavior in the emulator or on hardware.
