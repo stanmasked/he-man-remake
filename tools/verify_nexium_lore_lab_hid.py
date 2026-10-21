@@ -11,7 +11,7 @@ import argparse
 import json
 from pathlib import Path
 
-from instrument_nexium_lore_lab import HID_EVENTS, COLD_RESTORE_EVENTS
+from instrument_nexium_lore_lab import HID_EVENTS, COLD_RESTORE_EVENTS, RESAVE_EVENTS
 from verify_nexium_hid_publication import BUTTON_BITS, read_publications
 
 LAB_BITS = {**BUTTON_BITS, "L": 1 << 6, "R": 1 << 7}
@@ -66,9 +66,14 @@ def main() -> int:
     parser.add_argument("kernel_stdout", type=Path)
     parser.add_argument("--cold-restart", action="store_true",
                         help="verify only ZL+R restore edges of the second process")
+    parser.add_argument("--real-resave", action="store_true",
+                        help="verify genuine restore, move, second SD save NPAD edges")
     args = parser.parse_args()
-    result = verify(args.kernel_stdout.read_text(errors="replace"),
-                    COLD_RESTORE_EVENTS if args.cold_restart else HID_EVENTS)
+    if args.cold_restart and args.real_resave:
+        parser.error("Choose only one independent guest NPAD schedule")
+    selected = (COLD_RESTORE_EVENTS if args.cold_restart else
+                RESAVE_EVENTS if args.real_resave else HID_EVENTS)
+    result = verify(args.kernel_stdout.read_text(errors="replace"), selected)
     print(json.dumps(result, sort_keys=True, indent=2))
     print("PASS: pinned kernel published every lore-lab real NPAD edge")
     return 0
