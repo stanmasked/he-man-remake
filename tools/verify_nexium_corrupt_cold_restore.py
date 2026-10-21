@@ -18,7 +18,7 @@ from pathlib import Path
 from audit_switch_sd_journal import RECORD_SIZE, decode_record
 from instrument_nexium_lore_lab import FRAMES, COLD_RESTORE_EVENTS
 from verify_nexium_cold_restart import load_guest_frame
-from verify_nexium_sd_disk_receipt import audit_confined_sd
+from verify_nexium_sd_disk_receipt import audit_confined_sd, read_confined_sd_slot_bytes
 
 
 def _lab(root: Path) -> Path:
@@ -55,10 +55,9 @@ def prepare_bad_sd(source_root: Path, target_root: Path, first_receipt: dict) ->
         if slot["status"] != "structurally_valid":
             continue
         index = slot["slot"]
-        src = _lab(source_root) / f"progress{index}.bin"
-        raw = src.read_bytes()
-        if len(raw) != RECORD_SIZE or hashlib.sha256(raw).hexdigest() != slot["sha256"]:
-            raise ValueError("Journal bytes changed after independent receipt")
+        # The retained directory/leaf fds cannot be redirected to another
+        # path by a symlink swap between audit and fixture generation.
+        raw = read_confined_sd_slot_bytes(source_root, index, slot["sha256"])
         broken = bytearray(raw)
         broken[24] ^= 0x40  # Covered by outer FNV; every valid journal must fail.
         if decode_record(broken).get("reason") != "journal_checksum":
