@@ -9,6 +9,8 @@ on:
       - 'native/tests/test_switch_lore_sd_adapter.c'
       - 'native/tests/mock_libnx/switch.h'
       - 'native/run_tests.sh'
+      - 'tools/audit_switch_sd_journal.py'
+      - 'tests/test_switch_sd_journal_audit.py'
       - 'switch_lore/source/sd_journal.c'
       - 'switch_lore/source/main.c'
   workflow_dispatch:
@@ -104,6 +106,11 @@ jobs:
           trap 'rm -rf "$d" "$d2"' EXIT
           mkdir -p "$d2/sdmc:"
           (cd "$d2" && /tmp/heman-sd-adapter pre-mounted)
+      - name: Audit two synthetic SD-slot files without reading or changing source assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 -m unittest discover -s tests -p test_switch_sd_journal_audit.py -v
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."

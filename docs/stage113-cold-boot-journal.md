@@ -72,6 +72,27 @@ result. The mock validates adapter control flow and
 ordinary host file handling only; it does not emulate real `fsdev` services,
 SD media behavior or durability.
 
+## Offline evidence audit (synthetic saves only)
+
+After safely copying **only** the two lab files from a test SD volume into
+a local directory (do not commit or publish the files), run:
+
+```sh
+python3 tools/audit_switch_sd_journal.py /private/path/to/lab-saves
+```
+
+The tool reads only `progress0.bin` and `progress1.bin`; it never writes
+either file. It verifies exact 120-byte lengths, versioned outer/inner
+headers, little-endian generations, reserved bytes, and both FNV-1a
+accidental-corruption checksums. It reports generation numbers, SHA-256
+fingerprints, synthetic world seals and whether the two structurally valid
+slots agree on their world binding. It does **not** reveal raw file contents
+or assert a successful hardware commit, a real cold restart or compatibility
+with the running game's complete C99 world. If both structurally valid
+slots disagree on world bindings, it reports ambiguity instead of silently
+selecting the newest one. This is an offline diagnostic, not a replacement
+for the runtime acceptance gate in Issue #123.
+
 The actual Switch NRO is separately cross-compiled through the
 existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO
 header and AArch64 ISA. Its **ZL+L/ZL+R SD operations are not claimed to
