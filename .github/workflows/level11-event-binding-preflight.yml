@@ -1,0 +1,38 @@
+name: He-Man Level1-1 private event-binding integrity preflight
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-event-binding-preflight.yml'
+      - 'src/heman_tools/level11_event_binding_preflight.py'
+      - 'src/heman_tools/level11_private_readiness.py'
+      - 'tests/test_level11_event_binding_preflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-roles-not-authenticated:
+    name: Synthetic private role consistency (${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Reject forged/misordered event roles and source authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests \
+            -p test_level11_event_binding_preflight.py -v
+      - name: Confirm original-data protection
+        run: |
+          echo 'CI uses fabricated event tables; no private original IPA.'
+          echo 'No level geometry, event indices or proprietary assets exported.'
+          echo 'PASS never authorizes original iOS map import or scene playback.'
