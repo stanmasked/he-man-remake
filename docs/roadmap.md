@@ -47,6 +47,7 @@
 - [x] Add deterministic, one-frame-delayed player defeat respawn to the synthetic combat session with input validation and atomic rollback tests.
 - [ ] Profile the C99 engine on Nintendo Switch hardware/emulator, and compare real-game mechanics privately.
 - [x] Add a libnx-independent, host-tested 40x20 ASCII tile viewport and synthetic pickup/checkpoint/hazard/exit markers for the Switch probe (not an original sprite renderer).
+- [x] Stage153 owner-private **exact sprite index** structural verification: `SpriteSeqData.repo` has **2,354**, `SpriteCutData.repo` has **1,156** entries, whose full UTF-16 resource keys match WAD record headers at **all 3,510 indexed offsets** in both source screen packs. `SingleFrameSpriteData.repo` supplies **89** bounded offsets with a different unresolved WAD record header. All indexes consume exact EOF and match between packs; WAD bytes differ by resolution. No animation frame/timing or actor-state binding decoded; see [Stage153](stage153-sprite-repo-wad-index.md).
 - [ ] Introduce a production graphics/input adapter with textures and real-time pacing for future Switch builds.
 - [x] Add first opt-in libnx/devkitA64 **console probe** build recipe (unverified cross-compilation).
 - [x] Cross-compile the synthetic text-console Switch probe to a structurally valid NRO with devkitPro in GitHub Actions.
