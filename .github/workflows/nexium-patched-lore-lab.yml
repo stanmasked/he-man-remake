@@ -13,6 +13,7 @@ on:
       - 'tools/instrument_nexium_frames.py'
       - 'tools/verify_nexium_hid_publication.py'
       - 'tools/check_pinned_nexium_hid_source.py'
+      - 'tools/check_pinned_nexium_lore_hid_source.py'
       - 'patches/nexium-nro-segment-file-origin.patch'
   workflow_dispatch:
 
@@ -125,6 +126,9 @@ jobs:
           python3 "$GITHUB_WORKSPACE/tools/check_pinned_nexium_hid_source.py" \
             /tmp/nexium-upstream/nexium-kernel/src/hid_state.rs | \
             tee "$GITHUB_WORKSPACE/boot-evidence/pinned-kernel-hid-source.json"
+          python3 "$GITHUB_WORKSPACE/tools/check_pinned_nexium_lore_hid_source.py" \
+            /tmp/nexium-upstream/nexium-kernel/src/hid_state.rs | \
+            tee "$GITHUB_WORKSPACE/boot-evidence/pinned-kernel-lore-buttons.json"
           git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
           python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_lore_lab.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
@@ -255,5 +259,6 @@ jobs:
             boot-evidence/guest-lore-lab-report.json
             boot-evidence/guest-lore-hid-publication-report.json
             boot-evidence/pinned-kernel-hid-source.json
+            boot-evidence/pinned-kernel-lore-buttons.json
           if-no-files-found: warn
           retention-days: 7
