@@ -50,7 +50,7 @@ through a write. The same test binary is then executed in **four
 different host processes**, with actual disk files used for write,
 cold-read, second write, second cold-read; an appended byte corrupts
 the newest slot, and a **fifth process** must recover the older one.
-It cannot pass by accidentally retaining game state in process RAM.
+It cannot pass by accidentally retaining game state in process RAM. The same workflow also appends an extra byte to the newest file and then truncates that file to 60 bytes; each time a fresh process must reject the newest record and recover the previous complete slot.
 
 The actual Switch NRO is separately cross-compiled through the
 existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO

@@ -62,6 +62,9 @@ jobs:
           # The extra byte must mark the newest slot malformed.
           printf '\001' >> "$d/progress.1"
           /tmp/heman-cold-journal cold-read "$d/progress"
+          # Exercise actual truncated-file recovery from a fresh process too.
+          truncate -s 60 "$d/progress.1"
+          /tmp/heman-cold-journal cold-read "$d/progress"
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."
