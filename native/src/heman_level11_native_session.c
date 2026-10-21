@@ -49,7 +49,7 @@ static uint64_t fingerprint_world(const hm_world *w) {
  * of all objects and must never free them while the session is live. */
 static int sealed_world_unchanged(const hm_level11_native_session *s) {
     const hm_world *w;
-    if (!s || !(w = s->world) ||
+    if (!s || !(w = s->world) || w != s->sealed_world ||
         w->columns != s->sealed_columns ||
         w->rows != s->sealed_rows ||
         w->tile_size != s->sealed_tile_size ||
@@ -74,6 +74,12 @@ static int sealed_world_unchanged(const hm_level11_native_session *s) {
 static int ready(const hm_level11_native_session *session) {
     return session && session->initialized == 1u &&
            session->attack_previous_down <= 1u &&
+           session->bindings.left_gate_event ==
+               session->sealed_bindings.left_gate_event &&
+           session->bindings.skeletor_bio_event ==
+               session->sealed_bindings.skeletor_bio_event &&
+           session->bindings.concept_art_event ==
+               session->sealed_bindings.concept_art_event &&
            sealed_world_unchanged(session) &&
            hm_level11_native_bindings_valid(session->world,
                                              &session->bindings) &&
@@ -88,7 +94,9 @@ hm_lore_result hm_level11_session_init(
         return HM_LORE_INVALID;
     memset(&candidate, 0, sizeof(candidate));
     candidate.world = world;
+    candidate.sealed_world = world;
     candidate.bindings = *bindings;
+    candidate.sealed_bindings = *bindings;
     if (hm_init(world, &candidate.player) != HM_OK ||
         hm_lore_init(&candidate.lore) != HM_LORE_APPLIED)
         return HM_LORE_INVALID;
