@@ -128,8 +128,9 @@ class Stage145LexicalConstraintsTests(unittest.TestCase):
             self.assertNotIn(forbidden,report)
 
     def test_source_envelope_corruption_is_rejected(self):
-        fake={"Bad.ps2d":fixture([record()],tail_count=1,
-                                  opaque=text16("Known")+b"\xff")[:-4]}
+        # Damage the verified main envelope, not an unknown trailer; only
+        # the former has established byte boundaries and must hard fail.
+        fake={"Bad.ps2d":fixture([record()])[:-5]}
         with self.assertRaises(ValueError):
             summarize_lexicon_restrictions(fake,{"Known.shape":circle()})
 
