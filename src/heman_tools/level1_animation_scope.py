@@ -38,7 +38,7 @@ REPOSITORIES = (
 )
 WADS = ("sprite/SpriteSeqData.wad", "sprite/SpriteResData.wad")
 SKELETON_DIR = "skeleton2D/"
-SKELETON_EXTENSION = ".skel2d"
+SKELETON_EXTENSIONS = (".skel2d", ".skeleton2d")
 MAX_REPOSITORY_BYTES = 2_000_000
 MAX_WAD_BYTES = 6_000_000
 MAX_SKELETON_BYTES = 2_000_000
@@ -128,7 +128,7 @@ def summarize_animation_scopes(
     if set(skeletons[SCREENS[1]]) != skeleton_names:
         raise ValueError("Resolution-specific skeleton members differ")
     if any(not isinstance(name,str) or "/" in name or "\\" in name
-           or not name.endswith(SKELETON_EXTENSION)
+           or not name.endswith(SKELETON_EXTENSIONS)
            for name in skeleton_names):
         raise ValueError("Invalid original skeleton filename")
     if any(type(blob) is not bytes or not 1 <= len(blob) <= MAX_SKELETON_BYTES
@@ -226,7 +226,7 @@ def audit_private_animation_scopes(ipa: Path) -> dict:
             files={}
             for original_name in index:
                 if original_name.startswith(prefix) and original_name.endswith(
-                        SKELETON_EXTENSION):
+                        SKELETON_EXTENSIONS):
                     tail=original_name[len(prefix):]
                     if not tail or "/" in tail or "\\" in tail or len(tail)>255:
                         raise ValueError("Unsupported source skeleton nesting")
