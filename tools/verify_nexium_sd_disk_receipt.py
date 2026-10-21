@@ -177,7 +177,7 @@ def main(argv=None) -> int:
     receipt, okay = verify_runtime_receipt(args.data_root, guest)
     args.out.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n",
                         encoding="utf-8")
-    print(f"STAGE116_EMULATED_DISK_RECEIPT_{'PASS' if okay else 'FAIL'}: "
+    print(f"STAGE114_EMULATED_DISK_RECEIPT_{'PASS' if okay else 'FAIL'}: "
           f"{receipt['classification']}")
     return 0 if okay else 2
 
