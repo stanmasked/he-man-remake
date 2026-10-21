@@ -13,8 +13,8 @@ extern "C" {
  * original iOS ownership, geometry, collision semantics or footage.
  *
  * To reject accidental in-place map or event mutation, the opt-in session
- * checks borrowed fixture pointer identity and a full content checksum
- * before each step and upgrade. This is not a cryptographic authentication
+ * checks borrowed fixture pointer identity, exact event-to-reward
+ * bindings, and a full content checksum before each step and upgrade. This is not a cryptographic authentication
  * or proof that fixtures originated in the user's original iOS IPA.
  *
  * All state remains self-contained and zero-allocation. This is not
@@ -22,6 +22,9 @@ extern "C" {
  */
 typedef struct {
     const hm_world *world;
+    /* A copied hm_world descriptor with identical arrays is not the
+     * originally borrowed descriptor: do not silently switch ownership. */
+    const hm_world *sealed_world;
     /* Record borrowed fixture identities and a non-cryptographic content
      * guard at init. No original map data is stored or serialized. */
     const hm_event *sealed_events;
@@ -33,6 +36,10 @@ typedef struct {
     uint32_t sealed_columns, sealed_rows, sealed_tile_size;
     uint32_t sealed_event_count, sealed_mask_count;
     hm_level11_event_bindings bindings;
+    /* Binding roles are sealed separately from the world fingerprint:
+     * both lore targets have kind HM_PICKUP and may be swapped while
+     * still passing structural event-kind validation. */
+    hm_level11_event_bindings sealed_bindings;
     hm_state player;
     hm_lore_state lore;
     uint8_t attack_previous_down;
