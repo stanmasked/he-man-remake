@@ -58,6 +58,7 @@ static int write_slot(void *ignored,unsigned slot,const uint8_t *bytes) {
     FILE *file;
     size_t count;
     int write_error,flushed,closed;
+    Result committed;
     (void)ignored;
     if (!bytes || !file_name(slot,name,sizeof(name))) return 0;
     file=fopen(name,"wb");
@@ -66,10 +67,14 @@ static int write_slot(void *ignored,unsigned slot,const uint8_t *bytes) {
     write_error=ferror(file);
     flushed=fflush(file);
     closed=fclose(file);
-    /* If the partial new slot is damaged, the other previously valid
-     * slot stays untouched. This does not guarantee power-fail fsync. */
+    /* libnx explicitly requires a filesystem commit after each file close
+     * following writes. Request it even after a short/error write, because
+     * the inactive slot may already have been truncated or partly changed. */
+    committed=fsdevCommitDevice("sdmc");
+    /* The other previously valid slot remains untouched. Filesystem commit
+     * improves durability but is not a proof against every power-loss mode. */
     return count==HM_LEVEL11_JOURNAL_RECORD_SIZE && !write_error &&
-           flushed==0 && closed==0;
+           flushed==0 && closed==0 && R_SUCCEEDED(committed);
 }
 static hm_level11_journal_io journal_io(void) {
     hm_level11_journal_io io;

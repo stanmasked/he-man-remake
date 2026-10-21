@@ -67,12 +67,14 @@ existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO
 header and AArch64 ISA. Its **ZL+L/ZL+R SD operations are not claimed to
 have run under NeXium or on real Switch hardware** unless a separate
 host/device runtime test genuinely exercises `fsdevMountSdmc`, mkdir,
-file I/O and filesystem flush.
+file I/O, `fflush`/`fclose`, and `fsdevCommitDevice("sdmc")`.
 
-This is **best-effort torn-write recovery, NOT guaranteed physical
-power-loss atomicity**, nor a transactional Switch user SaveData
-service. A sudden power loss or platform cache behavior is not covered
-by host tests. Failure of SD mounting falls back safely to RAM. The
+The writer requests libnx's filesystem commit after each file close
+following a write, including short/error writes where the inactive slot
+may already have changed. This is **best-effort torn-write recovery, NOT
+guaranteed physical power-loss atomicity**, nor a transactional Switch
+user SaveData service. A sudden power loss or platform cache behavior is
+not covered by host tests. Failure of SD mounting falls back safely to RAM. The
 original iOS persistence model is unknown. No original game assets,
 level geometry or IPA bytes were added, and [Issue #110](https://github.com/stanmasked/he-man-remake/issues/110)
 remains open for source-authentic Level1-1 reconstruction.

@@ -92,8 +92,10 @@ reads the target back and validates it before reporting success.
 
 The SD path is still **experimental and not hardware-verified**. The
 backend checks stdio read/write error flags, standard file writes,
-`fflush`, `fclose` and journal read-back validation; it does not claim
-`fsync`/physical power-loss durability. The format is our own lab design, not an emulation or port
+`fflush`, `fclose`, requests libnx `fsdevCommitDevice("sdmc")` after
+each write close, and validates the journal by reading it back. The
+filesystem commit improves durability but does not prove resistance to
+every physical power-loss or device-cache failure mode. The format is our own lab design, not an emulation or port
 of commercial iOS save contents. Failed SD restore leaves the live
 session unchanged; ordinary L/R RAM save/load remains available. The
 game never opens the original IPA, writes commercial assets, saves
