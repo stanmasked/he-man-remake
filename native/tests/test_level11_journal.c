@@ -28,6 +28,9 @@ static int memory_write(void *ctx,unsigned slot,const uint8_t *data) {
     s->writes++;
     if(s->tear_next) {
         s->tear_next=0;
+        /* Model a genuinely truncated replacement, not an overlay on
+         * stale bytes which may still be a perfectly valid prior record. */
+        memset(s->bytes[slot],0,SZ);
         memcpy(s->bytes[slot],data,SZ/2u);
         s->exists[slot]=1;
         return 0;
