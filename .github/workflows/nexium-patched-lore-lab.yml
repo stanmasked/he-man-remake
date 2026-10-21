@@ -13,9 +13,11 @@ on:
       - 'tools/verify_nexium_cold_restart.py'
       - 'tools/verify_nexium_corrupt_cold_restore.py'
       - 'tools/verify_nexium_torn_slot_fallback.py'
+      - 'tools/verify_nexium_divergent_journal_priority.py'
       - 'tests/test_nexium_cold_restart.py'
       - 'tests/test_nexium_corrupt_cold_restore.py'
       - 'tests/test_nexium_torn_slot_fallback.py'
+      - 'tests/test_nexium_divergent_journal_priority.py'
       - 'tests/test_nexium_fd_fixture_reads.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
@@ -79,6 +81,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_fd_fixture_reads.py -v
+      - name: Test two valid divergent-progress journal oracle (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_divergent_journal_priority.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -433,6 +440,56 @@ jobs:
             --target-root "$PWD/boot-evidence/torn-newest-restart/nexium-data" \
             --manifest boot-evidence/torn-newest-restart/torn-newest-manifest.json \
             --out boot-evidence/torn-newest-restart/guest-torn-slot-recovery-report.json
+      - name: Prepare independent SD fixture with two valid but different-progress generations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/divergent-restart
+          python3 tools/verify_nexium_divergent_journal_priority.py prepare \
+            --source-root "$PWD/boot-evidence/nexium-data" \
+            --target-root "$PWD/boot-evidence/divergent-restart/nexium-data" \
+            --first-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --out boot-evidence/divergent-restart/divergent-sd-manifest.json
+      - name: Fifth separate NeXium guest process must restore valid newer PARTIAL progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HEMAN_LORE_RESTART_PHASE=restore
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/divergent-restart/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/divergent-restart/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/divergent-restart"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/divergent-restart/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/divergent-restart/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/divergent-restart/raster-exit-status.txt
+          tail -n 65 boot-evidence/divergent-restart/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Divergent-progress cold guest exited with $code" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Independent real guest/NPAD and pixel oracle for newest DIFFERENT progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --cold-restart boot-evidence/divergent-restart/raster-stdout.log | \
+            tee boot-evidence/divergent-restart/guest-lore-hid-publication-report.json
+          python3 tools/verify_nexium_divergent_journal_priority.py verify \
+            --first-evidence "$PWD/boot-evidence" \
+            --cold-evidence "$PWD/boot-evidence/divergent-restart" \
+            --target-root "$PWD/boot-evidence/divergent-restart/nexium-data" \
+            --manifest boot-evidence/divergent-restart/divergent-sd-manifest.json \
+            --out boot-evidence/divergent-restart/guest-divergent-priority-report.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -462,5 +519,9 @@ jobs:
             boot-evidence/torn-newest-restart/*.png
             boot-evidence/torn-newest-restart/*.json
             boot-evidence/torn-newest-restart/*status.txt
+            boot-evidence/divergent-restart/*.log
+            boot-evidence/divergent-restart/*.png
+            boot-evidence/divergent-restart/*.json
+            boot-evidence/divergent-restart/*status.txt
           if-no-files-found: warn
           retention-days: 7
