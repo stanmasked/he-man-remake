@@ -244,6 +244,14 @@ jobs:
                "$(awk '{print $1}' boot-evidence/guest-nro-after.sha256)"
           python3 tools/verify_nexium_lore_lab_pngs.py boot-evidence | tee boot-evidence/guest-lore-lab-report.json
           sha256sum nros/heman_level11_lore_lab.nro boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frame-sha256.txt
+      - name: Independently audit actual isolated emulator SD files after guest HUD result
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_sd_disk_receipt.py \
+            --data-root boot-evidence/nexium-data \
+            --guest-report boot-evidence/guest-lore-lab-report.json \
+            --out boot-evidence/guest-sd-disk-receipt.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -257,6 +265,7 @@ jobs:
             boot-evidence/guest-frame*.json
             boot-evidence/*nro*.sha256
             boot-evidence/guest-lore-lab-report.json
+            boot-evidence/guest-sd-disk-receipt.json
             boot-evidence/guest-lore-hid-publication-report.json
             boot-evidence/pinned-kernel-hid-source.json
             boot-evidence/pinned-kernel-lore-buttons.json
