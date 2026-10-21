@@ -14,10 +14,12 @@ on:
       - 'tools/verify_nexium_corrupt_cold_restore.py'
       - 'tools/verify_nexium_torn_slot_fallback.py'
       - 'tools/verify_nexium_divergent_journal_priority.py'
+      - 'tools/verify_nexium_real_resave_generations.py'
       - 'tests/test_nexium_cold_restart.py'
       - 'tests/test_nexium_corrupt_cold_restore.py'
       - 'tests/test_nexium_torn_slot_fallback.py'
       - 'tests/test_nexium_divergent_journal_priority.py'
+      - 'tests/test_nexium_real_resave_generations.py'
       - 'tests/test_nexium_fd_fixture_reads.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
@@ -86,6 +88,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_divergent_journal_priority.py -v
+      - name: Test actual guest two-generation SD oracle (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_real_resave_generations.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -490,6 +497,106 @@ jobs:
             --target-root "$PWD/boot-evidence/divergent-restart/nexium-data" \
             --manifest boot-evidence/divergent-restart/divergent-sd-manifest.json \
             --out boot-evidence/divergent-restart/guest-divergent-priority-report.json
+      - name: Before REAL second save re-audit unchanged first guest SD receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from verify_nexium_sd_disk_receipt import audit_confined_sd
+          initial = json.loads(Path("boot-evidence/guest-sd-disk-receipt.json").read_text())
+          disk, problem = audit_confined_sd(Path.cwd() / "boot-evidence/nexium-data")
+          if problem or disk["slots"] != initial["emulator_sd_slots"]:
+              raise SystemExit("Prior guest SD file bytes changed before second real save")
+          if disk["structurally_valid_slot_count"] != 1:
+              raise SystemExit("Expected exactly one original guest-written save")
+          print("PASS: first genuine guest SD slot unchanged before native second save")
+          PY
+      - name: Sixth independent process performs REAL native load D-pad move and second ZL+L save
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/real-resave
+          export HEMAN_LORE_RESTART_PHASE=resave
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/real-resave/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/real-resave"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/real-resave/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/real-resave/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/real-resave/raster-exit-status.txt
+          tail -n 45 boot-evidence/real-resave/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Second actual guest save process failed with $code" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Independently attest second ACTUAL guest SD generation and visible moved world
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --real-resave boot-evidence/real-resave/raster-stdout.log | \
+            tee boot-evidence/real-resave/guest-real-resave-hid.json
+          python3 tools/verify_nexium_real_resave_generations.py resave \
+            --first-evidence "$PWD/boot-evidence" \
+            --second-evidence "$PWD/boot-evidence/real-resave" \
+            --root "$PWD/boot-evidence/nexium-data" \
+            --first-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --out boot-evidence/real-resave/two-actual-guest-saves-report.json
+      - name: Seventh independent process restores the latest GAMEPLAY-WRITTEN save
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/real-two-save-cold
+          export HEMAN_LORE_RESTART_PHASE=restore
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/real-two-save-cold/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/real-two-save-cold"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/real-two-save-cold/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/real-two-save-cold/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/real-two-save-cold/raster-exit-status.txt
+          tail -n 45 boot-evidence/real-two-save-cold/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Latest gameplay save cold process failed ($code)" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Confirm latest of two real guest-origin generations and BOTH unchanged records
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --cold-restart boot-evidence/real-two-save-cold/raster-stdout.log | \
+            tee boot-evidence/real-two-save-cold/guest-lore-hid-publication-report.json
+          python3 tools/verify_nexium_real_resave_generations.py cold \
+            --first-evidence "$PWD/boot-evidence" \
+            --second-evidence "$PWD/boot-evidence/real-resave" \
+            --third-evidence "$PWD/boot-evidence/real-two-save-cold" \
+            --root "$PWD/boot-evidence/nexium-data" \
+            --first-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --resave-report boot-evidence/real-resave/two-actual-guest-saves-report.json \
+            --out boot-evidence/real-two-save-cold/latest-actual-gameplay-save-report.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -523,5 +630,13 @@ jobs:
             boot-evidence/divergent-restart/*.png
             boot-evidence/divergent-restart/*.json
             boot-evidence/divergent-restart/*status.txt
+            boot-evidence/real-resave/*.log
+            boot-evidence/real-resave/*.png
+            boot-evidence/real-resave/*.json
+            boot-evidence/real-resave/*status.txt
+            boot-evidence/real-two-save-cold/*.log
+            boot-evidence/real-two-save-cold/*.png
+            boot-evidence/real-two-save-cold/*.json
+            boot-evidence/real-two-save-cold/*status.txt
           if-no-files-found: warn
           retention-days: 7
