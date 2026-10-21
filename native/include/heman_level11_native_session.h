@@ -30,6 +30,8 @@ typedef struct {
     const uint16_t *sealed_tile_ids;
     const uint64_t *sealed_mask_rows;
     uint64_t world_seal;
+    uint32_t sealed_columns, sealed_rows, sealed_tile_size;
+    uint32_t sealed_event_count, sealed_mask_count;
     hm_level11_event_bindings bindings;
     hm_state player;
     hm_lore_state lore;
