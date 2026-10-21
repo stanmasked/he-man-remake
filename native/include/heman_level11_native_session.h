@@ -12,11 +12,26 @@ extern "C" {
  * bindings come from the caller; role validation is NOT proof of
  * original iOS ownership, geometry, collision semantics or footage.
  *
+ * To reject accidental in-place map or event mutation, the opt-in session
+ * checks borrowed fixture pointer identity and a full content checksum
+ * before each step and upgrade. This is not a cryptographic authentication
+ * or proof that fixtures originated in the user's original iOS IPA.
+ *
  * All state remains self-contained and zero-allocation. This is not
  * linked into the current stable 2-room or experimental 3-room NRO.
  */
 typedef struct {
     const hm_world *world;
+    /* Record borrowed fixture identities and a non-cryptographic content
+     * guard at init. No original map data is stored or serialized. */
+    const hm_event *sealed_events;
+    const uint8_t *sealed_solid;
+    const hm_mask_grid *sealed_mask;
+    const uint16_t *sealed_tile_ids;
+    const uint64_t *sealed_mask_rows;
+    uint64_t world_seal;
+    uint32_t sealed_columns, sealed_rows, sealed_tile_size;
+    uint32_t sealed_event_count, sealed_mask_count;
     hm_level11_event_bindings bindings;
     hm_state player;
     hm_lore_state lore;

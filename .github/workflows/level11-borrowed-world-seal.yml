@@ -1,0 +1,50 @@
+name: He-Man immutable borrowed Level1-1 world geometry
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-borrowed-world-seal.yml'
+      - 'native/include/heman_level11_native_session.h'
+      - 'native/src/heman_level11_native_session.c'
+      - 'native/tests/test_level11_native_session.c'
+      - 'native/include/heman_mask.h'
+      - 'native/src/heman_mask.c'
+      - 'native/run_tests.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  detect-mutated-original-bound-fixtures:
+    name: Real native map/physics mutation rejection (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify borrowed world immutability and input session
+        env:
+          CC: ${{ matrix.compiler }}
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/tests/test_level11_native_session.c \
+            -lm -o /tmp/heman-stage106-seal
+          /tmp/heman-stage106-seal
+      - name: Attestation limits
+        run: |
+          echo 'Tests a content checksum within ONE source-native session.'
+          echo 'Checks are NOT a cryptographic attestation of source geometry.'
+          echo 'Uses fictional maps only, not original iOS geometry or assets.'

@@ -183,12 +183,142 @@ static void test_reset_does_not_grant_an_attack_or_lore(void) {
     }
     assert(s.lore.left_gate_broken==0u);
 }
+static void test_original_fixture_content_is_sealed_without_export(void) {
+    hm_world w=fictional_world();
+    hm_event mutable_events[3];
+    hm_level11_native_session s, saved;
+    uint8_t old_tile;
+    float old_speed;
+    memcpy(mutable_events, objectives, sizeof(mutable_events));
+    w.events=mutable_events;
+    assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
+    saved=s;
+
+    /* Valid event type and identity, but different geometry: reject before
+       the hero can collect either lore token at a new invented position. */
+    mutable_events[2].x += 6.0f;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    assert(hm_level11_session_grant_wall_crusher(&s,1u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    mutable_events[2].x -= 6.0f;
+
+    /* Changes to even non-lore spatial fixtures are detected. */
+    mutable_events[0].radius += 1.0f;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    mutable_events[0].radius -= 1.0f;
+
+    /* Mutable borrowed collision data, even with an identical pointer. */
+    old_tile=solid[CW+1u];
+    solid[CW+1u]=(uint8_t)(old_tile ? 0u : 1u);
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    solid[CW+1u]=old_tile;
+
+    /* A physics edit is not a valid continuation of a sealed session. */
+    old_speed=w.speed; w.speed+=1.0f;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    w.speed=old_speed;
+
+    /* Pointer replacement with semantically identical fixtures is still
+       forbidden: callers must not swap a borrowed map under a session. */
+    w.events=objectives;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    w.events=mutable_events;
+
+    /* Original size limits retained, even if the caller corrupts header. */
+    w.columns=4096u;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    w.columns=CW;
+    w.event_count=32u;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    w.event_count=3u;
+
+    /* Restore data, then allow normal engine movement and only genuine
+       world events. No sticky permanent failure on a private rollback. */
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_BLOCKED);
+    assert(s.player.frame==1u);
+    assert(s.world_seal==saved.world_seal);
+}
+
+static void test_masked_grid_mutations_are_rejected_without_overread(void) {
+    hm_world w=fictional_world();
+    hm_mask_grid grid;
+    uint16_t tile_ids[CW*CH], alternative_ids[CW*CH];
+    uint64_t rows[16];
+    hm_level11_native_session s, saved;
+    uint32_t i;
+    for(i=0u;i<CW*CH;++i)
+        tile_ids[i]=(uint16_t)((i/CW)==8u ? 0u : UINT16_MAX);
+    for(i=0u;i<16u;++i) rows[i]=UINT64_C(0xffff);
+    memset(&grid,0,sizeof(grid));
+    grid.tile_ids=tile_ids; grid.mask_rows=rows;
+    grid.columns=CW; grid.rows=CH; grid.tile_size=16u;
+    grid.mask_count=1u;
+    w.solid=NULL;
+    w.mask_grid=&grid;
+    assert(hm_mask_valid(&grid));
+    assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
+    saved=s;
+
+    rows[0]^=UINT64_C(1);
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    rows[0]^=UINT64_C(1);
+
+    tile_ids[0]=0u;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    tile_ids[0]=UINT16_MAX;
+
+    /* Reject changed metadata and avoid scanning beyond saved allocations. */
+    grid.mask_count=1024u;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    grid.mask_count=1u;
+    grid.columns=4096u;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    grid.columns=CW;
+
+    memcpy(alternative_ids,tile_ids,sizeof(alternative_ids));
+    grid.tile_ids=alternative_ids;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    grid.tile_ids=tile_ids;
+
+    /* A restored mask resource permits the next actual native step. */
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_BLOCKED);
+    assert(s.player.frame==1u);
+}
+
+static void test_corrupt_world_is_not_allowed_on_new_init(void) {
+    hm_world w=fictional_world(), corrupted;
+    hm_level11_native_session s,saved;
+    assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
+    saved=s;
+    corrupted=w;
+    corrupted.columns=4097u; /* invalid core size without reading tiles */
+    assert(hm_level11_session_init(&s,&corrupted,&roles)==HM_LORE_INVALID);
+    same(&saved,&s);
+}
+
 int main(void) {
     test_button_hold_requires_real_release_at_gate();
     test_upgrade_after_first_gate_contact();
     test_distant_attack_cannot_reuse_trigger();
     test_invalid_inputs_do_not_change_physics_or_latch();
     test_reset_does_not_grant_an_attack_or_lore();
+    test_original_fixture_content_is_sealed_without_export();
+    test_masked_grid_mutations_are_rejected_without_overread();
+    test_corrupt_world_is_not_allowed_on_new_init();
+    puts("PASS: Stage106 immutable borrowed native world seal prevents altered "
+         "event map, solid tiles, mask geometry and physics replay");
     puts("PASS: Stage105 source-native session derives fresh attack on 0->1,"
          " never from held A; only real hm_step gate overlap grants lore");
     puts("Synthetic event geometry only; genuine iOS inputs/assets unverified");
