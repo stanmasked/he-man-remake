@@ -11,6 +11,7 @@ on:
       - 'tools/verify_nexium_lore_lab_pngs.py'
       - 'tools/verify_nexium_sd_disk_receipt.py'
       - 'tools/verify_nexium_cold_restart.py'
+      - 'tests/test_nexium_cold_restart.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
       - 'tests/test_switch_sd_journal_audit.py'
@@ -53,6 +54,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_sd_disk_receipt.py -v
+      - name: Test cross-process guest restoration oracle (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_cold_restart.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
