@@ -14,6 +14,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_core.c" \
   -lm -o "$TMP/test_core"
 
+# Stage 102: source-referenced, privately importable level 1-1 lore mechanics.
+# No original iOS map/geometry or commercial assets. Tested as pure C99.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/tests/test_level11_lore.c" \
+  -o "$TMP/test_level11_lore"
+"$TMP/test_level11_lore"
+
 "$TMP/test_core"
 
 
