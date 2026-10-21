@@ -97,20 +97,22 @@ class Stage112HIDRegression(unittest.TestCase):
             instrument(code)
 
     def test_fresh_attack_only_after_verified_gate_approach(self):
-        # 2026-10-21 real Stage112 NeXium guest evidence at frame 345:
-        # the fictional native actor centre was x=115.5, just outside
-        # the x=104 gate sensor (actor half-width 5, radius 4).
-        # 7 extra leftward game frames at 2 px each bring x ~101.5.
-        # No original iOS physics or original map geometry is implied.
+        # Actual *second* Stage112 NeXium guest archive (run 39600185389):
+        # frame 345: synthetic actor x=110, frame 395: actor x=94.
+        # Gate centre=104 and native AABB+circle contact requires 95<=x<=113.
+        # This was a TRUE block despite all real NPAD keys being published.
+        # Releasing DLEFT 2 receiver frames EARLIER makes the model
+        # expected x=98 (two fewer native steps at 2 px/step). The real
+        # NeXium rerun must verify the result; this test is not that proof.
         schedule = dict(HID_EVENTS)
         self.assertEqual(schedule[310], "buttons=DLEFT")
-        self.assertEqual(schedule[352], "buttons=")
+        self.assertEqual(schedule[350], "buttons=")
         self.assertEqual(schedule[365], "buttons=X")
         self.assertEqual(schedule[380], "buttons=")
-        measured_guest_x = 115.5
-        corrected_x = measured_guest_x - (352 - 345) * 2.0
-        self.assertLessEqual(abs(corrected_x - 104.0), 5.0 + 4.0)
-        self.assertGreaterEqual(365 - 352, 4)
+        actual_prior_guest_x = 94
+        corrected_x = actual_prior_guest_x + (352 - 350) * 2
+        self.assertTrue(95 <= corrected_x <= 113)
+        self.assertGreaterEqual(365 - 350, 4)
         self.assertLess(380, 395)
 
     def test_pinned_button_bits(self):
