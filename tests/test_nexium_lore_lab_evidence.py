@@ -13,7 +13,7 @@ from instrument_nexium_lore_lab import FRAMES, HID_EVENTS, instrument
 from verify_nexium_lore_lab_hid import LAB_BITS, expected_masks, verify as hid_verify
 from verify_nexium_lore_lab_pngs import (
     STATES, HERO, BG, GREY, GREEN, BIO, ART, SAVE, SD_FAILURE,
-    verify as png_verify, inspect,
+    verify as png_verify, inspect, main as png_cli,
 )
 from test_nexium_hid_instrument import SOURCE
 
@@ -221,6 +221,27 @@ class Stage112PNGMockRegression(unittest.TestCase):
         self.assertTrue(result["guest_sd_round_trip_verified"])
         self.assertFalse(result["original_ios_source_fidelity_verified"])
         self.assertFalse(result["hardware_nintendo_switch_execution_verified"])
+
+    def test_cli_stdout_contains_one_strict_json_document(self):
+        import contextlib
+        import io
+        import json
+        output, diagnostics = io.StringIO(), io.StringIO()
+        pil = types.ModuleType("PIL")
+        pil.Image = types.SimpleNamespace(
+            open=lambda path: FakePNG(self.fake[int(
+                Path(path).stem.split("-")[-1]
+            )])
+        )
+        with patch.dict(sys.modules, {"PIL": pil}):
+            with patch.object(sys, "argv", ["guest-oracle", str(self.folder)]):
+                with contextlib.redirect_stdout(output):
+                    with contextlib.redirect_stderr(diagnostics):
+                        self.assertEqual(png_cli(), 0)
+        report = json.loads(output.getvalue())
+        self.assertTrue(report["guest_sd_round_trip_verified"])
+        self.assertIn("PASS: genuine pinned NeXium guest", diagnostics.getvalue())
+        self.assertNotIn("PASS:", output.getvalue())
 
     def test_missing_guest_log_rejected(self):
         (self.folder / "raster-runner.log").write_text("CI passed\n")
