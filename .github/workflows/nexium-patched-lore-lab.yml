@@ -12,8 +12,10 @@ on:
       - 'tools/verify_nexium_sd_disk_receipt.py'
       - 'tools/verify_nexium_cold_restart.py'
       - 'tools/verify_nexium_corrupt_cold_restore.py'
+      - 'tools/verify_nexium_torn_slot_fallback.py'
       - 'tests/test_nexium_cold_restart.py'
       - 'tests/test_nexium_corrupt_cold_restore.py'
+      - 'tests/test_nexium_torn_slot_fallback.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
       - 'tests/test_switch_sd_journal_audit.py'
@@ -66,6 +68,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_corrupt_cold_restore.py -v
+      - name: Test newest-slot torn-journal cold recovery (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_torn_slot_fallback.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -370,6 +377,56 @@ jobs:
             --target-root "$PWD/boot-evidence/fault-restart/nexium-data" \
             --manifest boot-evidence/fault-restart/corrupt-fixture-manifest.json \
             --out boot-evidence/fault-restart/guest-corrupt-sd-failure-report.json
+      - name: Prepare separate older-valid and truncated-newer SD journal fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/torn-newest-restart
+          python3 tools/verify_nexium_torn_slot_fallback.py prepare \
+            --source-root "$PWD/boot-evidence/nexium-data" \
+            --target-root "$PWD/boot-evidence/torn-newest-restart/nexium-data" \
+            --first-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --out boot-evidence/torn-newest-restart/torn-newest-manifest.json
+      - name: Fourth independent guest process restores older record after newest is truncated
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HEMAN_LORE_RESTART_PHASE=restore
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/torn-newest-restart/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/torn-newest-restart/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/torn-newest-restart"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/torn-newest-restart/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/torn-newest-restart/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/torn-newest-restart/raster-exit-status.txt
+          tail -n 65 boot-evidence/torn-newest-restart/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Torn-newest cold guest exited with $code" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Attest genuine older-slot fallback and immutable truncated newer record
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --cold-restart boot-evidence/torn-newest-restart/raster-stdout.log | \
+            tee boot-evidence/torn-newest-restart/guest-lore-hid-publication-report.json
+          python3 tools/verify_nexium_torn_slot_fallback.py verify \
+            --first-evidence "$PWD/boot-evidence" \
+            --cold-evidence "$PWD/boot-evidence/torn-newest-restart" \
+            --target-root "$PWD/boot-evidence/torn-newest-restart/nexium-data" \
+            --manifest boot-evidence/torn-newest-restart/torn-newest-manifest.json \
+            --out boot-evidence/torn-newest-restart/guest-torn-slot-recovery-report.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -395,5 +452,9 @@ jobs:
             boot-evidence/fault-restart/*.png
             boot-evidence/fault-restart/*.json
             boot-evidence/fault-restart/*status.txt
+            boot-evidence/torn-newest-restart/*.log
+            boot-evidence/torn-newest-restart/*.png
+            boot-evidence/torn-newest-restart/*.json
+            boot-evidence/torn-newest-restart/*status.txt
           if-no-files-found: warn
           retention-days: 7
