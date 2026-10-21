@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "heman_level11_lab.h"
+#include "heman_level11_durable_save.h"
 
 #define WIDTH 640u
 #define HEIGHT 360u
@@ -14,6 +15,8 @@ static uint8_t tiles[HM_LORE_LAB_CELLS];
 static hm_world world;
 static hm_level11_native_session session;
 static hm_level11_lab_save saved;
+static int durable_status;
+#define DURABLE_SAVE_PREFIX "sdmc:/switch/heman_level11_lore_lab"
 
 /* Guard the complete destination including pixels outside the framebuffer.
  * All coordinates are pixel coordinates, not original-game asset positions. */
@@ -77,6 +80,12 @@ static void scene(uint32_t *pixels, uint32_t stride) {
               session.attack_previous_down ? UINT32_C(0xffe88b58) : grey);
     rectangle(pixels, stride, 350, 22, 6 + 14 * session.lore.collected_count,
               15, green);
+    /* Separate persistent-save HUD, never conflated with L/R RAM save.
+     * ZL disk save: green, ZR disk load: cyan, error: red, idle: grey. */
+    rectangle(pixels, stride, 425, 22, 35, 15,
+              durable_status==1 ? green :
+              durable_status==2 ? cyan :
+              durable_status<0 ? UINT32_C(0xff4e4eff) : grey);
 }
 static uint32_t controls(uint64_t buttons) {
     uint32_t value = 0u;
@@ -119,8 +128,20 @@ int main(int argc, char **argv) {
         held = padGetButtons(&pad);
         down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus) break;
-        tick = hm_level11_lab_tick(&session, &saved,
-                                  controls(held), controls(down));
+        if (down & HidNpadButton_ZL) {
+            durable_status=hm_level11_durable_store(DURABLE_SAVE_PREFIX,
+                                                    &session)==HM_DURABLE_OK
+                           ?1:-1;
+            tick=HM_LORE_BLOCKED;
+        } else if (down & HidNpadButton_ZR) {
+            durable_status=hm_level11_durable_load(DURABLE_SAVE_PREFIX,
+                                                   &session)==HM_DURABLE_OK
+                           ?2:-1;
+            tick=HM_LORE_BLOCKED;
+        } else {
+            tick = hm_level11_lab_tick(&session, &saved,
+                                      controls(held), controls(down));
+        }
         if (tick == HM_LORE_INVALID) { code = 5; break; }
         pixels = (uint32_t*)framebufferBegin(&fb, &stride);
         if (!pixels || (stride % sizeof(uint32_t)) != 0u ||
