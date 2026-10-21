@@ -14,6 +14,7 @@
 - [x] Implement an asset-free SVG schematic viewer for local level coordinates.
 - [x] Implement experimental per-pixel collision-mask readout and deterministic host-only landing/jump prototype (approximation, not original physics).
 - [x] Prototype static full-body wall/ceiling collisions and bounded slope adhesion (not authentic iOS physics).
+- [x] Compare candidate first-level coordinate envelopes privately: **142/159** object translations lie within the origin-zero 300×19×32 serialized tile extent (only **3/159** within direct cell indices); this is a *hypothesis*, not verified world scale. Privately compare **409** paired identical global `.shape` files and **94** embedded references; none directly match level object identities. See [Stage139](stage139-private-level1-coordinate-shape-evidence.md).
 - [ ] Verify actual tile semantics, one-way platforms, hitbox dimensions and original movement constants.
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
