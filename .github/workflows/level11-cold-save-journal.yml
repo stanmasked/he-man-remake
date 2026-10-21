@@ -1,0 +1,69 @@
+name: He-Man experimental dual-slot cold-start save journal
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-cold-save-journal.yml'
+      - 'native/include/heman_level11_journal.h'
+      - 'native/src/heman_level11_journal.c'
+      - 'native/tests/test_level11_journal.c'
+      - 'native/run_tests.sh'
+      - 'switch_lore/source/sd_journal.c'
+      - 'switch_lore/source/main.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-two-process-persistence:
+    name: C99 cold restart and torn journal recovery (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler }}
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile C99 dual-slot journal with sanitizers
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/src/heman_level11_snapshot.c \
+            native/src/heman_level11_lab.c \
+            native/src/heman_level11_journal.c \
+            native/tests/test_level11_journal.c \
+            -lm -o /tmp/heman-cold-journal
+      - name: Complete deterministic in-process corruption/recovery tests
+        run: /tmp/heman-cold-journal
+      - name: Persist and restore across independent host cold starts
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          /tmp/heman-cold-journal cold-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
+          /tmp/heman-cold-journal cold-read-upgrade "$d/progress"
+          test -s "$d/progress.0"
+          test -s "$d/progress.1"
+          # The extra byte must mark the newest slot malformed.
+          printf '\001' >> "$d/progress.1"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+      - name: Explicit evidence boundary
+        run: |
+          echo "Two independent host processes and source-native journal verified."
+          echo "SD card mounting/writing on Nintendo Switch hardware NOT verified."
+          echo "NeXium SD syscall support and original iOS persistence NOT proven."
