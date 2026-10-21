@@ -43,3 +43,30 @@ This protects against accidentally following already-existing unsafe
 parents in the test runner. It remains a check-then-open operation and is
 **not resistant to malicious concurrent symlink replacement**. Real FS/FSP
 write access must use race-resistant directory-relative file handles.
+
+## Stage116 follow-up: descriptor-relative, NOFOLLOW host receipt
+
+The Stage115 `lstat()` precheck prevented already-present parent symlinks,
+but a directory could be replaced between checking and opening the files.
+The **read-only host receipt** now opens the test data root from `/`, one
+component at a time, via directory file descriptors (`dir_fd`,
+`O_DIRECTORY | O_NOFOLLOW`). It retains those open handles through the slot
+inspection and opens each fixed `progress{0,1}.bin` filename relative to
+its verified parent. This rejects linked *ancestors of the data root* as well
+as linked `sdmc` components. Unsupported operating systems fail closed.
+
+For each slot the auditor requires a regular, single-link file and reads
+**at most 121 bytes**, rejecting symlinks, hardlinked aliases, FIFOs and
+other non-regular entries. It continues to use the same strict record
+decoder, structural ranking, world-binding ambiguity rules and metadata-only
+receipt. Missing directories remain missing evidence, never implicit success.
+
+Regression coverage includes a deterministic directory-name replacement
+after the directory handle is opened. Even when the original name is replaced
+by a symlink to another folder, the receipt reads from the held directory
+handle and does not claim the outside test fixture. This closes the
+check-then-open path-redirection window **for this host read-only auditor**;
+it is **not** a claim that NeXium's runtime FS/FSP writes are confined, that
+both slots are an atomic cross-file snapshot, or that cold-process persistence
+or Switch hardware durability is established. Those remain outstanding in
+NeXium's FS/FSP and runtime acceptance work.
