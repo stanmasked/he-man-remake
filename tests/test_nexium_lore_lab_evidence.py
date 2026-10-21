@@ -214,7 +214,7 @@ class Stage112PNGMockRegression(unittest.TestCase):
     def test_mock_positive_is_never_original_ios_evidence(self):
         result = self.check()
         self.assertEqual(
-            result["authentic_pinned_nexium_frame_rx_pngs_validated"], 12
+            result["authentic_pinned_nexium_frame_rx_pngs_validated"], len(FRAMES)
         )
         self.assertTrue(result["guest_sd_save_succeeded"])
         self.assertTrue(result["guest_sd_load_succeeded"])
