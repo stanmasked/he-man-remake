@@ -26,6 +26,11 @@ typedef struct {
  * The lore destination is changed only when the entire receipt is valid.
  * Return BLOCKED for no applicable new contact, INVALID for malformed data.
  */
+/* Structural role validation only: three distinct correctly typed native
+ * events, never evidence of original iOS level ownership or positions. */
+int hm_level11_native_bindings_valid(
+    const hm_world *world, const hm_level11_event_bindings *bindings);
+
 hm_lore_result hm_level11_accept_native_frame(
     const hm_world *world, const hm_state *before, const hm_state *after,
     hm_input input, float dt, uint8_t attack_fresh_press,
