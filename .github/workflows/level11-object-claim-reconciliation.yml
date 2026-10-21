@@ -1,0 +1,40 @@
+name: He-Man Level1-1 two-channel local object correspondence
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-object-claim-reconciliation.yml'
+      - 'src/heman_tools/level11_object_claim_reconciliation.py'
+      - 'src/heman_tools/level11_event_binding_preflight.py'
+      - 'tests/test_level11_object_claim_reconciliation.py'
+      - 'tests/test_level11_event_binding_preflight.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  object-claims-are-not-source-proof:
+    name: Local artifact integrity and same-kind role mismatch (${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Validate six fictional local artifacts, role joins and redaction
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests \
+            -p test_level11_object_claim_reconciliation.py -v
+      - name: Explicit evidence limitations
+        run: |
+          echo 'No user IPA, original map, real capture or proprietary artwork in CI.'
+          echo 'SHA-256 only validates supplied local bytes, NOT evidence origin.'
+          echo 'Manual annotations are NOT independent original iOS authenticity.'
+          echo 'A structural pass NEVER authorizes source level Switch integration.'
