@@ -18,6 +18,7 @@
 - [ ] Verify actual tile semantics, one-way platforms, hitbox dimensions and original movement constants.
 - [x] Audit owner-private global shape references in **81** physics-structure resources: **71** contain at least one exact length-prefixed UTF-16 shape identifier, with **137** resource/shape candidates and **112** unique shape stems; **400/409** shapes appear in the source geometry registry metadata. This is lexical evidence only; see [Stage140](stage140-private-physics-shape-lexical-census.md).
 - [x] Bound and parse repeated source physics-record *envelopes* for **81/81** private `.ps2d` / `.pstruct2d` files: **187 records**, **187 UTF-16 string references**, **175** matching shape identifiers; leave 50-byte per-record fields and 13 nonempty trailers opaque. See [Stage141](stage141-physics-record-envelope.md). No original asset bytes or automatic hitbox claims.
+- [x] Stage142 source-private analysis: **187** opaque 50-byte blocks contain **139** unique patterns; **13** additional trailers declare **44** groups, while all 13 admit merely *candidate* initial UTF-16 labels. No trailer group/parameter semantics decoded; see [Stage142](stage142-opaque-physics-trailer-evidence.md).
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
 - [x] Add independent synthetic pickup/checkpoint/hazard/exit event state and deterministic headless replay.
