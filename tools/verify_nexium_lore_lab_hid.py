@@ -11,15 +11,15 @@ import argparse
 import json
 from pathlib import Path
 
-from instrument_nexium_lore_lab import HID_EVENTS
+from instrument_nexium_lore_lab import HID_EVENTS, COLD_RESTORE_EVENTS
 from verify_nexium_hid_publication import BUTTON_BITS, read_publications
 
 LAB_BITS = {**BUTTON_BITS, "L": 1 << 6, "R": 1 << 7}
 
 
-def expected_masks() -> tuple[int, ...]:
+def expected_masks(events=HID_EVENTS) -> tuple[int, ...]:
     values = []
-    for frame, packet in HID_EVENTS:
+    for frame, packet in events:
         if frame < 1 or not packet.startswith("buttons="):
             raise ValueError("Invalid source-authored guest HID schedule")
         mask = 0
@@ -31,7 +31,7 @@ def expected_masks() -> tuple[int, ...]:
     return tuple(values)
 
 
-def verify(text: str) -> dict:
+def verify(text: str, events=HID_EVENTS) -> dict:
     entries = read_publications(text)
     if not entries:
         raise ValueError("No real pinned kernel HID publication records")
@@ -41,7 +41,7 @@ def verify(text: str) -> dict:
             compressed.append(entry["buttons"])
     if compressed and compressed[0] == 0:
         compressed.pop(0)
-    expected = list(expected_masks())
+    expected = list(expected_masks(events))
     if compressed != expected:
         raise ValueError(
             "Pinned NeXium missed or added real NPAD button transitions: "
@@ -53,7 +53,7 @@ def verify(text: str) -> dict:
         "kernel_shared_memory_samples": len(entries),
         "verified_guest_button_edges": len(expected),
         "observed_unique_button_kinds": sorted({
-            name for _, packet in HID_EVENTS for name in packet[8:].split(",")
+            name for _, packet in events for name in packet[8:].split(",")
             if name
         }),
         "real_guest_pngs_verified_here": False,
@@ -64,8 +64,11 @@ def verify(text: str) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("kernel_stdout", type=Path)
+    parser.add_argument("--cold-restart", action="store_true",
+                        help="verify only ZL+R restore edges of the second process")
     args = parser.parse_args()
-    result = verify(args.kernel_stdout.read_text(errors="replace"))
+    result = verify(args.kernel_stdout.read_text(errors="replace"),
+                    COLD_RESTORE_EVENTS if args.cold_restart else HID_EVENTS)
     print(json.dumps(result, sort_keys=True, indent=2))
     print("PASS: pinned kernel published every lore-lab real NPAD edge")
     return 0

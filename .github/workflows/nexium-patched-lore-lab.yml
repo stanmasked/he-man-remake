@@ -10,6 +10,8 @@ on:
       - 'tools/verify_nexium_lore_lab_hid.py'
       - 'tools/verify_nexium_lore_lab_pngs.py'
       - 'tools/verify_nexium_sd_disk_receipt.py'
+      - 'tools/verify_nexium_cold_restart.py'
+      - 'tests/test_nexium_cold_restart.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
       - 'tests/test_switch_sd_journal_audit.py'
@@ -52,6 +54,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_sd_disk_receipt.py -v
+      - name: Test cross-process guest restoration oracle (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_cold_restart.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -261,6 +268,52 @@ jobs:
             --data-root "$PWD/boot-evidence/nexium-data" \
             --guest-report boot-evidence/guest-lore-lab-report.json \
             --out boot-evidence/guest-sd-disk-receipt.json
+      - name: Close first runner and start independent guest process with RESTORE ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The preceding first run fully exited before this distinct invocation.
+          # Share ONLY the isolated emulator SD folder, not process RAM/HUD.
+          mkdir -p boot-evidence/cold-restart
+          export HEMAN_LORE_RESTART_PHASE=restore
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/cold-restart/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/cold-restart"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/cold-restart/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/cold-restart/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/cold-restart/raster-exit-status.txt
+          tail -n 65 boot-evidence/cold-restart/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Independent cold guest process exited with $code" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Independently verify cross-process restore and unchanged physical emulator SD files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --cold-restart boot-evidence/cold-restart/raster-stdout.log | \
+            tee boot-evidence/cold-restart/guest-lore-hid-publication-report.json
+          python3 tools/verify_nexium_sd_disk_receipt.py \
+            --data-root "$PWD/boot-evidence/nexium-data" \
+            --guest-report boot-evidence/guest-lore-lab-report.json \
+            --out boot-evidence/cold-restart/guest-sd-disk-receipt.json
+          python3 tools/verify_nexium_cold_restart.py \
+            boot-evidence boot-evidence/cold-restart \
+            --initial-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --final-receipt boot-evidence/cold-restart/guest-sd-disk-receipt.json \
+            --out boot-evidence/cold-restart/guest-cold-restart-report.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -278,5 +331,9 @@ jobs:
             boot-evidence/guest-lore-hid-publication-report.json
             boot-evidence/pinned-kernel-hid-source.json
             boot-evidence/pinned-kernel-lore-buttons.json
+            boot-evidence/cold-restart/*.log
+            boot-evidence/cold-restart/*.png
+            boot-evidence/cold-restart/*.json
+            boot-evidence/cold-restart/*status.txt
           if-no-files-found: warn
           retention-days: 7

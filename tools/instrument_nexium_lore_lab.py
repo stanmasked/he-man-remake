@@ -43,6 +43,15 @@ HID_EVENTS = (
     (538, "buttons="),
 )
 
+# Only a genuine NEW debug_boot OS process may use this schedule. It performs
+# no movement, upgrade, save or reset before restoring the prior process' SD.
+COLD_RESTORE_EVENTS = (
+    (520, "buttons=ZL"),
+    (530, "buttons=ZL,R"),
+    (535, "buttons=ZL"),
+    (538, "buttons="),
+)
+
 
 def instrument(source: str) -> str:
     if tuple(frame for frame, _ in HID_EVENTS) != tuple(sorted(
@@ -68,20 +77,37 @@ def instrument(source: str) -> str:
         ' => "' + event + '",'
         for event, frames in groups.items()
     ]
+    if not set(COLD_RESTORE_EVENTS).issubset(set(HID_EVENTS)):
+        raise ValueError("Cold restart HID events must reuse pinned frame schedule")
+    cold_arms = [
+        f'        {frame} => "{packet}",'
+        for frame, packet in COLD_RESTORE_EVENTS
+    ]
     for indent in ("            ", "        "):
         anchor = indent + "frames += 1;\n" + indent + after
         if output.count(anchor) != 1:
             raise ValueError("Expected exactly one pinned guest frame_rx path")
         lines = [
             f"if matches!(frames, {schedule}) {{",
-            '    let path = std::env::var("NEXIUM_HID_INJECT")?;',
-            "    let text = match frames {",
+            '    let cold = std::env::var("HEMAN_LORE_RESTART_PHASE")',
+            '        .map(|x| x == "restore").unwrap_or(false);',
+            "    let text = if cold {",
+            "        match frames {",
+            *cold_arms,
+            '            _ => "",',
+            "        }",
+            "    } else {",
+            "        match frames {",
             *arms,
-            "        _ => unreachable!(),",
+            '            _ => "",',
+            "        }",
             "    };",
-            "    std::fs::write(&path, text)?;",
-            '    writeln!(log, "HEMAN_LORE_HID frame={} {}", frames, text)?;',
-            "    log.flush()?;",
+            "    if !text.is_empty() {",
+            '        let path = std::env::var("NEXIUM_HID_INJECT")?;',
+            "        std::fs::write(&path, text)?;",
+            '        writeln!(log, "HEMAN_LORE_HID frame={} {}", frames, text)?;',
+            "        log.flush()?;",
+            "    }",
             "}",
         ]
         insertion = "\n".join(indent + item for item in lines)
