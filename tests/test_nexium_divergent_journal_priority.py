@@ -141,6 +141,18 @@ class Stage122DivergentProgressTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "two-collectible"):
             self.prepare()
 
+    def test_uncollecting_pickup_at_hero_position_is_rejected(self):
+        raw = bytearray((lab(self.source) / "progress0.bin").read_bytes())
+        struct.pack_into("<f", raw, 16 + 28, 56.0)
+        struct.pack_into("<Q", raw, 16 + 88, fnv64(raw[16:16+88]))
+        struct.pack_into("<Q", raw, 112, fnv64(raw[:112]))
+        (lab(self.source) / "progress0.bin").write_bytes(raw)
+        disk, issue = audit_confined_sd(self.source)
+        self.assertIsNone(issue)
+        self.receipt["emulator_sd_slots"] = disk["slots"]
+        with self.assertRaisesRegex(ValueError, "auto-recollect"):
+            self.prepare()
+
     def test_native_guest_must_prefer_newer_partial_lore(self):
         manifest = self.prepare()
         prior, digest = self.frames[(self.second, 540)]
