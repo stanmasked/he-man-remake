@@ -242,6 +242,21 @@ class Stage152AnimationResourceScopesTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError,"unsafe selected"):
                     audit_private_animation_scopes(path)
 
+    def test_alternate_original_skeleton2d_extension_included(self):
+        # Both extensions are present in the original iOS archive:
+        # .skel2d and .skeleton2d. Neither may be omitted from parity.
+        with TemporaryDirectory() as directory:
+            path=Path(directory)/"synthetic.ipa"
+            extras=[
+                (f"Payload/MOTU.app/{screen}/skeleton2D/Other.skeleton2d",
+                 b"fabricated-other-rig")
+                for screen in SCREENS
+            ]
+            synthetic_ipa(path,extra=extras)
+            result=audit_private_animation_scopes(path)
+        self.assertEqual(result["paired_skeleton_resource_files"],2)
+        self.assertEqual(result["byte_identical_skeleton_file_pairs"],2)
+
     def test_private_ipa_required(self):
         with self.assertRaisesRegex(ValueError,"Owner-private original IPA"):
             audit_private_animation_scopes(Path("/not-here/original.ipa"))
