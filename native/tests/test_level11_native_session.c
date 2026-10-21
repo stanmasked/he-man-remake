@@ -308,6 +308,54 @@ static void test_corrupt_world_is_not_allowed_on_new_init(void) {
     same(&saved,&s);
 }
 
+/* Two HM_PICKUP events have the same C99 event kind. Merely validating
+ * event kinds would still allow accidentally swapping lore destinations. */
+static void test_lore_pickup_roles_cannot_be_swapped_mid_session(void) {
+    hm_world w=fictional_world();
+    hm_level11_native_session s, saved;
+    hm_level11_event_bindings wrong=roles;
+    unsigned n;
+    assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
+    saved=s;
+    wrong.skeletor_bio_event=roles.concept_art_event;
+    wrong.concept_art_event=roles.skeletor_bio_event;
+    /* Each swapped event still has the correct HM_PICKUP kind. */
+    assert(hm_level11_native_bindings_valid(&w,&wrong));
+    s.bindings=wrong;
+    saved=s;
+    assert(hm_level11_session_step(&s,right(),DT,1u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    assert(hm_level11_session_grant_wall_crusher(&s,1u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    /* The original correct binding pair still succeeds after restoration. */
+    s.bindings=roles;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_BLOCKED);
+    for(n=0u;n<28u;++n)
+        assert(hm_level11_session_step(&s,right(),DT,0u)!=HM_LORE_INVALID);
+    assert((s.lore.collected_mask & 2u)!=0u);
+    assert((s.lore.collected_mask & 1u)==0u);
+    assert(s.lore.left_gate_broken==0u);
+    assert(s.bindings.skeletor_bio_event==roles.skeletor_bio_event);
+    assert(s.sealed_bindings.concept_art_event==roles.concept_art_event);
+}
+
+static void test_native_world_descriptor_cannot_be_swapped_mid_session(void) {
+    hm_world w=fictional_world();
+    hm_world cloned=w; /* identical values and borrowed arrays */
+    hm_level11_native_session s,saved;
+    assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
+    assert(s.sealed_world==&w);
+    s.world=&cloned; /* different owning descriptor, same arrays */
+    saved=s;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    assert(hm_level11_session_grant_wall_crusher(&s,1u)==HM_LORE_INVALID);
+    same(&saved,&s);
+    s.world=&w;
+    assert(hm_level11_session_step(&s,right(),DT,0u)==HM_LORE_BLOCKED);
+    assert(s.player.frame==1u);
+}
+
 int main(void) {
     test_button_hold_requires_real_release_at_gate();
     test_upgrade_after_first_gate_contact();
@@ -317,6 +365,10 @@ int main(void) {
     test_original_fixture_content_is_sealed_without_export();
     test_masked_grid_mutations_are_rejected_without_overread();
     test_corrupt_world_is_not_allowed_on_new_init();
+    test_lore_pickup_roles_cannot_be_swapped_mid_session();
+    test_native_world_descriptor_cannot_be_swapped_mid_session();
+    puts("PASS: Stage107 level1-1 event-reward role and borrowed world "
+         "descriptor identity are immutable across native gameplay");
     puts("PASS: Stage106 immutable borrowed native world seal prevents altered "
          "event map, solid tiles, mask geometry and physics replay");
     puts("PASS: Stage105 source-native session derives fresh attack on 0->1,"
