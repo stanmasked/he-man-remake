@@ -11,7 +11,9 @@ on:
       - 'tools/verify_nexium_lore_lab_pngs.py'
       - 'tools/verify_nexium_sd_disk_receipt.py'
       - 'tools/verify_nexium_cold_restart.py'
+      - 'tools/verify_nexium_corrupt_cold_restore.py'
       - 'tests/test_nexium_cold_restart.py'
+      - 'tests/test_nexium_corrupt_cold_restore.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
       - 'tests/test_switch_sd_journal_audit.py'
@@ -59,6 +61,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_cold_restart.py -v
+      - name: Test fault-injected independent-process guest oracle (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_corrupt_cold_restore.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -314,6 +321,55 @@ jobs:
             --initial-receipt boot-evidence/guest-sd-disk-receipt.json \
             --final-receipt boot-evidence/cold-restart/guest-sd-disk-receipt.json \
             --out boot-evidence/cold-restart/guest-cold-restart-report.json
+      - name: Prepare isolated checksum-invalid emulator SD fixture (no original media)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/fault-restart
+          python3 tools/verify_nexium_corrupt_cold_restore.py prepare \
+            --source-root "$PWD/boot-evidence/nexium-data" \
+            --target-root "$PWD/boot-evidence/fault-restart/nexium-data" \
+            --initial-receipt boot-evidence/guest-sd-disk-receipt.json \
+            --out boot-evidence/fault-restart/corrupt-fixture-manifest.json
+      - name: Third independent guest process must reject corrupted SD without losing RAM state
+        shell: bash
+        run: |
+          set -euo pipefail
+          export HEMAN_LORE_RESTART_PHASE=restore
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/fault-restart/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/fault-restart/raster-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/fault-restart"
+          export NEXIUM_HID_INJECT="$PWD/boot-evidence/fault-restart/guest-hid-input.txt"
+          export NEXIUM_HID_INJECT_EXCLUSIVE="1"
+          export NEXIUM_HID_TRACE="1"
+          export RUST_LOG="info,wgpu_core=warn"
+          echo 'buttons=' > "$NEXIUM_HID_INJECT"
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+          set +e
+          timeout --kill-after=6s 250s boot-evidence/debug_boot \
+            "$PWD/nros/heman_level11_lore_lab.nro" rustarmic runner \
+            >boot-evidence/fault-restart/raster-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/fault-restart/raster-exit-status.txt
+          tail -n 65 boot-evidence/fault-restart/raster-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Corrupted SD guest process failed to complete ($code)" >&2
+            exit 1
+          fi
+          sha256sum --check boot-evidence/guest-nro-before.sha256
+      - name: Independent fail-closed receipt of third guest and unchanged corrupted SD bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/verify_nexium_lore_lab_hid.py \
+            --cold-restart boot-evidence/fault-restart/raster-stdout.log | \
+            tee boot-evidence/fault-restart/guest-lore-hid-publication-report.json
+          python3 tools/verify_nexium_corrupt_cold_restore.py verify \
+            --evidence-folder "$PWD/boot-evidence/fault-restart" \
+            --target-root "$PWD/boot-evidence/fault-restart/nexium-data" \
+            --manifest boot-evidence/fault-restart/corrupt-fixture-manifest.json \
+            --out boot-evidence/fault-restart/guest-corrupt-sd-failure-report.json
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -335,5 +391,9 @@ jobs:
             boot-evidence/cold-restart/*.png
             boot-evidence/cold-restart/*.json
             boot-evidence/cold-restart/*status.txt
+            boot-evidence/fault-restart/*.log
+            boot-evidence/fault-restart/*.png
+            boot-evidence/fault-restart/*.json
+            boot-evidence/fault-restart/*status.txt
           if-no-files-found: warn
           retention-days: 7
