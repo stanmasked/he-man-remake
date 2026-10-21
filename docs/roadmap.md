@@ -7,6 +7,8 @@
 - [x] Decode object names, states, 3×3 transforms, and four typed property formats.
 - [x] Decode named point groups and indexed references in all 39 trailers.
 - [x] Decode v1–v3 multilayer tilemaps with 213/214 file validation and distinguish the named collision layer.
+- [x] Privately count original iOS Level1-1 object-table entries (159), three .map layers over 300×19 tiles and occupancy totals (map 1579, collision 790, destructible 33) in both screen packs; see [Stage138](stage138-original-level1-structural-readiness.md). These are structural counts, **not** original collision behavior.
+- [x] Add asset-free, aggregate-only private readiness gate combining selected level+map byte parity, explicit map-file links, collision occupancy topology, full object parsing and named-point links; no original coordinates or classified collision semantics exported.
 - [ ] Identify collision tile semantics and match shape ownership and object relationships.
 - [x] Decode local-space .shape polygons and circles, with 409/409 private archive validation and synthetic tests.
 - [x] Implement an asset-free SVG schematic viewer for local level coordinates.
