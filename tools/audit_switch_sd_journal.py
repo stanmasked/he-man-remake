@@ -98,9 +98,8 @@ def inspect_slot(path: Path, slot: int) -> dict:
     return {"slot": slot, **report}
 
 
-def audit_directory(directory: Path) -> dict:
-    slots = [inspect_slot(directory / f"progress{slot}.bin", slot)
-             for slot in (0, 1)]
+def summarize_slots(slots: list[dict]) -> dict:
+    """Reuse the same journal ranking/ambiguity rules for path or fd reads."""
     valid = [entry for entry in slots
              if entry["status"] == "structurally_valid"]
     bindings = {(entry["world_seal"], tuple(entry["bindings"]))
@@ -122,6 +121,12 @@ def audit_directory(directory: Path) -> dict:
         "original_ios_data_verified": False,
         "note": "Structural integrity only; FNV-1a is not authentication.",
     }
+
+
+def audit_directory(directory: Path) -> dict:
+    slots = [inspect_slot(directory / f"progress{slot}.bin", slot)
+             for slot in (0, 1)]
+    return summarize_slots(slots)
 
 
 def main(argv=None) -> int:
