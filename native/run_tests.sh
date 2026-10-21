@@ -72,6 +72,64 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_level11_lab.c" \
   -lm -o "$TMP/test_level11_lab"
 "$TMP/test_level11_lab"
+
+# Stage113: two independently recoverable journal slots and actual
+# separate-process cold-start file IO (source-only C99, synthetic world).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/src/heman_level11_native_session.c" \
+  "$ROOT/native/src/heman_level11_snapshot.c" \
+  "$ROOT/native/src/heman_level11_lab.c" \
+  "$ROOT/native/src/heman_level11_journal.c" \
+  "$ROOT/native/tests/test_level11_journal.c" \
+  -lm -o "$TMP/test_level11_journal"
+"$TMP/test_level11_journal"
+"$TMP/test_level11_journal" cold-write "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read-upgrade "$TMP/heman-progress"
+# Corrupt newest slot and prove a brand-new process recovers old slot.
+printf '\001' >> "$TMP/heman-progress.1"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+# Rebuild generation 2, then flip a protected payload byte without updating
+# the digest. A separate reader must reject it and recover generation 1.
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-corrupt "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+# Rebuild generation 2 again, then test a physically short on-disk record.
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
+truncate -s 60 "$TMP/heman-progress.1"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+# Simulate an interrupted write to the inactive disk slot; preserve slot 0.
+"$TMP/test_level11_journal" cold-torn-write "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+
+# Stage113 adapter-level host shim: compile the actual SD adapter against a
+# minimal mock libnx surface and a temporary sdmc: directory. This tests file
+# handling, slot recovery and error propagation, not real Switch SD services.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/tests/mock_libnx" -I"$ROOT/native/include" \
+  -I"$ROOT/switch_lore/source" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/src/heman_level11_native_session.c" \
+  "$ROOT/native/src/heman_level11_snapshot.c" \
+  "$ROOT/native/src/heman_level11_lab.c" \
+  "$ROOT/native/src/heman_level11_journal.c" \
+  "$ROOT/switch_lore/source/sd_journal.c" \
+  "$ROOT/native/tests/test_switch_lore_sd_adapter.c" \
+  -lm -o "$TMP/test_switch_lore_sd_adapter"
+mkdir -p "$TMP/sd-adapter-root/sdmc:"
+(cd "$TMP/sd-adapter-root" && "$TMP/test_switch_lore_sd_adapter")
+mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
+(cd "$TMP/sd-adapter-premounted-root" && "$TMP/test_switch_lore_sd_adapter" pre-mounted)
+
 "$TMP/test_level11_snapshot"
 "$TMP/test_level11_native_session"
 "$TMP/test_level11_native_contacts"

@@ -10,14 +10,15 @@ ELF2NRO ?= $(DEVKITPRO)/tools/bin/elf2nro
 ROOT := $(abspath ..)
 TARGET := heman_level11_lore_lab
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
-SOURCES := source/main.c \
+SOURCES := source/main.c source/sd_journal.c \
            $(ROOT)/native/src/heman_core.c \
            $(ROOT)/native/src/heman_mask.c \
            $(ROOT)/native/src/heman_level11_lore.c \
            $(ROOT)/native/src/heman_level11_native_contacts.c \
            $(ROOT)/native/src/heman_level11_native_session.c \
            $(ROOT)/native/src/heman_level11_snapshot.c \
-           $(ROOT)/native/src/heman_level11_lab.c
+           $(ROOT)/native/src/heman_level11_lab.c \
+           $(ROOT)/native/src/heman_level11_journal.c
 CFLAGS := -std=gnu99 -O2 -Wall -Wextra -Werror $(ARCH) \
           -I$(ROOT)/native/include -I$(DEVKITPRO)/libnx/include -D__SWITCH__
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \

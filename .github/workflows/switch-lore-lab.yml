@@ -4,11 +4,13 @@ on:
     paths:
       - '.github/workflows/switch-lore-lab.yml'
       - 'switch_lore/**'
-      - 'native/src/heman_level11_lab.c'
-      - 'native/include/heman_level11_lab.h'
-      - 'native/src/heman_level11_snapshot.c'
-      - 'native/src/heman_level11_native_contacts.c'
-      - 'native/src/heman_level11_native_session.c'
+      # The NRO links the shared native C99 core directly. Trigger a
+      # target build whenever any linked source or public header changes,
+      # including the Stage113 journal and snapshot formats. Keep this broad
+      # filter in sync with switch_lore/Makefile so core changes cannot skip
+      # the AArch64 link check.
+      - 'native/src/**'
+      - 'native/include/**'
       - 'native/tests/test_level11_lab.c'
   workflow_dispatch:
 

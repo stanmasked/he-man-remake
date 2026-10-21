@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from instrument_nexium_lore_lab import FRAMES, HID_EVENTS, instrument
 from verify_nexium_lore_lab_hid import LAB_BITS, expected_masks, verify as hid_verify
 from verify_nexium_lore_lab_pngs import (
-    STATES, HERO, BG, GREY, GREEN, BIO, ART, SAVE,
+    STATES, HERO, BG, GREY, GREEN, BIO, ART, SAVE, SD_FAILURE,
     verify as png_verify, inspect,
 )
 from test_nexium_hid_instrument import SOURCE
@@ -40,9 +40,10 @@ def trace(masks=None) -> str:
 class FakeFrame:
     size = (640, 360)
 
-    def __init__(self, state, payload):
+    def __init__(self, state, payload, sd_status=0):
         self.state = state
         self.payload = payload
+        self.sd_status = sd_status
 
     def getpixel(self, point):
         flags = self.state[:5]
@@ -57,6 +58,8 @@ class FakeFrame:
             return GREEN if self.state[5] >= 1 else BG
         if point == (372,30):
             return GREEN if self.state[5] == 2 else BG
+        if point == (430,30):
+            return {0: GREY, 1: GREEN, 2: SD_FAILURE}[self.sd_status]
         x,y = point
         if y == 188:
             left = 64 + self.state[6] - 5
@@ -64,7 +67,8 @@ class FakeFrame:
         raise AssertionError(f"unexpected fake pixel {point}")
 
     def tobytes(self):
-        return self.payload
+        # Keep mock frames byte-stable while satisfying the real RGB buffer size.
+        return self.payload.ljust(640 * 360 * 3, b"\0")
 
 
 class FakePNG:
@@ -89,8 +93,10 @@ class Stage112HIDRegression(unittest.TestCase):
         code = instrument(SOURCE)
         self.assertEqual(code.count("HEMAN_LORE_HID frame="), 2)
         self.assertEqual(code.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
-        for token in ('145 | 460 => "buttons=L"',
-                      '230 | 497 => "buttons=R"',
+        for token in ('145 => "buttons=L"',
+                      '230 => "buttons=R"',
+                      '470 => "buttons=ZL,L"',
+                      '530 => "buttons=ZL,R"',
                       '275 => "buttons=Y"', '365 => "buttons=X"'):
             self.assertIn(token, code)
         with self.assertRaises(ValueError):
@@ -120,8 +126,13 @@ class Stage112HIDRegression(unittest.TestCase):
         self.assertEqual(LAB_BITS["R"], 128)
         self.assertEqual(LAB_BITS["X"], 4)
         self.assertEqual(LAB_BITS["Y"], 8)
-        self.assertEqual(len(HID_EVENTS), 20)
-        self.assertEqual(len(FRAMES), 12)
+        self.assertEqual(len(HID_EVENTS), 26)
+        self.assertEqual(len(FRAMES), 13)
+        schedule = dict(HID_EVENTS)
+        self.assertEqual(schedule[460], "buttons=ZL")
+        self.assertEqual(schedule[470], "buttons=ZL,L")
+        self.assertEqual(schedule[520], "buttons=ZL")
+        self.assertEqual(schedule[530], "buttons=ZL,R")
 
     def test_simulated_complete_trace_not_a_guest_attestation(self):
         result = hid_verify(trace())
@@ -165,14 +176,17 @@ class Stage112PNGMockRegression(unittest.TestCase):
         payload = {}
         payload[165] = b"original-saved-guest-scene"
         payload[265] = payload[165]
+        payload[215] = b"reset-scene"
+        payload[518] = payload[215]
         payload[485] = b"completed-saved-guest-scene"
-        payload[530] = payload[485]
+        payload[540] = payload[485]
+        sd_statuses = {485: 1, 518: 1, 540: 1}
         for frame in FRAMES:
             state = STATES[frame]
             midpoint = (state[6] + state[7]) // 2
             row = state[:6] + (midpoint, midpoint)
             raw = payload.get(frame, f"guest-image-{frame}".encode())
-            self.fake[frame] = FakeFrame(row, raw)
+            self.fake[frame] = FakeFrame(row, raw, sd_statuses.get(frame, 0))
             (self.folder / f"raster-frame-{frame:04}.png").write_bytes(b"fake")
         log_lines = [
             "Production runner complete: frames=540",
@@ -200,8 +214,11 @@ class Stage112PNGMockRegression(unittest.TestCase):
     def test_mock_positive_is_never_original_ios_evidence(self):
         result = self.check()
         self.assertEqual(
-            result["authentic_pinned_nexium_frame_rx_pngs_validated"], 12
+            result["authentic_pinned_nexium_frame_rx_pngs_validated"], len(FRAMES)
         )
+        self.assertTrue(result["guest_sd_save_succeeded"])
+        self.assertTrue(result["guest_sd_load_succeeded"])
+        self.assertTrue(result["guest_sd_round_trip_verified"])
         self.assertFalse(result["original_ios_source_fidelity_verified"])
         self.assertFalse(result["hardware_nintendo_switch_execution_verified"])
 
@@ -238,10 +255,56 @@ class Stage112PNGMockRegression(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reproduce saved"):
             self.check()
 
-    def test_final_save_load_must_be_stable(self):
-        old = self.fake[530]
-        self.fake[530] = FakeFrame(old.state, b"changed completed pixels")
-        with self.assertRaisesRegex(ValueError, "pixel-stable"):
+    def test_final_ram_save_load_must_be_stable(self):
+        old = self.fake[540]
+        self.fake[540] = FakeFrame(old.state, b"changed completed pixels", old.sd_status)
+        with self.assertRaisesRegex(ValueError, "SD save/load did not reproduce"):
+            self.check()
+
+    def test_sd_unavailable_is_reported_and_reset_session_is_preserved(self):
+        for frame in (485, 518, 540):
+            old = self.fake[frame]
+            state = old.state
+            if frame == 540:
+                reset = STATES[518]
+                midpoint = (reset[6] + reset[7]) // 2
+                state = reset[:6] + (midpoint, midpoint)
+                payload = b"reset-scene"
+            elif frame == 518:
+                payload = b"reset-scene"
+            else:
+                payload = old.payload
+            self.fake[frame] = FakeFrame(state, payload, 2)
+        result = self.check()
+        self.assertFalse(result["guest_sd_save_succeeded"])
+        self.assertFalse(result["guest_sd_load_succeeded"])
+        self.assertFalse(result["guest_sd_round_trip_verified"])
+        self.assertTrue(result["guest_sd_failure_preserved_reset_session"])
+
+    def test_green_sd_restore_requires_a_successful_sd_save(self):
+        old = self.fake[485]
+        self.fake[485] = FakeFrame(old.state, old.payload, 2)
+        prior = self.fake[518]
+        self.fake[518] = FakeFrame(prior.state, prior.payload, 2)
+        with self.assertRaisesRegex(ValueError, "although this run's SD save failed"):
+            self.check()
+
+    def test_sd_load_failure_after_successful_save_preserves_reset_session(self):
+        old = self.fake[540]
+        reset = STATES[518]
+        midpoint = (reset[6] + reset[7]) // 2
+        reset_row = reset[:6] + (midpoint, midpoint)
+        self.fake[540] = FakeFrame(reset_row, b"reset-scene", 2)
+        result = self.check()
+        self.assertTrue(result["guest_sd_save_succeeded"])
+        self.assertFalse(result["guest_sd_load_succeeded"])
+        self.assertFalse(result["guest_sd_round_trip_verified"])
+        self.assertTrue(result["guest_sd_failure_preserved_reset_session"])
+
+    def test_sd_attempt_must_change_the_result_indicator(self):
+        old = self.fake[485]
+        self.fake[485] = FakeFrame(old.state, old.payload, 0)
+        with self.assertRaisesRegex(ValueError, "ZL\+L did not reach"):
             self.check()
 
     def test_position_cannot_be_teleported(self):

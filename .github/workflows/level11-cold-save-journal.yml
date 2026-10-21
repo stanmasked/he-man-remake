@@ -1,0 +1,118 @@
+name: He-Man experimental dual-slot cold-start save journal
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-cold-save-journal.yml'
+      - 'native/include/heman_level11_journal.h'
+      - 'native/src/heman_level11_journal.c'
+      - 'native/tests/test_level11_journal.c'
+      - 'native/tests/test_switch_lore_sd_adapter.c'
+      - 'native/tests/mock_libnx/switch.h'
+      - 'native/run_tests.sh'
+      - 'tools/audit_switch_sd_journal.py'
+      - 'tests/test_switch_sd_journal_audit.py'
+      - 'switch_lore/source/sd_journal.c'
+      - 'switch_lore/source/main.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-two-process-persistence:
+    name: C99 cold restart and torn journal recovery (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    env:
+      CC: ${{ matrix.compiler }}
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile C99 dual-slot journal with sanitizers
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/src/heman_level11_snapshot.c \
+            native/src/heman_level11_lab.c \
+            native/src/heman_level11_journal.c \
+            native/tests/test_level11_journal.c \
+            -lm -o /tmp/heman-cold-journal
+      - name: Complete deterministic in-process corruption/recovery tests
+        run: /tmp/heman-cold-journal
+      - name: Persist and restore across independent host cold starts
+        shell: bash
+        run: |
+          set -euo pipefail
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          /tmp/heman-cold-journal cold-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
+          /tmp/heman-cold-journal cold-read-upgrade "$d/progress"
+          test -s "$d/progress.0"
+          test -s "$d/progress.1"
+          # The extra byte must mark the newest slot malformed.
+          printf '\001' >> "$d/progress.1"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          # Rebuild generation 2 and corrupt a payload byte without its digest.
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
+          /tmp/heman-cold-journal cold-corrupt "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          # Rebuild generation 2 again and test an actually short file.
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
+          truncate -s 60 "$d/progress.1"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          # Simulate an interrupted half-record write to the inactive slot.
+          /tmp/heman-cold-journal cold-torn-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          # A file-backed writer lies about success after silently damaging
+          # the full record; read-back must fail and the next process falls back.
+          /tmp/heman-cold-journal cold-silent-corrupt-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+      - name: Exercise the actual Switch SD adapter through a host-only libnx shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/tests/mock_libnx -I native/include -I switch_lore/source \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/src/heman_level11_snapshot.c \
+            native/src/heman_level11_lab.c \
+            native/src/heman_level11_journal.c \
+            switch_lore/source/sd_journal.c \
+            native/tests/test_switch_lore_sd_adapter.c \
+            -lm -o /tmp/heman-sd-adapter
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          mkdir -p "$d/sdmc:"
+          (cd "$d" && /tmp/heman-sd-adapter)
+          d2="$(mktemp -d)"
+          trap 'rm -rf "$d" "$d2"' EXIT
+          mkdir -p "$d2/sdmc:"
+          (cd "$d2" && /tmp/heman-sd-adapter pre-mounted)
+      - name: Audit two synthetic SD-slot files without reading or changing source assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 -m unittest discover -s tests -p test_switch_sd_journal_audit.py -v
+      - name: Explicit evidence boundary
+        run: |
+          echo "Two independent host processes and source-native journal verified."
+          echo "SD card mounting/writing on Nintendo Switch hardware NOT verified."
+          echo "NeXium SD syscall support and original iOS persistence NOT proven."

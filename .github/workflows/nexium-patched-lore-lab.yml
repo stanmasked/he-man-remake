@@ -1,4 +1,4 @@
-name: Patched NeXium real guest Level1-1 synthetic lore lab HID and RAM save
+name: Patched NeXium real guest Level1-1 lore lab HID, RAM and SD save/load probe
 on:
   pull_request:
     paths:
@@ -231,7 +231,7 @@ jobs:
           python3 tools/verify_nexium_lore_lab_hid.py \
             boot-evidence/raster-stdout.log | \
             tee boot-evidence/guest-lore-hid-publication-report.json
-      - name: Verify actual lore-lab save/reset/load and collectible route via guest PNGs
+      - name: Verify actual lore-lab RAM/SD save attempts, fail-closed restore and collectible route via guest PNGs
         shell: bash
         run: |
           set -euo pipefail
