@@ -179,7 +179,7 @@ static void test_distant_attack_cannot_use_old_sticky_gate_trigger(void) {
     hm_world w = world_init();
     hm_state player;
     hm_lore_state lore, before_lore;
-    hm_input move = move_right(), stop = {0.0f, 0u, 0u};
+    hm_input stop = {0.0f, 0u, 0u};
     hm_state previous;
     unsigned n;
     assert(hm_init(&w, &player) == HM_OK);
