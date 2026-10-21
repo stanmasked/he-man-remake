@@ -46,7 +46,10 @@ def _member_name(name: str, *, directory: str, suffixes: tuple[str, ...]) -> str
     return tail
 
 
-def _safe_read(archive: ZipFile, info, max_size=MAX_ITEM_BYTES) -> bytes:
+def _safe_read(archive: ZipFile, info, max_size: int | None = None) -> bytes:
+    # Resolve the configurable cap per call, not at Python function definition time.
+    if max_size is None:
+        max_size = MAX_ITEM_BYTES
     if (info is None or info.is_dir() or info.flag_bits & 1
             or not 1 <= info.file_size <= max_size
             or stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK):
