@@ -135,7 +135,7 @@ def masked_common_scene_digest(image_path: Path) -> str:
         (132, 22, 174, 37),  # Bio HUD lamp (42x15)
         (350, 22, 384, 37),  # variable-sized earned count indicator
         (420, 22, 456, 37),  # save/load diagnostic status, not game state
-        (115, 183, 126, 194),  # fictional Bio pickup marker (11x11)
+        (207, 183, 218, 194),  # fictional Bio event1: ORIGIN_X 64 + 148 - 5
     )
     for x0, y0, x1, y1 in rects:
         for y in range(y0, y1):
