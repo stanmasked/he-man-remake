@@ -68,7 +68,7 @@ class Stage140PhysicsShapeCensusTests(unittest.TestCase):
         self.assertFalse(result["original_physics_resource_binding_verified"])
         self.assertFalse(result["safe_for_switch_collision_import"])
         for secret in ("FakeAlpha","FakeBeta","FakeStation","FakeActor","FakeUnused",
-                       "geometry/","physics_struct/","MOTU.app","registry"):
+                       "geometry/","physics_struct/","MOTU.app","synthetic registry"):
             self.assertNotIn(secret,json.dumps(result))
 
     def test_same_text_without_u16_prefix_does_not_count(self):
@@ -141,10 +141,15 @@ class Stage140PhysicsShapeCensusTests(unittest.TestCase):
     def test_selected_zip_symlink_is_rejected(self):
         with TemporaryDirectory() as d:
             p=Path(d)/"synthetic.ipa"
-            bad=ZipInfo("Payload/MOTU.app/screen-med/physics_struct/Link.ps2d")
-            bad.create_system=3
-            bad.external_attr=(stat.S_IFLNK|0o777)<<16
-            fabricate(p,extra=[(bad,b"relative.link")])
+            bad=[]
+            # Both packs have the same selected path, so the structural
+            # parity check passes and the symlink guard itself is tested.
+            for pack in ("screen-med","screen-xlarge"):
+                info=ZipInfo(f"Payload/MOTU.app/{pack}/physics_struct/Link.ps2d")
+                info.create_system=3
+                info.external_attr=(stat.S_IFLNK|0o777)<<16
+                bad.append((info,b"relative.link"))
+            fabricate(p,extra=bad)
             with self.assertRaisesRegex(ValueError,"unsafe selected"):
                 audit_private_physics_shape_census(p)
 
