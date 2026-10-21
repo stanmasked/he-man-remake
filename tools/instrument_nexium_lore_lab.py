@@ -53,6 +53,24 @@ COLD_RESTORE_EVENTS = (
 )
 
 
+
+# New genuine guest process: restore prior file, move with the real D-pad,
+# write a second independent journal generation via the real ZL+L chord.
+# Neither the original NRO nor any journal bytes are patched.
+RESAVE_EVENTS = (
+    (80, "buttons=ZL"),
+    (90, "buttons=ZL,R"),
+    (100, "buttons=ZL"),
+    (105, "buttons="),
+    (180, "buttons=DRIGHT"),
+    (215, "buttons="),
+    (290, "buttons=ZL"),
+    (300, "buttons=ZL,L"),
+    (310, "buttons=ZL"),
+    (320, "buttons="),
+)
+
+
 def instrument(source: str) -> str:
     if tuple(frame for frame, _ in HID_EVENTS) != tuple(sorted(
         set(frame for frame, _ in HID_EVENTS)
@@ -66,7 +84,10 @@ def instrument(source: str) -> str:
     if output.count(before) != 2:
         raise ValueError("Pinned guest frame_rx layout drifted")
     output = output.replace(before, after)
-    schedule = " | ".join(str(frame) for frame, _ in HID_EVENTS)
+    schedule = " | ".join(str(f) for f in sorted({
+        f for events in (HID_EVENTS, COLD_RESTORE_EVENTS, RESAVE_EVENTS)
+        for f, _ in events
+    }))
     groups: dict[str, list[int]] = {}
     for frame, event in HID_EVENTS:
         if not event.startswith("buttons="):
@@ -83,17 +104,32 @@ def instrument(source: str) -> str:
         f'        {frame} => "{packet}",'
         for frame, packet in COLD_RESTORE_EVENTS
     ]
+    if tuple(f for f, _ in RESAVE_EVENTS) != tuple(sorted({
+        f for f, _ in RESAVE_EVENTS
+    })):
+        raise ValueError("Resave phase events must increase strictly")
+    if max(f for f, _ in RESAVE_EVENTS) >= max(FRAMES):
+        raise ValueError("Resave phase has no post-action guest frame")
+    resave_arms = [
+        f'        {frame} => "{packet}",'
+        for frame, packet in RESAVE_EVENTS
+    ]
     for indent in ("            ", "        "):
         anchor = indent + "frames += 1;\n" + indent + after
         if output.count(anchor) != 1:
             raise ValueError("Expected exactly one pinned guest frame_rx path")
         lines = [
             f"if matches!(frames, {schedule}) {{",
-            '    let cold = std::env::var("HEMAN_LORE_RESTART_PHASE")',
-            '        .map(|x| x == "restore").unwrap_or(false);',
-            "    let text = if cold {",
+            '    let phase = std::env::var("HEMAN_LORE_RESTART_PHASE")',
+            '        .unwrap_or_default();',
+            '    let text = if phase == "restore" {',
             "        match frames {",
             *cold_arms,
+            '            _ => "",',
+            "        }",
+            '    } else if phase == "resave" {',
+            "        match frames {",
+            *resave_arms,
             '            _ => "",',
             "        }",
             "    } else {",
