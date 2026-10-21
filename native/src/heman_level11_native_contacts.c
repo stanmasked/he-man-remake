@@ -1,6 +1,7 @@
 #include "heman_level11_native_contacts.h"
 #include <stdint.h>
 #include <string.h>
+#include <math.h>
 
 /* 32 events maximum is part of the unmodified hm_core C99 ABI. */
 static int binding_valid(const hm_world *w,
@@ -14,9 +15,43 @@ static int binding_valid(const hm_world *w,
         b->left_gate_event == b->concept_art_event ||
         b->skeletor_bio_event == b->concept_art_event)
         return 0;
-    return w->events[b->left_gate_event].kind == HM_TRIGGER &&
-           w->events[b->skeletor_bio_event].kind == HM_PICKUP &&
-           w->events[b->concept_art_event].kind == HM_PICKUP;
+    if (w->events[b->left_gate_event].kind != HM_TRIGGER ||
+        w->events[b->skeletor_bio_event].kind != HM_PICKUP ||
+        w->events[b->concept_art_event].kind != HM_PICKUP ||
+        !isfinite(w->actor_half_width) ||
+        !isfinite(w->actor_height) ||
+        w->actor_half_width <= 0.0f || w->actor_height <= 0.0f)
+        return 0;
+    {
+        uint32_t k;
+        const uint32_t indexes[3] = {
+            b->left_gate_event, b->skeletor_bio_event,
+            b->concept_art_event
+        };
+        for (k = 0u; k < 3u; ++k) {
+            const hm_event *e = &w->events[indexes[k]];
+            if (!isfinite(e->x) || !isfinite(e->y) ||
+                !isfinite(e->radius) || e->radius < 1.0f ||
+                e->radius > 128.0f) return 0;
+        }
+    }
+    return 1;
+}
+
+/* Same actor-body-vs-event-circle test as heman_core.c:touches().
+ * This supplements the sticky HM_TRIGGER bit with evidence that the actor
+ * is STILL at the gate when a fresh sword command is submitted. Therefore
+ * the player can return later after obtaining Wall Crusher. No original
+ * iOS obstacle coordinates are encoded here.
+ */
+static int at_sensor(const hm_world *w, const hm_state *s,
+                     const hm_event *e) {
+    const float dx = fmaxf(0.0f,
+                         fabsf(e->x - s->x) - w->actor_half_width);
+    const float top = s->feet_y - w->actor_height;
+    const float dy = fmaxf(0.0f,
+                         fmaxf(top - e->y, e->y - s->feet_y));
+    return dx * dx + dy * dy <= e->radius * e->radius;
 }
 
 hm_lore_result hm_level11_accept_native_frame(
@@ -26,7 +61,7 @@ hm_lore_result hm_level11_accept_native_frame(
     hm_state recomputed;
     hm_lore_state candidate;
     hm_lore_result result;
-    uint32_t new_triggers, new_pickups;
+    uint32_t new_pickups;
     uint32_t gate_bit, bio_bit, art_bit;
     int applied = 0, already = 0;
     if (!before || !after || !lore || !binding_valid(world, bindings) ||
@@ -48,18 +83,20 @@ hm_lore_result hm_level11_accept_native_frame(
         after->hazards != before->hazards)
         return HM_LORE_BLOCKED;
 
-    new_triggers = after->triggered & ~before->triggered;
     new_pickups = after->picked & ~before->picked;
     gate_bit = UINT32_C(1) << bindings->left_gate_event;
     bio_bit = UINT32_C(1) << bindings->skeletor_bio_event;
     art_bit = UINT32_C(1) << bindings->concept_art_event;
     candidate = *lore;
 
-    /* A fresh gate collision alone cannot break an obstacle: an actual
-     * fresh attack command must coincide, and Wall Crusher be granted.
-     * The native HM_TRIGGER is a movement contact sensor; future source-
-     * validated integration must bind it to the proper collision fixture. */
-    if ((new_triggers & gate_bit) && attack_fresh_press) {
+    /* HM_TRIGGER bits are sticky in hm_core. An attack must be fresh,
+     * issued while the live physics body still touches the authored gate
+     * sensor, and the sensor must actually be triggered by native physics.
+     * This also permits returning after upgrading Wall Crusher; neither a
+     * stale trigger alone nor a distant attack can break the obstacle.
+     * The sensor must later be bound to verified original scene geometry. */
+    if (attack_fresh_press && (after->triggered & gate_bit) &&
+        at_sensor(world, after, &world->events[bindings->left_gate_event])) {
         result = hm_lore_attack_left_gate(&candidate, 1u);
         if (result == HM_LORE_INVALID) return HM_LORE_INVALID;
         applied |= result == HM_LORE_APPLIED;
