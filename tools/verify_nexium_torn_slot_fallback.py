@@ -17,7 +17,7 @@ from pathlib import Path
 from audit_switch_sd_journal import RECORD_SIZE, decode_record, fnv64
 from instrument_nexium_lore_lab import FRAMES, COLD_RESTORE_EVENTS
 from verify_nexium_cold_restart import load_guest_frame
-from verify_nexium_sd_disk_receipt import audit_confined_sd
+from verify_nexium_sd_disk_receipt import audit_confined_sd, read_confined_sd_slot_bytes
 
 TRUNCATION_BYTES = 64
 
@@ -48,14 +48,7 @@ def prepare_torn_newest(source_root: Path, target_root: Path, initial: dict) -> 
     if entry["status"] != "structurally_valid":
         raise ValueError("Source journal structural candidate is not valid")
     # This path is in the dedicated CI run's private SD fixture, not a user SD.
-    source_file = lab(source_root) / f"progress{selected}.bin"
-    if source_file.is_symlink() or not source_file.is_file():
-        raise ValueError("Source slot may not be a symlink or special file")
-    original = source_file.read_bytes()
-    if (len(original) != RECORD_SIZE or
-        hashlib.sha256(original).hexdigest() != entry["sha256"] or
-        decode_record(original).get("status") != "structurally_valid"):
-        raise ValueError("Source journal no longer matches disk receipt")
+    original = read_confined_sd_slot_bytes(source_root, selected, entry["sha256"])
     generation = entry["generation"]
     if not (0 < generation < (1 << 64) - 1):
         raise ValueError("No safe generation for torn newer slot")

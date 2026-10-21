@@ -16,6 +16,7 @@ on:
       - 'tests/test_nexium_cold_restart.py'
       - 'tests/test_nexium_corrupt_cold_restore.py'
       - 'tests/test_nexium_torn_slot_fallback.py'
+      - 'tests/test_nexium_fd_fixture_reads.py'
       - 'tools/audit_switch_sd_journal.py'
       - 'tests/test_nexium_sd_disk_receipt.py'
       - 'tests/test_switch_sd_journal_audit.py'
@@ -73,6 +74,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_torn_slot_fallback.py -v
+      - name: Test descriptor-relative source SD fixture reads (MOCK ONLY)
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_fd_fixture_reads.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
