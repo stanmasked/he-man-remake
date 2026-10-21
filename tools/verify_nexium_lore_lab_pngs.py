@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import re
+import sys
 from pathlib import Path
 
 from instrument_nexium_lore_lab import FRAMES, HID_EVENTS
@@ -227,7 +228,7 @@ def main() -> int:
     args = parser.parse_args()
     result = verify(args.guest_folder)
     print(json.dumps(result, sort_keys=True, indent=2))
-    print("PASS: genuine pinned NeXium guest RAM/SD-path diagnostic and PNG receipt; SD result is reported separately")
+    print("PASS: genuine pinned NeXium guest RAM/SD-path diagnostic and PNG receipt; SD result is reported separately", file=sys.stderr)
     return 0
 
 
