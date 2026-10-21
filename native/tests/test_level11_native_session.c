@@ -303,7 +303,7 @@ static void test_corrupt_world_is_not_allowed_on_new_init(void) {
     assert(hm_level11_session_init(&s,&w,&roles)==HM_LORE_APPLIED);
     saved=s;
     corrupted=w;
-    corrupted.columns=4096u; /* borrowed solid[] capacity unchanged */
+    corrupted.columns=4097u; /* invalid core size without reading tiles */
     assert(hm_level11_session_init(&s,&corrupted,&roles)==HM_LORE_INVALID);
     same(&saved,&s);
 }
