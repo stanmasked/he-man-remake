@@ -23,11 +23,6 @@ static void init(void) {
     assert(hm_level11_lab_init(&world,solid,sizeof(solid),&session)
             ==HM_LORE_APPLIED);
 }
-static void move_right(unsigned n) {
-    unsigned k;
-    for(k=0u;k<n;++k)
-        assert(hm_level11_lab_tick(&session,NULL,0u,0u)==HM_LORE_INVALID);
-}
 static void advance(unsigned n) {
     unsigned k;
     hm_level11_lab_save ram={{0},0};
