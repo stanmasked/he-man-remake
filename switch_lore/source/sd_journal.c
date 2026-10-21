@@ -39,31 +39,37 @@ static int read_slot(void *ignored,unsigned slot,uint8_t *output) {
     char name[PATH_CAP];
     FILE *file;
     size_t count;
-    int extra,closed;
+    int extra,read_error,closed;
     (void)ignored;
-    if (!file_name(slot,name,sizeof(name))) return 0;
+    if (!output || !file_name(slot,name,sizeof(name))) return 0;
     file=fopen(name,"rb");
     if (!file) return 0;
     count=fread(output,1u,HM_LEVEL11_JOURNAL_RECORD_SIZE,file);
     extra=fgetc(file);
+    read_error=ferror(file);
     closed=fclose(file);
-    return count==HM_LEVEL11_JOURNAL_RECORD_SIZE && extra==EOF && closed==0;
+    /* EOF is valid only when the stream reached the true end cleanly.
+     * A read error must not be mistaken for a well-formed 120-byte file. */
+    return count==HM_LEVEL11_JOURNAL_RECORD_SIZE && extra==EOF &&
+           !read_error && closed==0;
 }
 static int write_slot(void *ignored,unsigned slot,const uint8_t *bytes) {
     char name[PATH_CAP];
     FILE *file;
     size_t count;
-    int flushed,closed;
+    int write_error,flushed,closed;
     (void)ignored;
-    if (!file_name(slot,name,sizeof(name))) return 0;
+    if (!bytes || !file_name(slot,name,sizeof(name))) return 0;
     file=fopen(name,"wb");
     if (!file) return 0;
     count=fwrite(bytes,1u,HM_LEVEL11_JOURNAL_RECORD_SIZE,file);
+    write_error=ferror(file);
     flushed=fflush(file);
     closed=fclose(file);
     /* If the partial new slot is damaged, the other previously valid
      * slot stays untouched. This does not guarantee power-fail fsync. */
-    return count==HM_LEVEL11_JOURNAL_RECORD_SIZE && flushed==0 && closed==0;
+    return count==HM_LEVEL11_JOURNAL_RECORD_SIZE && !write_error &&
+           flushed==0 && closed==0;
 }
 static hm_level11_journal_io journal_io(void) {
     hm_level11_journal_io io;
