@@ -9,6 +9,9 @@
 typedef struct {
     uint8_t bytes[2][SZ];
     int exists[2];
+    /* Emulate an IO callback that refuses every physically short record.
+     * The native journal itself only accepts exact 120-byte reads. */
+    size_t accessible_size[2];
     unsigned writes;
     int tear_next;
     int corrupt_next;
@@ -19,7 +22,8 @@ static hm_level11_native_session game;
 
 static int memory_read(void *ctx,unsigned slot,uint8_t *data) {
     memory_slots *s=(memory_slots*)ctx;
-    if (slot>1u || !s->exists[slot]) return 0;
+    if (slot>1u || !s->exists[slot] || s->accessible_size[slot]!=SZ)
+        return 0;
     memcpy(data,s->bytes[slot],SZ);
     return 1;
 }
@@ -34,10 +38,12 @@ static int memory_write(void *ctx,unsigned slot,const uint8_t *data) {
         memset(s->bytes[slot],0,SZ);
         memcpy(s->bytes[slot],data,SZ/2u);
         s->exists[slot]=1;
+        s->accessible_size[slot]=SZ/2u;
         return 0;
     }
     memcpy(s->bytes[slot],data,SZ);
     s->exists[slot]=1;
+    s->accessible_size[slot]=SZ;
     if(s->corrupt_next) {
         s->corrupt_next=0;
         /* Backend claims success, but the bytes actually persisted fail
@@ -149,6 +155,85 @@ static void memory_tests(void) {
     assert(!hm_level11_journal_store(&game,&io,&generation));
     assert(!hm_level11_journal_restore(&game,&io,&generation));
     assert(memcmp(&before,&game,sizeof(game))==0);
+}
+/* Stage136: execute the actual same native C99 journal restore routine used
+ * by the Switch NRO against ALL 120 short-read boundaries and ALL 960
+ * single-bit faults. This complements Stage135's independent Python format
+ * audit; it does not simulate physical SD commits or real power failure.
+ */
+static void native_fault_matrix(void) {
+    memory_slots m;
+    hm_level11_journal_io io;
+    uint8_t older[SZ], newer[SZ];
+    uint64_t generation=0u;
+    unsigned size,offset,bit;
+    unsigned checked_short=0u,checked_flip=0u;
+    memset(&m,0,sizeof(m));
+    io.context=&m;
+    io.read_slot=memory_read;
+    io.write_slot=memory_write;
+    boot();
+    walk(30u);
+    assert(game.lore.collected_mask==2u);
+    assert(game.lore.wall_crusher_unlocked==0u);
+    assert(hm_level11_journal_store(&game,&io,&generation));
+    assert(generation==1u && m.exists[0] && !m.exists[1]);
+    memcpy(older,m.bytes[0],SZ);
+    assert(hm_level11_session_grant_wall_crusher(&game,1u)
+           ==HM_LORE_APPLIED);
+    assert(hm_level11_journal_store(&game,&io,&generation));
+    assert(generation==2u && m.exists[1]);
+    memcpy(newer,m.bytes[1],SZ);
+    assert(memcmp(older,newer,SZ)!=0);
+
+    /* Every incomplete source record has a shorter-than-120 response from
+     * the simulated file adapter. Native journal restore must not trust it. */
+    for(size=0u;size<SZ;++size) {
+        m.accessible_size[1]=(size_t)size;
+        boot();
+        generation=777u;
+        assert(hm_level11_journal_restore(&game,&io,&generation));
+        assert(generation==1u);
+        assert(game.lore.wall_crusher_unlocked==0u);
+        assert(game.lore.collected_mask==2u);
+        assert(hm_level11_session_valid(&game));
+        assert(memcmp(m.bytes[0],older,SZ)==0);
+        ++checked_short;
+    }
+    m.accessible_size[1]=SZ;
+
+    /* Every bit of both envelopes and every payload byte must be rejected
+     * when corrupted without updating the real native journal checksum.
+     * Full 960-case coverage, not 120 representative low-bit samples. */
+    for(offset=0u;offset<SZ;++offset) {
+        for(bit=0u;bit<8u;++bit) {
+            memcpy(m.bytes[1],newer,SZ);
+            m.bytes[1][offset]^=(uint8_t)(1u<<bit);
+            boot();
+            generation=777u;
+            assert(hm_level11_journal_restore(&game,&io,&generation));
+            assert(generation==1u);
+            assert(game.lore.wall_crusher_unlocked==0u);
+            assert(game.lore.collected_mask==2u);
+            assert(hm_level11_session_valid(&game));
+            assert(memcmp(m.bytes[0],older,SZ)==0);
+            ++checked_flip;
+        }
+    }
+    assert(checked_short==120u && checked_flip==960u);
+
+    /* With its exact, unchanged newer data restored, the real C99 loader
+     * must select generation2 and the genuinely different upgrade state. */
+    memcpy(m.bytes[1],newer,SZ);
+    boot();
+    generation=0u;
+    assert(hm_level11_journal_restore(&game,&io,&generation));
+    assert(generation==2u);
+    assert(game.lore.wall_crusher_unlocked==1u);
+    assert(game.lore.collected_mask==2u);
+    assert(memcmp(m.bytes[0],older,SZ)==0);
+    puts("STAGE136_NATIVE_C99_FAULT_MATRIX_PASS: 120 short reads, "
+         "960 single-bit errors, intact newest and old journal preserved");
 }
 typedef struct {char prefix[256]; int tear_next; int corrupt_next;} files;
 static int file_name(const files *p,unsigned slot,char *out,size_t n) {
@@ -275,6 +360,7 @@ int main(int argc,char **argv) {
     } else {
         assert(argc==1);
         memory_tests();
+        native_fault_matrix();
         puts("PASS: Stage113 two-slot rollback, incompatible world rejection, "
              "torn write, broken digest, monotonic generation and no live mutation");
     }
