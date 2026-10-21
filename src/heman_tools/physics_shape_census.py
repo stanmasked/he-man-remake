@@ -36,8 +36,12 @@ def _member_name(name: str, *, directory: str, suffixes: tuple[str, ...]) -> str
     if not name.startswith(directory):
         return None
     tail = name[len(directory):]
+    # The actual original geometry directory also has non-.shape members.
+    # Ignore those without mistaking them for malformed selected .shape files.
+    if not tail.endswith(suffixes):
+        return None
     if (not tail or "/" in tail or "\\" in tail or "\x00" in tail
-            or len(tail) > 255 or not tail.endswith(suffixes)):
+            or len(tail) > 255):
         raise ValueError("Malformed or nested selected private resource")
     return tail
 
