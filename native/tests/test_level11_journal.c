@@ -176,6 +176,13 @@ static void cold_process(const char *mode,const char *path) {
         walk(30u);
         assert(hm_level11_journal_store(&game,&io,&generation));
         assert(generation==1u);
+    } else if(strcmp(mode,"cold-corrupt")==0) {
+        uint8_t bytes[SZ];
+        /* Change a payload byte without updating its digest. The next
+         * independent process must reject this exact-length file. */
+        assert(file_read(&p,1u,bytes));
+        bytes[24u]^=0x40u;
+        assert(file_write(&p,1u,bytes));
     } else if(strcmp(mode,"cold-read")==0) {
         assert(hm_level11_journal_restore(&game,&io,&generation));
         assert(generation==1u);

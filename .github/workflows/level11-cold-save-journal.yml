@@ -62,7 +62,12 @@ jobs:
           # The extra byte must mark the newest slot malformed.
           printf '\001' >> "$d/progress.1"
           /tmp/heman-cold-journal cold-read "$d/progress"
-          # Exercise actual truncated-file recovery from a fresh process too.
+          # Rebuild generation 2 and corrupt a payload byte without its digest.
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
+          /tmp/heman-cold-journal cold-corrupt "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
+          # Rebuild generation 2 again and test an actually short file.
+          /tmp/heman-cold-journal cold-upgrade "$d/progress"
           truncate -s 60 "$d/progress.1"
           /tmp/heman-cold-journal cold-read "$d/progress"
       - name: Explicit evidence boundary

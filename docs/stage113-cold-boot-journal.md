@@ -46,11 +46,13 @@ without changing the current session on error.
 
 The dedicated GCC and Clang ASan/UBSan test suite exercises a real
 C99 fictional world and an in-memory journal that can fail halfway
-through a write. The same test binary is then executed in **four
-different host processes**, with actual disk files used for write,
-cold-read, second write, second cold-read; an appended byte corrupts
-the newest slot, and a **fifth process** must recover the older one.
-It cannot pass by accidentally retaining game state in process RAM. The same workflow also appends an extra byte to the newest file and then truncates that file to 60 bytes; each time a fresh process must reject the newest record and recover the previous complete slot.
+through a write. Separate host processes write and restore actual disk
+files across cold starts, upgrade the session, then test three independent
+failure cases: an appended extra byte, a payload-bit change without a
+matching checksum update, and a file truncated to 60 bytes. After each
+failure, a fresh process must reject the newest record and recover the
+previous complete slot. The tests cannot pass by retaining game state in
+process RAM.
 
 The actual Switch NRO is separately cross-compiled through the
 existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO

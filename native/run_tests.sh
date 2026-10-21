@@ -95,7 +95,13 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 # Corrupt newest slot and prove a brand-new process recovers old slot.
 printf '\001' >> "$TMP/heman-progress.1"
 "$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
-# Truncate the newest on-disk record to a real short file and cold-read again.
+# Rebuild generation 2, then flip a protected payload byte without updating
+# the digest. A separate reader must reject it and recover generation 1.
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-corrupt "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+# Rebuild generation 2 again, then test a physically short on-disk record.
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
 truncate -s 60 "$TMP/heman-progress.1"
 "$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
 
