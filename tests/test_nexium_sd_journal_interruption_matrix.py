@@ -64,13 +64,19 @@ class Stage135CompleteJournalInterruptionMatrix(unittest.TestCase):
                 self.new_slot.write_bytes(self.newer[:length])
                 self.assert_only_old_candidate("wrong_length")
 
-    def test_every_single_bit_flip_in_full_new_record_falls_back(self):
+    def test_all_960_single_bit_flips_in_full_new_record_fall_back(self):
+        tested = 0
+        # Every bit in every byte of the journal, including both checksum
+        # envelopes and reserved bytes; never just a representative bit.
         for offset in range(RECORD_SIZE):
-            with self.subTest(byte_offset=offset):
-                bad = bytearray(self.newer)
-                bad[offset] ^= 0x01
-                self.new_slot.write_bytes(bad)
-                self.assert_only_old_candidate()
+            for bit in range(8):
+                with self.subTest(byte_offset=offset, bit_index=bit):
+                    bad = bytearray(self.newer)
+                    bad[offset] ^= 1 << bit
+                    self.new_slot.write_bytes(bad)
+                    self.assert_only_old_candidate()
+                    tested += 1
+        self.assertEqual(tested, RECORD_SIZE * 8)
 
     def test_complete_newer_generation_supersedes_older(self):
         self.new_slot.write_bytes(self.newer)
