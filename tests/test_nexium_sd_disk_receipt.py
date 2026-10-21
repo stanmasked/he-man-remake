@@ -67,6 +67,12 @@ class Stage114DiskReceiptTests(unittest.TestCase):
         self.assertEqual(report["emulator_sd_directory_validation"],
                          "non_directory_sd_component")
 
+    def test_guest_ci_uses_explicit_absolute_isolated_sd_root(self):
+        workflow = (
+            ROOT / ".github/workflows/nexium-patched-lore-lab.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('--data-root "$PWD/boot-evidence/nexium-data"', workflow)
+
     def test_relative_data_root_rejected_without_reading(self):
         report, okay = verify_runtime_receipt(Path("relative-guest-data"), self.claim())
         self.assertFalse(okay)

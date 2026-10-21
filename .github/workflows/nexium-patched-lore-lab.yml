@@ -258,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/verify_nexium_sd_disk_receipt.py \
-            --data-root boot-evidence/nexium-data \
+            --data-root "$PWD/boot-evidence/nexium-data" \
             --guest-report boot-evidence/guest-lore-lab-report.json \
             --out boot-evidence/guest-sd-disk-receipt.json
       - name: Upload logs and guest PNGs even on failure
