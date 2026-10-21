@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "heman_level11_lab.h"
+#include "sd_journal.h"
 
 #define WIDTH 640u
 #define HEIGHT 360u
@@ -14,6 +15,8 @@ static uint8_t tiles[HM_LORE_LAB_CELLS];
 static hm_world world;
 static hm_level11_native_session session;
 static hm_level11_lab_save saved;
+/* 0 = unattempted, 1 = SD save/load succeeded, 2 = unavailable/rejected. */
+static uint8_t sd_status;
 
 /* Guard the complete destination including pixels outside the framebuffer.
  * All coordinates are pixel coordinates, not original-game asset positions. */
@@ -77,6 +80,9 @@ static void scene(uint32_t *pixels, uint32_t stride) {
               session.attack_previous_down ? UINT32_C(0xffe88b58) : grey);
     rectangle(pixels, stride, 350, 22, 6 + 14 * session.lore.collected_count,
               15, green);
+    rectangle(pixels, stride, 420, 22, 36, 15,
+              sd_status==1u ? UINT32_C(0xff55df7c) :
+              sd_status==2u ? UINT32_C(0xff7777ef) : grey);
 }
 static uint32_t controls(uint64_t buttons) {
     uint32_t value = 0u;
@@ -119,8 +125,34 @@ int main(int argc, char **argv) {
         held = padGetButtons(&pad);
         down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus) break;
-        tick = hm_level11_lab_tick(&session, &saved,
-                                  controls(held), controls(down));
+        if ((held & HidNpadButton_ZL) && (down & HidNpadButton_L)) {
+            /* ZL+L is the ONLY path that touches SD. Ordinary L
+             * remains the previously guest-verified RAM save. */
+            tick = hm_level11_lab_tick(&session, &saved,
+                                      HM_LAB_SAVE, HM_LAB_SAVE);
+            if (tick == HM_LORE_APPLIED)
+                sd_status = hm_switch_lore_sd_save(&session) ? 1u : 2u;
+        } else if ((held & HidNpadButton_ZL) &&
+                   (down & HidNpadButton_R)) {
+            /* Restore into a temporary session first. Never corrupt
+             * the running game if SD is missing or a slot is torn. */
+            hm_level11_native_session candidate=session;
+            uint8_t bytes[HM_LEVEL11_SNAPSHOT_SIZE];
+            if (hm_switch_lore_sd_load(&candidate) &&
+                hm_level11_snapshot_encode(&candidate,bytes,sizeof(bytes))) {
+                session=candidate;
+                memcpy(saved.data,bytes,sizeof(bytes));
+                saved.valid=1u;
+                sd_status=1u;
+                tick=HM_LORE_APPLIED;
+            } else {
+                sd_status=2u;
+                tick=HM_LORE_BLOCKED;
+            }
+        } else {
+            tick = hm_level11_lab_tick(&session, &saved,
+                                      controls(held), controls(down));
+        }
         if (tick == HM_LORE_INVALID) { code = 5; break; }
         pixels = (uint32_t*)framebufferBegin(&fb, &stride);
         if (!pixels || (stride % sizeof(uint32_t)) != 0u ||
