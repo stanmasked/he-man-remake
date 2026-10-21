@@ -59,7 +59,7 @@ def decode_record(raw: bytes) -> dict:
     if any(not math.isfinite(v) or abs(v) > 1000000.0
            for v in (x, feet_y, vy, camera_x, camera_y)):
         return invalid("snapshot_float")
-    flags = snap[76:81]
+    flags = snap[76:82]  # Four physics flags plus two lore booleans.
     mask, count, previous_down = snap[82], snap[83], snap[84]
     if (any(value > 1 for value in flags) or previous_down > 1 or
             mask > 3 or count > 2 or mask.bit_count() != count):

@@ -96,6 +96,13 @@ class ReadOnlyJournalAuditTests(unittest.TestCase):
         struct.pack_into("<Q", raw, 112, fnv64(raw[:112]))
         self.assertEqual(decode_record(raw)["reason"], "snapshot_checksum")
 
+    def test_invalid_lore_boolean_with_recalculated_checksums_rejected(self):
+        raw = bytearray(synthetic_record())
+        raw[16 + 81] = 3  # left_gate_broken must be 0 or 1
+        struct.pack_into("<Q", raw, 16 + 88, fnv64(raw[16:16 + 88]))
+        struct.pack_into("<Q", raw, 112, fnv64(raw[:112]))
+        self.assertEqual(decode_record(raw)["reason"], "snapshot_state_fields")
+
     def test_two_structural_worlds_cannot_choose_compatible_candidate(self):
         self.put(0, synthetic_record(1, seal=1234))
         self.put(1, synthetic_record(2, seal=5678))
