@@ -89,7 +89,8 @@ class Stage112HIDRegression(unittest.TestCase):
         code = instrument(SOURCE)
         self.assertEqual(code.count("HEMAN_LORE_HID frame="), 2)
         self.assertEqual(code.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
-        for token in ('145 => "buttons=L"', '230 => "buttons=R"',
+        for token in ('145 | 460 => "buttons=L"',
+                      '230 | 497 => "buttons=R"',
                       '275 => "buttons=Y"', '355 => "buttons=X"'):
             self.assertIn(token, code)
         with self.assertRaises(ValueError):
