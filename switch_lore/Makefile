@@ -17,6 +17,7 @@ SOURCES := source/main.c \
            $(ROOT)/native/src/heman_level11_native_contacts.c \
            $(ROOT)/native/src/heman_level11_native_session.c \
            $(ROOT)/native/src/heman_level11_snapshot.c \
+           $(ROOT)/native/src/heman_level11_durable_save.c \
            $(ROOT)/native/src/heman_level11_lab.c
 CFLAGS := -std=gnu99 -O2 -Wall -Wextra -Werror $(ARCH) \
           -I$(ROOT)/native/include -I$(DEVKITPRO)/libnx/include -D__SWITCH__
