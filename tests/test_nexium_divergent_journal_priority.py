@@ -72,7 +72,7 @@ class Stage122DivergentProgressTests(unittest.TestCase):
                     "sd_status": 1, "native_player_x": 160}
         fresh = {"lights": (0,0,0,0,0), "collected_count": 0,
                  "sd_status": 0, "native_player_x": 24}
-        partial = {"lights": (1,1,0,1,1), "collected_count": 1,
+        partial = {"lights": (1,1,1,0,1), "collected_count": 1,
                    "sd_status": 1, "native_player_x": 160}
         self.frames = {
             (self.first, 485): (complete, "complete-scene"),
@@ -101,17 +101,17 @@ class Stage122DivergentProgressTests(unittest.TestCase):
         self.assertEqual(disk["structurally_valid_slot_count"], 2)
         self.assertEqual(disk["latest_structural_candidate_slot"], 1)
         self.assertEqual([s["collected_count"] for s in disk["slots"]], [2, 1])
-        self.assertEqual([s["collected_mask"] for s in disk["slots"]], [3, 2])
+        self.assertEqual([s["collected_mask"] for s in disk["slots"]], [3, 1])
         self.assertEqual(manifest["newer_generation"], 8)
         self.assertEqual((lab(self.source) / "progress0.bin").read_bytes(), self.original)
         self.assertFalse(manifest["actual_second_gameplay_save_observed"])
 
-    def test_partial_snapshot_removes_only_bio_and_preserves_art_world(self):
+    def test_partial_snapshot_removes_only_art_and_preserves_bio_world(self):
         self.prepare()
         prev = (lab(self.target) / "progress0.bin").read_bytes()
         newest = (lab(self.target) / "progress1.bin").read_bytes()
         self.assertEqual(struct.unpack_from("<I", prev, 16+64)[0], 0b110)
-        self.assertEqual(struct.unpack_from("<I", newest, 16+64)[0], 0b100)
+        self.assertEqual(struct.unpack_from("<I", newest, 16+64)[0], 0b010)
         self.assertEqual(prev[16+81], newest[16+81])
         self.assertEqual(prev[16+80], newest[16+80])
         self.assertEqual(decode_record(newest)["generation"], 8)
