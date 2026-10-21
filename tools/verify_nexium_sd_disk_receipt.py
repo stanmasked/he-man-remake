@@ -8,6 +8,7 @@ with O_NOFOLLOW, rather than resolving host paths after a separate lstat.
 """
 import argparse
 import errno
+import hashlib
 import json
 import os
 import stat
@@ -112,6 +113,62 @@ def audit_confined_sd(data_root: Path) -> tuple[dict, str | None]:
     except OSError:
         return _missing_disk(), "unreadable_sd_directory"
 
+
+
+def read_confined_sd_slot_bytes(data_root: Path, slot: int, expected_sha256: str) -> bytes:
+    """Read verified CI fixture bytes without reopening any filesystem path.
+
+    The complete absolute ancestor chain, lab directory and regular leaf are
+    held through descriptor-relative O_NOFOLLOW opens. Never expose raw bytes
+    in a CI report or upload. Reject aliases and extra/truncated slot bytes.
+    """
+    if slot not in (0, 1) or not isinstance(expected_sha256, str) or (
+        len(expected_sha256) != 64 or
+        any(ch not in "0123456789abcdef" for ch in expected_sha256)
+    ):
+        raise ValueError("Expected a valid fixed slot and SHA-256 checksum")
+    if not data_root.is_absolute() or ".." in data_root.parts:
+        raise ValueError("Unsafe fixture source data root")
+    if not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_DIRECTORY"):
+        raise ValueError("Secure fixture descriptor operations unavailable")
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    directory_flags |= getattr(os, "O_CLOEXEC", 0)
+    leaf_flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK
+    leaf_flags |= getattr(os, "O_CLOEXEC", 0)
+    components = list(data_root.parts[1:]) + [
+        "sdmc", "switch", "heman_lore_lab"
+    ]
+    try:
+        with ExitStack() as stack:
+            parent = os.open("/", directory_flags)
+            stack.callback(os.close, parent)
+            for component in components:
+                opened = os.open(component, directory_flags, dir_fd=parent)
+                stack.callback(os.close, opened)
+                parent = opened
+            leaf = os.open(f"progress{slot}.bin", leaf_flags, dir_fd=parent)
+            stack.callback(os.close, leaf)
+            info = os.fstat(leaf)
+            if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise ValueError("Fixture source leaf is not a unique regular file")
+            chunks = []
+            remaining = RECORD_SIZE + 1
+            while remaining:
+                chunk = os.read(leaf, remaining)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            data = b"".join(chunks)
+            if len(data) != RECORD_SIZE:
+                raise ValueError("Fixture source journal has invalid size")
+            if decode_record(data).get("status") != "structurally_valid":
+                raise ValueError("Fixture source journal failed integrity validation")
+            if hashlib.sha256(data).hexdigest() != expected_sha256:
+                raise ValueError("Fixture source journal no longer matches disk receipt")
+            return data
+    except OSError as exc:
+        raise ValueError("Unsafe or inaccessible fixture source directory/slot") from exc
 
 def verify_runtime_receipt(data_root: Path, guest_report: dict) -> tuple[dict, bool]:
     disk, problem = audit_confined_sd(data_root)
