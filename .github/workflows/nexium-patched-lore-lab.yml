@@ -9,6 +9,10 @@ on:
       - 'tools/instrument_nexium_lore_lab.py'
       - 'tools/verify_nexium_lore_lab_hid.py'
       - 'tools/verify_nexium_lore_lab_pngs.py'
+      - 'tools/verify_nexium_sd_disk_receipt.py'
+      - 'tools/audit_switch_sd_journal.py'
+      - 'tests/test_nexium_sd_disk_receipt.py'
+      - 'tests/test_switch_sd_journal_audit.py'
       - 'tests/test_nexium_lore_lab_evidence.py'
       - 'tools/instrument_nexium_frames.py'
       - 'tools/verify_nexium_hid_publication.py'
@@ -43,6 +47,11 @@ jobs:
         run: |
           set -euo pipefail
           PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_lore_lab_evidence.py -v
+      - name: Test independent disk receipts on synthetic host files
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python -m unittest discover -s tests -p test_nexium_sd_disk_receipt.py -v
       - name: No synthetic data qualifies as actual guest evidence
         run: |
           echo 'These tests use MOCK objects and synthetically generated logs.'
@@ -249,7 +258,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 tools/verify_nexium_sd_disk_receipt.py \
-            --data-root boot-evidence/nexium-data \
+            --data-root "$PWD/boot-evidence/nexium-data" \
             --guest-report boot-evidence/guest-lore-lab-report.json \
             --out boot-evidence/guest-sd-disk-receipt.json
       - name: Upload logs and guest PNGs even on failure

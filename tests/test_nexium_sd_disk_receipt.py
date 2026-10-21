@@ -26,6 +26,59 @@ class Stage114DiskReceiptTests(unittest.TestCase):
             "guest_sd_round_trip_verified": round_trip,
         }
 
+    def test_symlinked_lab_directory_does_not_read_external_records(self):
+        outside = self.root / "outside"
+        outside.mkdir()
+        record = synthetic_record(generation=2)
+        (outside / "progress0.bin").write_bytes(record)
+        self.lab.rmdir()
+        self.lab.symlink_to(outside, target_is_directory=True)
+        report, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(report["classification"], "unsafe_emulator_sd_directory")
+        self.assertEqual(report["emulator_sd_directory_validation"],
+                         "symlinked_sd_directory_disallowed")
+        self.assertFalse(report["actual_emulator_file_bytes_examined"])
+        self.assertEqual((outside / "progress0.bin").read_bytes(), record)
+
+    def test_symlinked_sdmc_parent_rejected(self):
+        import shutil
+        shutil.rmtree(self.root / "sdmc")
+        outsider = self.root / "outside"
+        outsider.mkdir()
+        (self.root / "sdmc").symlink_to(outsider, target_is_directory=True)
+        report, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(report["emulator_sd_directory_validation"],
+                         "symlinked_sd_directory_disallowed")
+
+    def test_data_root_itself_cannot_be_a_symlink(self):
+        alias = self.root / "linked-data"
+        alias.symlink_to(self.root, target_is_directory=True)
+        report, okay = verify_runtime_receipt(alias, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(report["classification"], "unsafe_emulator_sd_directory")
+
+    def test_non_directory_lab_component_rejected(self):
+        self.lab.rmdir()
+        self.lab.write_bytes(b"not a directory")
+        report, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(report["emulator_sd_directory_validation"],
+                         "non_directory_sd_component")
+
+    def test_guest_ci_uses_explicit_absolute_isolated_sd_root(self):
+        workflow = (
+            ROOT / ".github/workflows/nexium-patched-lore-lab.yml"
+        ).read_text(encoding="utf-8")
+        self.assertIn('--data-root "$PWD/boot-evidence/nexium-data"', workflow)
+
+    def test_relative_data_root_rejected_without_reading(self):
+        report, okay = verify_runtime_receipt(Path("relative-guest-data"), self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(report["emulator_sd_directory_validation"],
+                         "relative_data_root_disallowed")
+
     def test_green_hud_without_any_file_must_fail(self):
         receipt, okay = verify_runtime_receipt(self.root, self.claim())
         self.assertFalse(okay)
