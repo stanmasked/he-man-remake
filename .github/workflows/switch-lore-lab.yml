@@ -1,0 +1,85 @@
+name: He-Man opt-in Level1-1 lore mechanics Switch lab NRO
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/switch-lore-lab.yml'
+      - 'switch_lore/**'
+      - 'native/src/heman_level11_lab.c'
+      - 'native/include/heman_level11_lab.h'
+      - 'native/src/heman_level11_snapshot.c'
+      - 'native/src/heman_level11_native_contacts.c'
+      - 'native/src/heman_level11_native_session.c'
+      - 'native/tests/test_level11_lab.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-lore-integration:
+    name: Shared controller/physics/save native lab (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile with ASan/UBSan and run genuine C99 simulation
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/src/heman_level11_snapshot.c \
+            native/src/heman_level11_lab.c \
+            native/tests/test_level11_lab.c \
+            -lm -o /tmp/heman-lore-lab-tests
+          /tmp/heman-lore-lab-tests
+
+  crosscompile-switch-lore-lab:
+    name: Build actual asset-free Level1-1 lab NRO for AArch64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject publishing original IPA or commercial game media
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|ogg|wav|mp3|pvr)$'; then
+            echo "Original source game media forbidden in public CI" >&2
+            exit 1
+          fi
+      - name: Compile same exact native C99 controller lab for Switch
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_lore clean all
+          test -s switch_lore/heman_level11_lore_lab.elf
+          test -s switch_lore/heman_level11_lore_lab.nro
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_lore/heman_level11_lore_lab.elf | grep -F AArch64
+          test "$(dd if=switch_lore/heman_level11_lore_lab.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_lore/heman_level11_lore_lab.nro
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage111-asset-free-lore-switch-lab-nro
+          path: switch_lore/heman_level11_lore_lab.nro
+          if-no-files-found: error
+          retention-days: 7
