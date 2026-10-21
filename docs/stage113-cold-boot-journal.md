@@ -35,27 +35,31 @@ detection (NOT a cryptographic signature).
 
 Before every store, the module checks both candidate slots *including*
 inner world/event binding compatibility, chooses the **older, missing or
-damaged slot**, and never writes the last valid one. On load it chooses
-the newest fully compatible candidate, falling back to the preceding
-good slot after truncation, corruption or interrupted overwrite. It
-rejects version drift, invalid game geometry, invalid reward state,
-malformed file length, generation overflow and missing I/O callbacks,
-without changing the current session on error.
+damaged slot**, and never writes the last valid one. After a successful
+write callback, it reads the target slot back and validates the envelope,
+snapshot/world binding and expected generation before reporting success.
+On load it chooses the newest fully compatible candidate, falling back
+to the preceding good slot after truncation, corruption or interrupted
+overwrite. It rejects version drift, invalid game geometry, invalid
+reward state, malformed file length, generation overflow and missing I/O
+callbacks, without changing the current session on error.
 
 ## Reproducible automated checks
 
 The dedicated GCC and Clang ASan/UBSan test suite exercises a real
 C99 fictional world and an in-memory journal that can fail halfway
 through a write. Separate host processes write and restore actual disk
-files across cold starts, upgrade the session, then test four independent
+files across cold starts, upgrade the session, then test five independent
 failure cases: an appended extra byte, a payload-bit change without a
 matching checksum update, an unsupported schema with a recomputed valid
-checksum, a file truncated to 60 bytes, and a simulated interrupted write
-that leaves only half of the inactive slot on disk. After each failure,
-a fresh process must reject the newest record and recover the previous
-complete slot. The tests cannot pass by retaining game state in process
-RAM. The half-write case models an interrupted write; it does not emulate
-physical power loss or prove storage-device flush durability.
+checksum, a file truncated to 60 bytes, an interrupted write that leaves
+only half of the inactive slot on disk, and a backend that reports a
+successful write while persisting a checksum-damaged record. The last case
+verifies that read-back validation catches silent write corruption. After
+each failure, a fresh process must reject the newest record and recover
+the previous complete slot. The tests cannot pass by retaining game state
+in process RAM. The half-write case models an interrupted write; it does
+not emulate physical power loss or prove storage-device flush durability.
 
 The actual Switch NRO is separately cross-compiled through the
 existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO

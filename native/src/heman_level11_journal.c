@@ -101,6 +101,17 @@ int hm_level11_journal_store(const hm_level11_native_session *session,
      * A platform must never implement callbacks that overwrite both. */
     if (io->write_slot(io->context,slot,bytes)!=1)
         return 0;
+    /* A callback reporting success is not sufficient evidence that the
+     * bytes on disk are intact. Read back the target and validate its
+     * envelope, snapshot/world binding and expected generation before
+     * telling the caller the save committed. The prior good slot is still
+     * untouched if this verification fails. */
+    {
+        uint64_t verified_generation=0u;
+        if (!read_compatible(io,slot,session,&verified_generation,&candidate) ||
+            verified_generation!=last+1u)
+            return 0;
+    }
     if (generation) *generation=last+1u;
     return 1;
 }

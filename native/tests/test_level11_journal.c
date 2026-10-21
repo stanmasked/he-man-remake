@@ -11,6 +11,7 @@ typedef struct {
     int exists[2];
     unsigned writes;
     int tear_next;
+    int corrupt_next;
 } memory_slots;
 static uint8_t solids[HM_LORE_LAB_CELLS];
 static hm_world world;
@@ -37,6 +38,12 @@ static int memory_write(void *ctx,unsigned slot,const uint8_t *data) {
     }
     memcpy(s->bytes[slot],data,SZ);
     s->exists[slot]=1;
+    if(s->corrupt_next) {
+        s->corrupt_next=0;
+        /* Backend claims success, but the bytes actually persisted fail
+         * the journal checksum and must be caught by read-back verify. */
+        s->bytes[slot][24u]^=0x40u;
+    }
     return 1;
 }
 static void boot(void) {
@@ -91,6 +98,14 @@ static void memory_tests(void) {
     assert(hm_level11_journal_restore(&game,&io,&generation));
     assert(generation==1u && game.lore.wall_crusher_unlocked==0u);
     assert(m.bytes[0][0u]=='H' && m.bytes[0][1u]=='1');
+    /* A backend can claim success while persisting damaged bytes. Read-back
+     * verification must reject the commit and keep the prior generation. */
+    m.corrupt_next=1;
+    assert(!hm_level11_journal_store(&game,&io,&generation));
+    assert(generation==1u);
+    boot();
+    assert(hm_level11_journal_restore(&game,&io,&generation));
+    assert(generation==1u && game.lore.wall_crusher_unlocked==0u);
     /* Torn third commit must NOT erase generation1. */
     m.tear_next=1;
     assert(!hm_level11_journal_store(&game,&io,&generation));
