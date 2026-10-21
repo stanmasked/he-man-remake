@@ -136,6 +136,86 @@ class Stage114DiskReceiptTests(unittest.TestCase):
         self.assertFalse(okay)
         self.assertEqual(receipt["emulator_sd_slots"][0]["reason"], "wrong_length")
 
+    def test_symlinked_ancestor_of_data_root_is_rejected(self):
+        original = self.root / "parent"
+        (original / "data" / "sdmc" / "switch" / "heman_lore_lab").mkdir(parents=True)
+        (original / "data" / "sdmc" / "switch" / "heman_lore_lab" /
+         "progress0.bin").write_bytes(synthetic_record(9))
+        alias = self.root / "parent-alias"
+        alias.symlink_to(original, target_is_directory=True)
+        receipt, okay = verify_runtime_receipt(alias / "data", self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(receipt["emulator_sd_directory_validation"],
+                         "symlinked_sd_directory_disallowed")
+        self.assertFalse(receipt["actual_emulator_file_bytes_examined"])
+
+    def test_parent_traversal_not_allowed_even_for_equivalent_absolute_path(self):
+        alias = Path(str(self.root) + "/../" + self.root.name)
+        receipt, okay = verify_runtime_receipt(alias, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(receipt["emulator_sd_directory_validation"],
+                         "parent_traversal_disallowed")
+
+    def test_audit_uses_no_path_open_when_reading_journal(self):
+        from unittest.mock import patch
+        (self.lab / "progress0.bin").write_bytes(synthetic_record(4))
+        # Original audit_directory used Path.open after a separate lstat;
+        # descriptor-relative reads must never call that vulnerable API.
+        with patch.object(Path, "open", side_effect=AssertionError("Path.open used")):
+            receipt, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertTrue(okay)
+        self.assertEqual(receipt["emulator_sd_directory_validation"],
+                         "secure_fd_relative_inspection")
+
+    def test_fifo_slot_rejected_without_blocking(self):
+        import os
+        if not hasattr(os, "mkfifo"):
+            self.skipTest("FIFO requires POSIX")
+        os.mkfifo(self.lab / "progress0.bin")
+        receipt, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(receipt["emulator_sd_slots"][0]["reason"], "non_regular_file")
+
+    def test_hardlink_aliases_are_not_valid_independent_disk_evidence(self):
+        import os
+        source = self.lab / "progress0.bin"
+        source.write_bytes(synthetic_record(5))
+        os.link(source, self.lab / "progress1.bin")
+        receipt, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertFalse(okay)
+        self.assertEqual(receipt["emulator_sd_slots"][0]["reason"],
+                         "hardlinked_file_disallowed")
+        self.assertEqual(receipt["emulator_sd_slots"][1]["reason"],
+                         "hardlinked_file_disallowed")
+
+    def test_replaced_directory_name_cannot_redirect_open_slot(self):
+        import os
+        from unittest.mock import patch
+        original = synthetic_record(3)
+        external = synthetic_record(9)
+        (self.lab / "progress0.bin").write_bytes(original)
+        outsider = self.root / "outside"
+        outsider.mkdir()
+        (outsider / "progress0.bin").write_bytes(external)
+        actual_open = os.open
+        swapped = [False]
+
+        def switch_after_directory_open(name, flags, *args, **kwargs):
+            fd = actual_open(name, flags, *args, **kwargs)
+            if name == "heman_lore_lab" and not swapped[0]:
+                swapped[0] = True
+                self.lab.rename(self.lab.with_name("moved_lab"))
+                self.lab.symlink_to(outsider, target_is_directory=True)
+            return fd
+
+        with patch("verify_nexium_sd_disk_receipt.os.open",
+                   side_effect=switch_after_directory_open):
+            receipt, okay = verify_runtime_receipt(self.root, self.claim())
+        self.assertTrue(swapped[0])
+        self.assertTrue(okay)
+        self.assertEqual(receipt["emulator_sd_slots"][0]["generation"], 3)
+        self.assertEqual(outsider.joinpath("progress0.bin").read_bytes(), external)
+
 
 if __name__ == "__main__":
     unittest.main()
