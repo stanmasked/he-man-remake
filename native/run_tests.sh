@@ -57,6 +57,21 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_level11_snapshot.c" \
   "$ROOT/native/tests/test_level11_snapshot.c" \
   -lm -o "$TMP/test_level11_snapshot"
+
+# Stage111: this exact fictional C99 world/input/save integration is also
+# compiled into switch_lore/heman_level11_lore_lab.nro (separate target).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/src/heman_level11_native_session.c" \
+  "$ROOT/native/src/heman_level11_snapshot.c" \
+  "$ROOT/native/src/heman_level11_lab.c" \
+  "$ROOT/native/tests/test_level11_lab.c" \
+  -lm -o "$TMP/test_level11_lab"
+"$TMP/test_level11_lab"
 "$TMP/test_level11_snapshot"
 "$TMP/test_level11_native_session"
 "$TMP/test_level11_native_contacts"
