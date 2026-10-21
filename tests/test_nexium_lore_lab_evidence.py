@@ -284,8 +284,22 @@ class Stage112PNGMockRegression(unittest.TestCase):
     def test_green_sd_restore_requires_a_successful_sd_save(self):
         old = self.fake[485]
         self.fake[485] = FakeFrame(old.state, old.payload, 2)
+        prior = self.fake[518]
+        self.fake[518] = FakeFrame(prior.state, prior.payload, 2)
         with self.assertRaisesRegex(ValueError, "although this run's SD save failed"):
             self.check()
+
+    def test_sd_load_failure_after_successful_save_preserves_reset_session(self):
+        old = self.fake[540]
+        reset = STATES[518]
+        midpoint = (reset[6] + reset[7]) // 2
+        reset_row = reset[:6] + (midpoint, midpoint)
+        self.fake[540] = FakeFrame(reset_row, b"reset-scene", 2)
+        result = self.check()
+        self.assertTrue(result["guest_sd_save_succeeded"])
+        self.assertFalse(result["guest_sd_load_succeeded"])
+        self.assertFalse(result["guest_sd_round_trip_verified"])
+        self.assertTrue(result["guest_sd_failure_preserved_reset_session"])
 
     def test_sd_attempt_must_change_the_result_indicator(self):
         old = self.fake[485]
