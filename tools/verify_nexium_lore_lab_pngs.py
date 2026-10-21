@@ -152,7 +152,9 @@ def verify(folder: Path) -> dict:
             if found["lights"] != status[:5]:
                 raise ValueError(
                     f"Actual guest HUD did not follow expected save/lore route "
-                    f"at frame {frame}: {found['lights']} != {status[:5]}"
+                    f"at frame {frame}: {found['lights']} != {status[:5]}; "
+                    f"guest player x={found['native_player_x']} "
+                    f"(fixed collision gate requires contact x in [95, 113])"
                 )
             if found["collected_count"] != status[5]:
                 raise ValueError(f"Native two-lore counter mismatched at {frame}")
