@@ -1,0 +1,45 @@
+name: He-Man level1-1 lore progression source C99
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-lore-core.yml'
+      - 'native/include/heman_level11_lore.h'
+      - 'native/src/heman_level11_lore.c'
+      - 'native/tests/test_level11_lore.c'
+      - 'native/run_tests.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  documented-first-level-objectives:
+    name: Original-described lore rules with ${{ matrix.compiler }} (ASan/UBSan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile strict portable independent lore progression
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_level11_lore.c \
+            native/tests/test_level11_lore.c \
+            -o /tmp/heman-level11-lore
+          /tmp/heman-level11-lore
+      - name: Limit evidence claim
+        run: |
+          echo 'Source-grounded objectives are modeled, but geometry/timing'
+          echo 'of original iOS release v2.0.0 are not verified here.'
+          echo 'This job runs no commercial IPA or original game assets.'
