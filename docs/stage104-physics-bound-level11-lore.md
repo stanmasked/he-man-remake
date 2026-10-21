@@ -22,10 +22,14 @@ new state. An arbitrary manual "overlap = true" or edited
 `hm_state.picked`/`triggered` flag fails. The adapter accepts
 only newly earned pickup/trigger bits on an actual consecutive native
 simulation step. It refuses teleport/reset or death/respawn rewards.
-For the gate, the trigger crossing **must coincide with a declared
-fresh attack button press**, and the Wall Crusher must already have
-been granted. The gate opens BEFORE processing pickup bits from the
-same frame. Duplicate input receipts are idempotent. Failure to
+For the gate, an actual native HM_TRIGGER must have been reached and
+the CURRENT actor body must still overlap that same gate sensor when a
+declared fresh attack button press is received. Wall Crusher must already
+have been granted. Core HM_TRIGGER bits are sticky, so this also permits
+the player to return to the gate after unlocking Wall Crusher; it
+rejects distant attacks using an old trigger bit. The gate opens BEFORE
+processing pickup bits from the same frame. Duplicate receipts are
+idempotent. Failure to
 validate an entire receipt leaves lore state unchanged.
 
 This contracts **source-native movement contact with a separately
