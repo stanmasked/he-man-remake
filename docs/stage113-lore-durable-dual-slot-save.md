@@ -18,8 +18,10 @@ Stage113 adds an **entirely optional, non-iOS** persistence layer.
   right displays grey (no result), green (disk store passed), cyan
   (disk load passed), or red (disk operation failed).
 - No filesystem operations occur at startup or from ordinary movement.
-  Even on an emulator with no SD mount, failed ZL/ZR must leave current
-  player/reward state intact and keep the game running.
+  When ZL/ZR is pressed, libnx checks the existing `sdmc` filesystem
+  and mounts it lazily if absent using `fsdevMountSdmc()`. An unavailable
+  SD mount yields a visible failure rather than interrupting gameplay.
+  The already guest-proven L/R RAM-saving route does not touch SD.
 
 The two files, if a writable SD mount exists, are named
 `sdmc:/switch/heman_level11_lore_lab.0.bin` and
