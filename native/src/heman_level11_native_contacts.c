@@ -4,8 +4,8 @@
 #include <math.h>
 
 /* 32 events maximum is part of the unmodified hm_core C99 ABI. */
-static int binding_valid(const hm_world *w,
-                         const hm_level11_event_bindings *b) {
+int hm_level11_native_bindings_valid(const hm_world *w,
+                                     const hm_level11_event_bindings *b) {
     if (!w || !b || !w->events || w->event_count < 3u ||
         w->event_count > 32u ||
         b->left_gate_event >= w->event_count ||
@@ -64,7 +64,7 @@ hm_lore_result hm_level11_accept_native_frame(
     uint32_t new_pickups;
     uint32_t gate_bit, bio_bit, art_bit;
     int applied = 0, already = 0;
-    if (!before || !after || !lore || !binding_valid(world, bindings) ||
+    if (!before || !after || !lore || !hm_level11_native_bindings_valid(world, bindings) ||
         !hm_lore_state_valid(lore) || attack_fresh_press > 1u ||
         before->frame == UINT32_MAX)
         return HM_LORE_INVALID;

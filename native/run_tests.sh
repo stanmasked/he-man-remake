@@ -32,6 +32,19 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_level11_native_contacts.c" \
   "$ROOT/native/tests/test_level11_native_contacts.c" \
   -lm -o "$TMP/test_level11_native_contacts"
+
+# Stage 105: a native-owned button latch derives rising attack edges and
+# executes hm_step without accepting forged after-frame states from callers.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/src/heman_level11_native_session.c" \
+  "$ROOT/native/tests/test_level11_native_session.c" \
+  -lm -o "$TMP/test_level11_native_session"
+"$TMP/test_level11_native_session"
 "$TMP/test_level11_native_contacts"
 "$TMP/test_level11_lore"
 
