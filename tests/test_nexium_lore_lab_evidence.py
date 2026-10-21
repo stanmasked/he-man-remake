@@ -103,22 +103,22 @@ class Stage112HIDRegression(unittest.TestCase):
             instrument(code)
 
     def test_fresh_attack_only_after_verified_gate_approach(self):
-        # Actual *second* Stage112 NeXium guest archive (run 39600185389):
-        # frame 345: synthetic actor x=110, frame 395: actor x=94.
-        # Gate centre=104 and native AABB+circle contact requires 95<=x<=113.
-        # This was a TRUE block despite all real NPAD keys being published.
-        # Releasing DLEFT 2 receiver frames EARLIER makes the model
-        # expected x=98 (two fewer native steps at 2 px/step). The real
-        # NeXium rerun must verify the result; this test is not that proof.
+        # Actual frame_rx PNGs, not simulated states:
+        # SUCCESS Stage117 #39651499791: frame345 x=108, frame395 x=96.
+        # FAILURE Stage118 #39654091047: frame345 x=106, frame395 x=94.
+        # All 26 kernel NPAD transitions were published in the failed run.
+        # A two-frame earlier release should add roughly two game ticks
+        # at 2 px/tick. The estimate is not runtime proof: actual gate
+        # opening must still be verified from the real guest PNG.
         schedule = dict(HID_EVENTS)
         self.assertEqual(schedule[310], "buttons=DLEFT")
-        self.assertEqual(schedule[350], "buttons=")
+        self.assertEqual(schedule[348], "buttons=")
         self.assertEqual(schedule[365], "buttons=X")
         self.assertEqual(schedule[380], "buttons=")
-        actual_prior_guest_x = 94
-        corrected_x = actual_prior_guest_x + (352 - 350) * 2
-        self.assertTrue(95 <= corrected_x <= 113)
-        self.assertGreaterEqual(365 - 350, 4)
+        for observed in (94, 96):
+            estimated_x = observed + (350 - 348) * 2
+            self.assertTrue(95 <= estimated_x <= 113)
+        self.assertGreaterEqual(365 - 348, 4)
         self.assertLess(380, 395)
 
     def test_pinned_button_bits(self):
