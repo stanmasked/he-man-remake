@@ -133,6 +133,72 @@ static void test_no_fresh_attack_cannot_open_gate(void) {
     assert((lore.collected_mask & 2u) != 0u);
 }
 
+static void test_gate_can_be_opened_after_returning_with_upgrade(void) {
+    hm_world w = world_init();
+    hm_state player, before;
+    hm_lore_state lore;
+    hm_input moving = move_right();
+    hm_input stopped = {0.0f, 0u, 0u};
+    hm_lore_result r;
+    unsigned n = 0u;
+    assert(hm_init(&w, &player) == HM_OK);
+    assert(hm_lore_init(&lore) == HM_LORE_APPLIED);
+    /* First contact without Wall Crusher records a sticky core trigger,
+       but is NOT authorization to break the gate. */
+    while (!(player.triggered & 1u) && n++ < 100u)
+        assert(native_frame(&w, &player, &lore, 0u, NULL, NULL)
+               != HM_LORE_INVALID);
+    assert(player.triggered & 1u);
+    assert(lore.left_gate_broken == 0u);
+    assert(hm_lore_grant_wall_crusher(&lore, 1u) == HM_LORE_APPLIED);
+    /* The player can attack while STILL touching the gate even though
+       native HM_TRIGGER rises only once in an entire run. */
+    before = player;
+    assert(hm_step(&w, &player, stopped, DT) == HM_OK);
+    assert(player.triggered == before.triggered);
+    r = hm_level11_accept_native_frame(&w, &before, &player, stopped, DT,
+                                       1u, &bindings, &lore);
+    assert(r == HM_LORE_APPLIED);
+    assert(lore.left_gate_broken == 1u);
+    before = player;
+    assert(hm_step(&w, &player, stopped, DT) == HM_OK);
+    assert(hm_level11_accept_native_frame(&w, &before, &player, stopped, DT,
+                                           1u, &bindings, &lore)
+           == HM_LORE_ALREADY_DONE);
+    for (n = 0u; n < 65u; ++n) {
+        before = player;
+        assert(hm_step(&w, &player, moving, DT) == HM_OK);
+        assert(hm_level11_accept_native_frame(&w, &before, &player, moving,
+                    DT, 0u, &bindings, &lore) != HM_LORE_INVALID);
+    }
+    assert(lore.collected_count == 2u);
+    assert(lore.collected_mask == 3u);
+}
+
+static void test_distant_attack_cannot_use_old_sticky_gate_trigger(void) {
+    hm_world w = world_init();
+    hm_state player;
+    hm_lore_state lore, before_lore;
+    hm_input move = move_right(), stop = {0.0f, 0u, 0u};
+    hm_state previous;
+    unsigned n;
+    assert(hm_init(&w, &player) == HM_OK);
+    assert(hm_lore_init(&lore) == HM_LORE_APPLIED);
+    assert(hm_lore_grant_wall_crusher(&lore, 1u) == HM_LORE_APPLIED);
+    for (n = 0u; n < 70u; ++n)
+        assert(native_frame(&w, &player, &lore, 0u, NULL, NULL)
+               != HM_LORE_INVALID);
+    assert(player.triggered & 1u);
+    assert(player.x > 130.0f);
+    assert(lore.left_gate_broken == 0u);
+    before_lore = lore;
+    previous = player;
+    assert(hm_step(&w, &player, stop, DT) == HM_OK);
+    assert(hm_level11_accept_native_frame(&w, &previous, &player, stop,
+                DT, 1u, &bindings, &lore) == HM_LORE_BLOCKED);
+    unmodified(&before_lore, &lore);
+}
+
 static void test_forged_full_state_and_bad_binding_fail_atomically(void) {
     hm_world w = world_init();
     hm_state player, before, after;
@@ -248,6 +314,8 @@ static void test_no_reaward_on_replayed_receipt(void) {
 int main(void) {
     test_true_native_route_both_rewards_in_any_order();
     test_no_fresh_attack_cannot_open_gate();
+    test_gate_can_be_opened_after_returning_with_upgrade();
+    test_distant_attack_cannot_use_old_sticky_gate_trigger();
     test_forged_full_state_and_bad_binding_fail_atomically();
     test_wrong_input_timing_and_reset_rejected();
     test_no_reaward_on_replayed_receipt();
