@@ -53,7 +53,7 @@ class Stage135CompleteJournalInterruptionMatrix(unittest.TestCase):
         self.assertEqual(report["latest_structural_candidate_slot"], 0)
         self.assertEqual(report["slots"][0]["sha256"], self.old_sha256)
         self.assertEqual(report["slots"][0]["generation"], 17)
-        self.assertEqual(report["slots"][1]["status"], "structurally_invalid")
+        self.assertEqual(report["slots"][1]["status"], "invalid")
         if reason:
             self.assertEqual(report["slots"][1]["reason"], reason)
         self.assertEqual(self.old_slot.read_bytes(), self.older)
