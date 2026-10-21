@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import stat
 from pathlib import Path
 import zipfile
 
@@ -170,8 +171,8 @@ def audit_private_first_level(ipa: Path) -> dict:
         ):
             raise ValueError("Unsafe or missing source first-level descriptor")
         info = matches[0]
-        if info.is_dir():
-            raise ValueError("Source first-level member is a directory")
+        if info.is_dir() or stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK:
+            raise ValueError("Source first-level member is not a regular file")
         raw = z.read(info)
     objects = parse_level_objects(raw)
     points = parse_waypoints(raw)
