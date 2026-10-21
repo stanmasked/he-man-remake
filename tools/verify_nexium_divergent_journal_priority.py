@@ -21,7 +21,7 @@ from verify_nexium_sd_disk_receipt import (
     audit_confined_sd, read_confined_sd_slot_bytes,
 )
 
-BIO_EVENT_INDEX = 1  # The exclusively synthetic source-authored test world.
+ART_EVENT_INDEX = 2  # The exclusively synthetic source-authored test world.
 
 
 def lab(root: Path) -> Path:
@@ -56,15 +56,15 @@ def prepare_divergent_slots(source_root: Path, target_root: Path, first: dict) -
         raise ValueError("Cannot generate newer journal without wraparound")
 
     # Preserve all other world/player fields. Make a structurally valid but
-    # visibly DIFFERENT synthetic snapshot: Bio is uncollected, Art remains.
+    # visibly DIFFERENT synthetic snapshot: Art is uncollected, Bio remains.
     newer = bytearray(previous)
     picked = struct.unpack_from("<I", newer, 16 + 64)[0]
-    if picked & (1 << BIO_EVENT_INDEX) == 0 or (
+    if picked & (1 << ART_EVENT_INDEX) == 0 or (
         struct.unpack_from("<I", newer, 16 + 68)[0] & 1
     ) == 0:
         raise ValueError("Expected actual earned Bio and broken gate bits")
-    struct.pack_into("<I", newer, 16 + 64, picked & ~(1 << BIO_EVENT_INDEX))
-    newer[16 + 82] = 2  # Art only, Bio bit cleared.
+    struct.pack_into("<I", newer, 16 + 64, picked & ~(1 << ART_EVENT_INDEX))
+    newer[16 + 82] = 1  # Bio only; distant Art item bit cleared.
     newer[16 + 83] = 1
     struct.pack_into("<Q", newer, 16 + 88, fnv64(newer[16:16 + 88]))
     struct.pack_into("<Q", newer, 8, generation + 1)
@@ -76,7 +76,7 @@ def prepare_divergent_slots(source_root: Path, target_root: Path, first: dict) -
             new_meta.get("status") != "structurally_valid" or
             old_meta["collected_count"] != 2 or
             new_meta["collected_count"] != 1 or
-            new_meta["collected_mask"] != 2 or
+            new_meta["collected_mask"] != 1 or
             new_meta["generation"] != old_meta["generation"] + 1 or
             new_meta["world_seal"] != old_meta["world_seal"] or
             new_meta["bindings"] != old_meta["bindings"]):
@@ -101,10 +101,10 @@ def prepare_divergent_slots(source_root: Path, target_root: Path, first: dict) -
         "older_sha256": hashlib.sha256(previous).hexdigest(),
         "newer_sha256": hashlib.sha256(newer).hexdigest(),
         "older_collected_mask": 3,
-        "newer_collected_mask": 2,
+        "newer_collected_mask": 1,
         "older_collected_count": 2,
         "newer_collected_count": 1,
-        "synthetically_modified_collectible": "fictional_bio",
+        "synthetically_modified_collectible": "fictional_concept_art",
         "actual_second_gameplay_save_observed": False,
         "real_guest_execution_verified": False,
         "hardware_sd_power_loss_verified": False,
@@ -113,10 +113,10 @@ def prepare_divergent_slots(source_root: Path, target_root: Path, first: dict) -
 
 
 def masked_common_scene_digest(image_path: Path) -> str:
-    """Only exempt the *known* Bio HUD, pickup sprite and count bar rectangles.
+    """Only exempt the *known* Art HUD, pickup sprite and count bar rectangles.
 
     Do not alter guest PNGs; compare raw RGB guest pixels outside the precise
-    regions which are legitimately affected by uncollecting Bio in this
+    regions which are legitimately affected by uncollecting Art in this
     fictional, source-authored world.
     """
     from PIL import Image
@@ -132,10 +132,10 @@ def masked_common_scene_digest(image_path: Path) -> str:
     if len(raw) != 640 * 360 * 3:
         raise ValueError("Invalid guest pixel storage length")
     rects = (
-        (132, 22, 174, 37),  # Bio HUD lamp (42x15)
+        (186, 22, 228, 37),  # Art HUD lamp (42x15)
         (350, 22, 384, 37),  # variable-sized earned count indicator
         (420, 22, 456, 37),  # save/load diagnostic status, not game state
-        (207, 183, 218, 194),  # fictional Bio event1: ORIGIN_X 64 + 148 - 5
+        (115, 183, 126, 194),  # fictional Art event2: ORIGIN_X 64 + 56 - 5
     )
     for x0, y0, x1, y1 in rects:
         for y in range(y0, y1):
@@ -192,7 +192,7 @@ def verify_divergent_restore(first: Path, second: Path, root: Path,
         raise ValueError("Second OS process was not a fresh game")
     if new != pre_load or before_digest != pre_load_digest:
         raise ValueError("Cold game mutated before the only restore command")
-    if restored["lights"] != (1, 1, 0, 1, 1) or (
+    if restored["lights"] != (1, 1, 1, 0, 1) or (
             restored["collected_count"] != 1 or restored["sd_status"] != 1):
         raise ValueError("Native loader did not select the NEWER partial-progress slot")
     if restored["native_player_x"] != saved["native_player_x"]:
@@ -201,7 +201,7 @@ def verify_divergent_restore(first: Path, second: Path, root: Path,
         raise ValueError("Newer partial-progress state indistinguishable from older full state")
     if masked_common_scene_digest(first / "raster-frame-0485.png") != (
             masked_common_scene_digest(second / "raster-frame-0540.png")):
-        raise ValueError("Divergent slot changed pixels outside legitimate Bio/count regions")
+        raise ValueError("Divergent slot changed pixels outside legitimate Art/count regions")
 
     disk, issue = audit_confined_sd(root)
     if (issue or disk["structurally_valid_slot_count"] != 2 or
@@ -217,7 +217,7 @@ def verify_divergent_restore(first: Path, second: Path, root: Path,
         "two_structurally_valid_divergent_slots": True,
         "newer_generation_selected_in_guest_pixels": True,
         "original_completed_guest_scene_different": True,
-        "unchanged_world_pixels_outside_bio_and_count": True,
+        "unchanged_world_pixels_outside_art_and_count": True,
         "original_and_modified_journal_sha256_unchanged": True,
         "fresh_guest_process_and_real_npad_required": True,
         "synthetic_second_snapshot_not_a_genuine_gameplay_save": True,
