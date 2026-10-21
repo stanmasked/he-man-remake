@@ -73,6 +73,10 @@ jobs:
           # Simulate an interrupted half-record write to the inactive slot.
           /tmp/heman-cold-journal cold-torn-write "$d/progress"
           /tmp/heman-cold-journal cold-read "$d/progress"
+          # A file-backed writer lies about success after silently damaging
+          # the full record; read-back must fail and the next process falls back.
+          /tmp/heman-cold-journal cold-silent-corrupt-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."

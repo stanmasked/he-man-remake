@@ -48,19 +48,19 @@ callbacks, without changing the current session on error.
 ## Reproducible automated checks
 
 The dedicated GCC and Clang ASan/UBSan test suite exercises a real
-C99 fictional world and an in-memory journal that can fail halfway
-through a write. Separate host processes write and restore actual disk
-files across cold starts, upgrade the session, then test six independent
-failure cases: an appended extra byte, a payload-bit change without a
-matching checksum update, an unsupported schema with a recomputed valid
-checksum, a file truncated to 60 bytes, an interrupted write that leaves
-only half of the inactive slot on disk, and a backend that reports a
-successful write while persisting a checksum-damaged record. The last case
-verifies that read-back validation catches silent write corruption. After
-each failure, a fresh process must reject the newest record and recover
-the previous complete slot. The tests cannot pass by retaining game state
-in process RAM. The half-write case models an interrupted write; it does
-not emulate physical power loss or prove storage-device flush durability.
+C99 fictional world. Native tests cover unsupported schema with a valid
+outer checksum, an in-memory backend that lies about a damaged write,
+world-binding mismatch, generation overflow and preservation of the live
+session on failure. Separate host processes write and restore actual disk
+files across cold starts, upgrade the session, and test an appended extra
+byte, payload corruption without a matching checksum, a file truncated
+to 60 bytes, an interrupted half-record write, and a file-backed writer
+that reports success after silently damaging the completed record. After
+each disk failure, a fresh process must reject the newest record and
+recover the previous complete slot. The tests cannot pass by retaining
+game state in process RAM. The half-write case models an interrupted
+write; it does not emulate physical power loss or prove storage-device
+flush durability.
 
 The actual Switch NRO is separately cross-compiled through the
 existing `switch-lore-lab.yml` devkitPro workflow, checking its NRO

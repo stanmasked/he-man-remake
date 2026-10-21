@@ -150,7 +150,7 @@ static void memory_tests(void) {
     assert(!hm_level11_journal_restore(&game,&io,&generation));
     assert(memcmp(&before,&game,sizeof(game))==0);
 }
-typedef struct {char prefix[256]; int tear_next;} files;
+typedef struct {char prefix[256]; int tear_next; int corrupt_next;} files;
 static int file_name(const files *p,unsigned slot,char *out,size_t n) {
     int r;
     if(slot>1u)return 0;
@@ -189,7 +189,21 @@ static int file_write(void *ctx,unsigned slot,const uint8_t *data) {
     }
     amount=fwrite(data,1u,SZ,fp);
     flushed=fflush(fp);closed=fclose(fp);
-    return amount==SZ && flushed==0 && closed==0;
+    if(amount!=SZ || flushed!=0 || closed!=0)return 0;
+    if(p->corrupt_next) {
+        int byte;
+        p->corrupt_next=0;
+        /* Deliberately model a storage layer that claims success although
+         * the complete record was silently damaged after the write. */
+        fp=fopen(path,"r+b");if(!fp)return 0;
+        if(fseek(fp,24L,SEEK_SET)!=0) { fclose(fp); return 0; }
+        byte=fgetc(fp);
+        if(byte==EOF || fseek(fp,24L,SEEK_SET)!=0 ||
+           fputc(byte ^ 0x40,fp)==EOF) { fclose(fp); return 0; }
+        flushed=fflush(fp);closed=fclose(fp);
+        if(flushed!=0 || closed!=0)return 0;
+    }
+    return 1;
 }
 static void cold_process(const char *mode,const char *path) {
     files p;
@@ -220,6 +234,18 @@ static void cold_process(const char *mode,const char *path) {
         assert(!hm_level11_journal_store(&game,&io,&generation));
         assert(generation==1u);
         assert(!file_read(&p,1u,bytes));
+    } else if(strcmp(mode,"cold-silent-corrupt-write")==0) {
+        uint8_t bytes[SZ];
+        assert(hm_level11_journal_restore(&game,&io,&generation));
+        assert(generation==1u && game.lore.wall_crusher_unlocked==0u);
+        assert(hm_level11_session_grant_wall_crusher(&game,1u)
+               ==HM_LORE_APPLIED);
+        p.corrupt_next=1;
+        /* The callback reports success, but the journal's read-back check
+         * must reject the corrupted complete record and keep generation 1. */
+        assert(!hm_level11_journal_store(&game,&io,&generation));
+        assert(generation==1u);
+        assert(file_read(&p,1u,bytes));
     } else if(strcmp(mode,"cold-read")==0) {
         assert(hm_level11_journal_restore(&game,&io,&generation));
         assert(generation==1u);
