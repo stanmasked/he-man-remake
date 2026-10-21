@@ -128,7 +128,7 @@ int hm_level11_snapshot_encode(const hm_level11_native_session *session,
 int hm_level11_snapshot_restore(hm_level11_native_session *session,
                                 const uint8_t *input, size_t input_size) {
     hm_level11_native_session next;
-    uint32_t checkpoint, i;
+    uint32_t checkpoint;
     if (CHAR_BIT!=8 || sizeof(float)!=4u ||
         !input || input_size!=HM_LEVEL11_SNAPSHOT_SIZE ||
         !hm_level11_session_valid(session) ||
