@@ -49,7 +49,7 @@ callbacks, without changing the current session on error.
 The dedicated GCC and Clang ASan/UBSan test suite exercises a real
 C99 fictional world and an in-memory journal that can fail halfway
 through a write. Separate host processes write and restore actual disk
-files across cold starts, upgrade the session, then test five independent
+files across cold starts, upgrade the session, then test six independent
 failure cases: an appended extra byte, a payload-bit change without a
 matching checksum update, an unsupported schema with a recomputed valid
 checksum, a file truncated to 60 bytes, an interrupted write that leaves
