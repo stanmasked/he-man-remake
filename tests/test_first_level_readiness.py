@@ -200,13 +200,23 @@ class Stage138FirstLevelStructuralReadinessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "fake.ipa"
             make_synthetic_ipa(path)
-            with zipfile.ZipFile(path, "a") as z:
-                # Modifying an existing path by duplicate should be rejected
-                # by established source pairing; do not silently choose one.
-                with self.assertRaises(Exception):
-                    # The strict failure is asserted below after the duplicate.
-                    raise Exception("test marker")
-            # Actual paired ZIP duplication is a separate adversarial case.
+            with zipfile.ZipFile(path) as z:
+                entries = [(item.filename, z.read(item))
+                           for item in z.infolist()]
+            with zipfile.ZipFile(path, "w") as z:
+                for name, raw in entries:
+                    if name.endswith("/screen-xlarge/maps/" + MAP):
+                        # Still a valid .map but different tile placement.
+                        raw = sample(layer(
+                            w=3, h=2,
+                            ids=(7, 65535, 7, 7, 65535, 65535),
+                            atlas=(0, 255, 0, 0, 255, 255)))
+                    z.writestr(name, raw)
+            output = audit_private_first_level(path)
+        self.assertFalse(output["structural_checks"]["identical_level_and_map_bytes"])
+        self.assertFalse(output["structural_checks"][
+            "collision_layer_occupancy_topology_cross_pack"])
+        self.assertFalse(output["ready_for_automatic_collision_import"])
 
     def test_missing_original_archive_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "Missing privately held"):
