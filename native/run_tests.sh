@@ -72,6 +72,30 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_level11_lab.c" \
   -lm -o "$TMP/test_level11_lab"
 "$TMP/test_level11_lab"
+
+# Stage113: two independently recoverable journal slots and actual
+# separate-process cold-start file IO (source-only C99, synthetic world).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/src/heman_level11_native_session.c" \
+  "$ROOT/native/src/heman_level11_snapshot.c" \
+  "$ROOT/native/src/heman_level11_lab.c" \
+  "$ROOT/native/src/heman_level11_journal.c" \
+  "$ROOT/native/tests/test_level11_journal.c" \
+  -lm -o "$TMP/test_level11_journal"
+"$TMP/test_level11_journal"
+"$TMP/test_level11_journal" cold-write "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read-upgrade "$TMP/heman-progress"
+# Corrupt newest slot and prove a brand-new process recovers old slot.
+printf '\\001' >> "$TMP/heman-progress.1"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+
 "$TMP/test_level11_snapshot"
 "$TMP/test_level11_native_session"
 "$TMP/test_level11_native_contacts"
