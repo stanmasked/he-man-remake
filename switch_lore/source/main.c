@@ -18,6 +18,16 @@ static hm_level11_lab_save saved;
 static int durable_status;
 #define DURABLE_SAVE_PREFIX "sdmc:/switch/heman_level11_lore_lab"
 
+/* libnx may already mount sdmc at launch. Mount lazily ONLY on an
+ * explicit disk-save/disk-load input; never disrupt the already proven
+ * NeXium route using L/R RAM saves. Missing SD must fail visibly,
+ * without altering the player or exiting the synthetic lab. */
+static int ensure_sd_ready(void) {
+    if (fsdevGetDeviceFileSystem("sdmc") != NULL) return 1;
+    return R_SUCCEEDED(fsdevMountSdmc());
+}
+
+
 /* Guard the complete destination including pixels outside the framebuffer.
  * All coordinates are pixel coordinates, not original-game asset positions. */
 static void rectangle(uint32_t *pixels, uint32_t stride, int x, int y,
@@ -129,13 +139,15 @@ int main(int argc, char **argv) {
         down = padGetButtonsDown(&pad);
         if (down & HidNpadButton_Plus) break;
         if (down & HidNpadButton_ZL) {
-            durable_status=hm_level11_durable_store(DURABLE_SAVE_PREFIX,
-                                                    &session)==HM_DURABLE_OK
+            durable_status=(ensure_sd_ready() &&
+                            hm_level11_durable_store(DURABLE_SAVE_PREFIX,
+                                                     &session)==HM_DURABLE_OK)
                            ?1:-1;
             tick=HM_LORE_BLOCKED;
         } else if (down & HidNpadButton_ZR) {
-            durable_status=hm_level11_durable_load(DURABLE_SAVE_PREFIX,
-                                                   &session)==HM_DURABLE_OK
+            durable_status=(ensure_sd_ready() &&
+                            hm_level11_durable_load(DURABLE_SAVE_PREFIX,
+                                                    &session)==HM_DURABLE_OK)
                            ?2:-1;
             tick=HM_LORE_BLOCKED;
         } else {
