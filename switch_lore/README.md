@@ -25,9 +25,11 @@ so the Switch application does not invent collision flags.
 | A | Jump on a new button press |
 | X | Attack; requires release and new press at gate |
 | Y | **Debug cheat**, explicitly grant Wall Crusher |
-| B | Restart the tutorial player/inventory, keeping the RAM save slot |
+| B | Restart the tutorial player/inventory, keeping both save paths |
 | L | Save the current state in a **RAM-only** 96-byte receipt |
 | R | Load the RAM-only receipt (if one exists) |
+| ZL + L (new L press) | Write the current state to the experimental two-slot SD journal |
+| ZL + R (new R press) | Restore the newest compatible SD journal slot |
 | Plus | Exit homebrew |
 
 At startup, the left→right course contains the open Concept Art item
@@ -78,12 +80,26 @@ make -C switch_lore clean all
 
 Output: `switch_lore/heman_level11_lore_lab.nro`.
 
-**Save is not persistent**: it exists in RAM until the application
-exits. The format is our own lab design, not an emulation or port of
-commercial iOS save contents. The game never opens the original IPA,
-writes commercial assets, saves private map locations or connects to
-the official level 1-1. No original paid upgrade/purchase system
-is implemented; Y is an openly labelled synthetic test shortcut.
+**Default L/R saving remains RAM-only** and is lost when the
+application exits. Stage 113 adds an opt-in SD journal using ZL+L and
+ZL+R. It stores two 120-byte records at
+`sdmc:/switch/heman_lore_lab/progress0.bin` and
+`sdmc:/switch/heman_lore_lab/progress1.bin`; each record contains the
+project's 96-byte synthetic snapshot, a generation number and an outer
+checksum. The older/invalid slot is replaced while the newest compatible
+slot is kept for recovery. After a successful write callback, the journal
+reads the target back and validates it before reporting success.
+
+The SD path is still **experimental and not hardware-verified**. The
+backend uses standard file writes, `fflush`, `fclose` and journal
+read-back validation; it does not claim `fsync`/physical power-loss
+durability. The format is our own lab design, not an emulation or port
+of commercial iOS save contents. Failed SD restore leaves the live
+session unchanged; ordinary L/R RAM save/load remains available. The
+game never opens the original IPA, writes commercial assets, saves
+private map locations or connects to the official level 1-1. No original
+paid upgrade/purchase system is implemented; Y is an openly labelled
+synthetic test shortcut.
 
 ## What remains blocked
 
