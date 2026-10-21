@@ -136,7 +136,7 @@ def verify(folder: Path) -> dict:
     # earned player progress. Endgame repeats to show no phantom extra
     # rewards; final RAM save followed by RAM load renders same source
     # scene with identical pixels rather than a mock verifier redraw.
-    if digests[130] != digests[265]:
+    if digests[165] != digests[265]:
         raise ValueError("Guest snapshot restore did not reproduce saved scene")
     if digests[485] != digests[530]:
         raise ValueError("Guest completed lore save/load was not pixel-stable")
