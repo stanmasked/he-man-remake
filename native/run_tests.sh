@@ -21,6 +21,18 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_level11_lore.c" \
   "$ROOT/native/tests/test_level11_lore.c" \
   -o "$TMP/test_level11_lore"
+
+# Stage 104: replay the *actual* C99 physics step before granting Level 1-1
+# gate/pickup progression. All world geometry in the test is fictional.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_core.c" \
+  "$ROOT/native/src/heman_mask.c" \
+  "$ROOT/native/src/heman_level11_lore.c" \
+  "$ROOT/native/src/heman_level11_native_contacts.c" \
+  "$ROOT/native/tests/test_level11_native_contacts.c" \
+  -lm -o "$TMP/test_level11_native_contacts"
+"$TMP/test_level11_native_contacts"
 "$TMP/test_level11_lore"
 
 "$TMP/test_core"

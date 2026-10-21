@@ -1,0 +1,50 @@
+name: He-Man Level1-1 actual C99 physics-bound lore contact tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-physics-contacts.yml'
+      - 'native/include/heman_level11_lore.h'
+      - 'native/include/heman_level11_native_contacts.h'
+      - 'native/src/heman_core.c'
+      - 'native/src/heman_level11_lore.c'
+      - 'native/src/heman_level11_native_contacts.c'
+      - 'native/tests/test_level11_native_contacts.c'
+      - 'native/run_tests.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  no-forged-lore-contact:
+    name: Real C99 hm_step and attack/pickup receipt with ${{ matrix.compiler }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Strict host C99 build under address/undefined behavior sanitizers
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/include \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/tests/test_level11_native_contacts.c \
+            -lm -o /tmp/heman-stage104-contacts
+          /tmp/heman-stage104-contacts
+      - name: Guard provenance claims
+        run: |
+          echo 'This replays real SOURCE C99 hm_step using FICTIONAL event geometry.'
+          echo 'It does not launch an original iOS game or assert its collision coordinates.'
+          echo 'No private IPA, commercial content, or real-world map evidence in CI.'
