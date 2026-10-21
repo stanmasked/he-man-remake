@@ -70,6 +70,9 @@ jobs:
           /tmp/heman-cold-journal cold-upgrade "$d/progress"
           truncate -s 60 "$d/progress.1"
           /tmp/heman-cold-journal cold-read "$d/progress"
+          # Simulate an interrupted half-record write to the inactive slot.
+          /tmp/heman-cold-journal cold-torn-write "$d/progress"
+          /tmp/heman-cold-journal cold-read "$d/progress"
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."

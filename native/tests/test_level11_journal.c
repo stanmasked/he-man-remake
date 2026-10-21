@@ -132,7 +132,7 @@ static void memory_tests(void) {
     assert(!hm_level11_journal_restore(&game,&io,&generation));
     assert(memcmp(&before,&game,sizeof(game))==0);
 }
-typedef struct {char prefix[256];} files;
+typedef struct {char prefix[256]; int tear_next;} files;
 static int file_name(const files *p,unsigned slot,char *out,size_t n) {
     int r;
     if(slot>1u)return 0;
@@ -160,6 +160,15 @@ static int file_write(void *ctx,unsigned slot,const uint8_t *data) {
     int flushed,closed;
     if(!file_name(p,slot,path,sizeof(path)))return 0;
     fp=fopen(path,"wb");if(!fp)return 0;
+    if(p->tear_next) {
+        /* Simulate a power interruption after replacing the target slot
+         * with only half a record; the other slot must remain untouched. */
+        p->tear_next=0;
+        amount=fwrite(data,1u,SZ/2u,fp);
+        flushed=fflush(fp);closed=fclose(fp);
+        (void)amount;(void)flushed;(void)closed;
+        return 0;
+    }
     amount=fwrite(data,1u,SZ,fp);
     flushed=fflush(fp);closed=fclose(fp);
     return amount==SZ && flushed==0 && closed==0;
@@ -183,6 +192,16 @@ static void cold_process(const char *mode,const char *path) {
         assert(file_read(&p,1u,bytes));
         bytes[24u]^=0x40u;
         assert(file_write(&p,1u,bytes));
+    } else if(strcmp(mode,"cold-torn-write")==0) {
+        uint8_t bytes[SZ];
+        assert(hm_level11_journal_restore(&game,&io,&generation));
+        assert(generation==1u);
+        assert(hm_level11_session_grant_wall_crusher(&game,1u)
+               ==HM_LORE_APPLIED);
+        p.tear_next=1;
+        assert(!hm_level11_journal_store(&game,&io,&generation));
+        assert(generation==1u);
+        assert(!file_read(&p,1u,bytes));
     } else if(strcmp(mode,"cold-read")==0) {
         assert(hm_level11_journal_restore(&game,&io,&generation));
         assert(generation==1u);

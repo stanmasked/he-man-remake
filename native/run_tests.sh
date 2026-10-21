@@ -104,6 +104,9 @@ printf '\001' >> "$TMP/heman-progress.1"
 "$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
 truncate -s 60 "$TMP/heman-progress.1"
 "$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
+# Simulate an interrupted write to the inactive disk slot; preserve slot 0.
+"$TMP/test_level11_journal" cold-torn-write "$TMP/heman-progress"
+"$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
 
 "$TMP/test_level11_snapshot"
 "$TMP/test_level11_native_session"
