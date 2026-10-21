@@ -127,6 +127,8 @@ truncate -s 60 "$TMP/heman-progress.1"
   -lm -o "$TMP/test_switch_lore_sd_adapter"
 mkdir -p "$TMP/sd-adapter-root/sdmc:"
 (cd "$TMP/sd-adapter-root" && "$TMP/test_switch_lore_sd_adapter")
+mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
+(cd "$TMP/sd-adapter-premounted-root" && "$TMP/test_switch_lore_sd_adapter" pre-mounted)
 
 "$TMP/test_level11_snapshot"
 "$TMP/test_level11_native_session"

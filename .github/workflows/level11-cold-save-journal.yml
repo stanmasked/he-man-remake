@@ -100,6 +100,10 @@ jobs:
           trap 'rm -rf "$d"' EXIT
           mkdir -p "$d/sdmc:"
           (cd "$d" && /tmp/heman-sd-adapter)
+          d2="$(mktemp -d)"
+          trap 'rm -rf "$d" "$d2"' EXIT
+          mkdir -p "$d2/sdmc:"
+          (cd "$d2" && /tmp/heman-sd-adapter pre-mounted)
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."

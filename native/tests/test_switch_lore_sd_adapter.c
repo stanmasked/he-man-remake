@@ -87,8 +87,35 @@ static void append_extra_byte(const char *path) {
     assert(fclose(file) == 0);
 }
 
-int main(void) {
+static void write_short_file(const char *path) {
+    uint8_t short_record[60] = {0};
+    FILE *file = fopen(path, "wb");
+    assert(file != NULL);
+    assert(fwrite(short_record, 1u, sizeof(short_record), file) == sizeof(short_record));
+    assert(fclose(file) == 0);
+}
+
+static int run_premounted_case(void) {
     hm_level11_native_session before;
+    boot();
+    before = game;
+    /* Simulate libnx having mounted sdmc before this adapter is called. */
+    mock_mounted = 1;
+    assert(!hm_switch_lore_sd_load(&game));
+    assert(mount_calls == 0u && mock_mounted && commit_calls == 0u);
+    assert(memcmp(&before, &game, sizeof(game)) == 0);
+    assert(access("sdmc:/switch/heman_lore_lab", F_OK) == 0);
+    puts("STAGE113_SWITCH_SD_PREMOUNT_REUSE_PASS");
+    return 0;
+}
+
+int main(int argc, char **argv) {
+    hm_level11_native_session before;
+
+    if (argc == 2 && strcmp(argv[1], "pre-mounted") == 0)
+        return run_premounted_case();
+    if (argc != 1)
+        return 2;
 
     boot();
     assert(mount_calls == 0u && commit_calls == 0u && !mock_mounted);
@@ -137,6 +164,12 @@ int main(void) {
     /* Extra bytes make the remaining older record invalid too; failure must
      * preserve the caller's live session byte-for-byte. */
     append_extra_byte(SLOT0);
+    before = game;
+    assert(!hm_switch_lore_sd_load(&game));
+    assert(memcmp(&before, &game, sizeof(game)) == 0);
+
+    /* A truncated 60-byte record must also be rejected without mutating state. */
+    write_short_file(SLOT0);
     before = game;
     assert(!hm_switch_lore_sd_load(&game));
     assert(memcmp(&before, &game, sizeof(game)) == 0);
