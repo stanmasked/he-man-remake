@@ -73,6 +73,10 @@ hm_lore_result hm_level11_session_step(
 hm_lore_result hm_level11_session_grant_wall_crusher(
     hm_level11_native_session *session, uint8_t granted);
 
+/* Read-only validity guard, including Stage106/107 world and role seals.
+ * Useful for optional same-world replay snapshot processing. */
+int hm_level11_session_valid(const hm_level11_native_session *session);
+
 #ifdef __cplusplus
 }
 #endif

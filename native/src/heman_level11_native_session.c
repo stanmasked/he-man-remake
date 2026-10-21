@@ -86,6 +86,10 @@ static int ready(const hm_level11_native_session *session) {
            hm_lore_state_valid(&session->lore);
 }
 
+int hm_level11_session_valid(const hm_level11_native_session *session) {
+    return ready(session);
+}
+
 hm_lore_result hm_level11_session_init(
     hm_level11_native_session *session, const hm_world *world,
     const hm_level11_event_bindings *bindings) {
