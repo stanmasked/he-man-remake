@@ -16,6 +16,9 @@ structure across both resource screen packs:
 | Nonempty `map` cells | 1,579 | 1,579 |
 | Nonempty `collision` cells | 790 | 790 |
 | Nonempty `destructible` cells | 33 | 33 |
+| Four-connected occupied `collision` regions | 20 | 20 |
+
+In the occupied collision grid there are 20 **four-neighbor-connected** regions (largest: 102 occupied cells; one isolated cell). These are topology-only measurements, **not** 20 separately physical obstacles.
 
 The three-layer parser reached the precise end of both `.map` entries
 without extra bytes, and the two screen packs matched. These are **file
