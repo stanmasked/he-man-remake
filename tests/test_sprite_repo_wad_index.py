@@ -182,7 +182,7 @@ class Stage153SpriteRepoIndexTests(unittest.TestCase):
         repos,wads=invented_files()
         rp=_FAMILIES[0][1];wp=_FAMILIES[0][2];label=_FAMILIES[0][0]
         for screen in SCREENS:
-            repos[screen][rp]=repository(label,wp,("A","B"),(0,10_000))
+            repos[screen][rp]=repository(label,wp,("ImaginaryOne","ImaginaryTwo"),(0,10_000))
         with self.assertRaisesRegex(SpriteIndexFormatError,"offset exceeds"):
             summarize_sprite_repo_wad_index(repos,wads)
 
