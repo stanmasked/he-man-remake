@@ -27,3 +27,19 @@ inside the CI workspace, never a personal user's SD data directory.
 
 This is a stacked test-only PR. Do not modify the previously passing NRO or
 the original iOS game assets.
+
+## Stage115 follow-up: read-only auditor directory containment
+
+The receipt checker now first inspects the declared *absolute* test
+`NEXIUM_DATA_ROOT`, `sdmc`, `switch` and `heman_lore_lab` directory entries
+with `lstat()`. If an existing component is a symlink or a non-directory,
+it **does not open either journal slot** and emits
+`unsafe_emulator_sd_directory`. Symlinked external test fixtures, a linked
+root, non-directory components and relative roots have dedicated unit tests.
+A missing directory still produces a missing-SD receipt instead of reading
+unrelated host content.
+
+This protects against accidentally following already-existing unsafe
+parents in the test runner. It remains a check-then-open operation and is
+**not resistant to malicious concurrent symlink replacement**. Real FS/FSP
+write access must use race-resistant directory-relative file handles.

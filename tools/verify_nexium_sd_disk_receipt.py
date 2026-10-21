@@ -7,14 +7,54 @@ files fails closed rather than being misrepresented as disk evidence.
 """
 import argparse
 import json
+import stat
 from pathlib import Path
 
 from audit_switch_sd_journal import audit_directory
 
 
+def reject_unsafe_sd_parents(data_root: Path) -> str | None:
+    """Refuse symlinks and non-directories in *run-scoped* SD path components.
+
+    This is fail-closed, but not race-free; real guest SD IPC needs openat-like
+    directory-handle-based containment before it may access arbitrary hosts.
+    """
+    if not data_root.is_absolute():
+        return "relative_data_root_disallowed"
+    for candidate in (
+        data_root,
+        data_root / "sdmc",
+        data_root / "sdmc" / "switch",
+        data_root / "sdmc" / "switch" / "heman_lore_lab",
+    ):
+        try:
+            mode = candidate.lstat().st_mode
+        except FileNotFoundError:
+            return None  # missing directory => neither slot can exist
+        except OSError:
+            return "unreadable_sd_directory"
+        if stat.S_ISLNK(mode):
+            return "symlinked_sd_directory_disallowed"
+        if not stat.S_ISDIR(mode):
+            return "non_directory_sd_component"
+    return None
+
+
 def verify_runtime_receipt(data_root: Path, guest_report: dict) -> tuple[dict, bool]:
+    problem = reject_unsafe_sd_parents(data_root)
     lab = data_root / "sdmc" / "switch" / "heman_lore_lab"
-    disk = audit_directory(lab)
+    if problem:
+        # Do not open any files under an unsafe parent, even when the guest
+        # claims failure; an untrusted alias must never become disk evidence.
+        disk = {
+            "slots": [{"slot": i, "status": "invalid", "reason": problem}
+                      for i in (0, 1)],
+            "structurally_valid_slot_count": 0,
+            "latest_structural_candidate_slot": None,
+            "ambiguous_world_binding": False,
+        }
+    else:
+        disk = audit_directory(lab)
     save_claim = guest_report.get("guest_sd_save_succeeded") is True
     load_claim = guest_report.get("guest_sd_load_succeeded") is True
     round_trip = guest_report.get("guest_sd_round_trip_verified") is True
@@ -23,8 +63,10 @@ def verify_runtime_receipt(data_root: Path, guest_report: dict) -> tuple[dict, b
     has_usable_record = valid and candidate is not None
     inconsistent_claim = round_trip and not (save_claim and load_claim)
     missing_disk_proof = (save_claim or load_claim or round_trip) and not has_usable_record
-    success = not (inconsistent_claim or missing_disk_proof)
-    if inconsistent_claim:
+    success = problem is None and not (inconsistent_claim or missing_disk_proof)
+    if problem:
+        classification = "unsafe_emulator_sd_directory"
+    elif inconsistent_claim:
         classification = "inconsistent_guest_optical_claim"
     elif missing_disk_proof:
         classification = "green_guest_hud_without_structurally_valid_sd_file"
@@ -44,6 +86,7 @@ def verify_runtime_receipt(data_root: Path, guest_report: dict) -> tuple[dict, b
         "emulator_sd_structurally_valid_slot_count": disk["structurally_valid_slot_count"],
         "emulator_sd_latest_structural_candidate_slot": candidate,
         "emulator_sd_world_ambiguous": disk["ambiguous_world_binding"],
+        "emulator_sd_directory_validation": problem or "no_unsafe_components_observed",
         "actual_emulator_file_bytes_examined": has_usable_record,
         "independent_process_cold_restart_verified": False,
         "nintendo_switch_hardware_sd_verified": False,
