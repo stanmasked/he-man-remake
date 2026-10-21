@@ -6,6 +6,8 @@ on:
       - 'native/include/heman_level11_journal.h'
       - 'native/src/heman_level11_journal.c'
       - 'native/tests/test_level11_journal.c'
+      - 'native/tests/test_switch_lore_sd_adapter.c'
+      - 'native/tests/mock_libnx/switch.h'
       - 'native/run_tests.sh'
       - 'switch_lore/source/sd_journal.c'
       - 'switch_lore/source/main.c'
@@ -77,6 +79,27 @@ jobs:
           # the full record; read-back must fail and the next process falls back.
           /tmp/heman-cold-journal cold-silent-corrupt-write "$d/progress"
           /tmp/heman-cold-journal cold-read "$d/progress"
+      - name: Exercise the actual Switch SD adapter through a host-only libnx shim
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$CC" -std=c99 -O1 -g -Wall -Wextra -Werror -pedantic \
+            -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I native/tests/mock_libnx -I native/include -I switch_lore/source \
+            native/src/heman_core.c native/src/heman_mask.c \
+            native/src/heman_level11_lore.c \
+            native/src/heman_level11_native_contacts.c \
+            native/src/heman_level11_native_session.c \
+            native/src/heman_level11_snapshot.c \
+            native/src/heman_level11_lab.c \
+            native/src/heman_level11_journal.c \
+            switch_lore/source/sd_journal.c \
+            native/tests/test_switch_lore_sd_adapter.c \
+            -lm -o /tmp/heman-sd-adapter
+          d="$(mktemp -d)"
+          trap 'rm -rf "$d"' EXIT
+          mkdir -p "$d/sdmc:"
+          (cd "$d" && /tmp/heman-sd-adapter)
       - name: Explicit evidence boundary
         run: |
           echo "Two independent host processes and source-native journal verified."

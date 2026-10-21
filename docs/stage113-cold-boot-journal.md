@@ -63,12 +63,12 @@ write; it does not emulate physical power loss or prove storage-device
 flush durability.
 
 A separate host-shim contract test compiles the actual
-\`switch_lore/source/sd_journal.c\` against a minimal mock of the libnx mount
-and commit API and a temporary POSIX directory named \`sdmc:\`. It exercises
+`switch_lore/source/sd_journal.c` against a minimal mock of the libnx mount
+and commit API and a temporary POSIX directory named `sdmc:`. It exercises
 lazy mount failure/retry, exact 120-byte slot files, two-slot rotation,
 corrupt-newest fallback, extra-byte rejection, live-session preservation and
 a failed filesystem-commit result. The mock validates adapter control flow and
-ordinary host file handling only; it does not emulate real \`fsdev\` services,
+ordinary host file handling only; it does not emulate real `fsdev` services,
 SD media behavior or durability.
 
 The actual Switch NRO is separately cross-compiled through the
