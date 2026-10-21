@@ -91,10 +91,27 @@ class Stage112HIDRegression(unittest.TestCase):
         self.assertEqual(code.count("HEMAN_GUEST_FRAME_PNG frame="), 2)
         for token in ('145 | 460 => "buttons=L"',
                       '230 | 497 => "buttons=R"',
-                      '275 => "buttons=Y"', '355 => "buttons=X"'):
+                      '275 => "buttons=Y"', '365 => "buttons=X"'):
             self.assertIn(token, code)
         with self.assertRaises(ValueError):
             instrument(code)
+
+    def test_fresh_attack_only_after_verified_gate_approach(self):
+        # 2026-10-21 real Stage112 NeXium guest evidence at frame 345:
+        # the fictional native actor centre was x=115.5, just outside
+        # the x=104 gate sensor (actor half-width 5, radius 4).
+        # 7 extra leftward game frames at 2 px each bring x ~101.5.
+        # No original iOS physics or original map geometry is implied.
+        schedule = dict(HID_EVENTS)
+        self.assertEqual(schedule[310], "buttons=DLEFT")
+        self.assertEqual(schedule[352], "buttons=")
+        self.assertEqual(schedule[365], "buttons=X")
+        self.assertEqual(schedule[380], "buttons=")
+        measured_guest_x = 115.5
+        corrected_x = measured_guest_x - (352 - 345) * 2.0
+        self.assertLessEqual(abs(corrected_x - 104.0), 5.0 + 4.0)
+        self.assertGreaterEqual(365 - 352, 4)
+        self.assertLess(380, 395)
 
     def test_pinned_button_bits(self):
         self.assertEqual(LAB_BITS["L"], 64)
