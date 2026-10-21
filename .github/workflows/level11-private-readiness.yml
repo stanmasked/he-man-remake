@@ -1,0 +1,39 @@
+name: He-Man original level 1-1 private-source readiness contract
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/level11-private-readiness.yml'
+      - 'src/heman_tools/level11_private_readiness.py'
+      - 'tests/test_level11_private_readiness.py'
+      - 'src/heman_tools/first_level_report_audit.py'
+      - 'src/heman_tools/level_evidence_gate.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-source-structural-preflight:
+    name: Deny unverified original geometry import with Python ${{ matrix.python }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Validate fail-closed private original-source gate with fabricated reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests \
+            -p test_level11_private_readiness.py -v
+      - name: Explicit evidence boundary
+        run: |
+          echo 'Private IPA, game map, screenshots and video are NOT in CI.'
+          echo 'No original gameplay or collision semantics are authenticated.'
+          echo 'A structural pass NEVER permits automatic Switch map export.'
