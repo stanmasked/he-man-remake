@@ -16,6 +16,7 @@
 - [x] Prototype static full-body wall/ceiling collisions and bounded slope adhesion (not authentic iOS physics).
 - [x] Compare candidate first-level coordinate envelopes privately: **142/159** object translations lie within the origin-zero 300×19×32 serialized tile extent (only **3/159** within direct cell indices); this is a *hypothesis*, not verified world scale. Privately compare **409** paired identical global `.shape` files and **94** embedded references; none directly match level object identities. See [Stage139](stage139-private-level1-coordinate-shape-evidence.md).
 - [ ] Verify actual tile semantics, one-way platforms, hitbox dimensions and original movement constants.
+- [x] Audit owner-private global shape references in **81** physics-structure resources: **71** contain at least one exact length-prefixed UTF-16 shape identifier, with **137** resource/shape candidates and **112** unique shape stems; **400/409** shapes appear in the source geometry registry metadata. This is lexical evidence only; see [Stage140](stage140-private-physics-shape-lexical-census.md).
 - [ ] Match primitive .shape resources and original player hitbox to level objects.
 - [x] Implement and headlessly test a keyboard-controllable host physics scene with camera, jump and reset.
 - [x] Add independent synthetic pickup/checkpoint/hazard/exit event state and deterministic headless replay.
