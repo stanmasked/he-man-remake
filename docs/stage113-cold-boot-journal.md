@@ -37,7 +37,8 @@ Before every store, the module checks both candidate slots *including*
 inner world/event binding compatibility, chooses the **older, missing or
 damaged slot**, and never writes the last valid one. After a successful
 write callback, it reads the target slot back and validates the envelope,
-snapshot/world binding and expected generation before reporting success.
+snapshot/world binding, expected generation, and byte-identical canonical
+snapshot before reporting success.
 On load it chooses the newest fully compatible candidate, falling back
 to the preceding good slot after truncation, corruption or interrupted
 overwrite. It rejects version drift, invalid game geometry, invalid

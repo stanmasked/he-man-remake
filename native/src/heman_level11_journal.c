@@ -108,8 +108,13 @@ int hm_level11_journal_store(const hm_level11_native_session *session,
      * untouched if this verification fails. */
     {
         uint64_t verified_generation=0u;
+        uint8_t verified_snapshot[HM_LEVEL11_SNAPSHOT_SIZE];
         if (!read_compatible(io,slot,session,&verified_generation,&candidate) ||
-            verified_generation!=last+1u)
+            verified_generation!=last+1u ||
+            !hm_level11_snapshot_encode(&candidate,verified_snapshot,
+                                        sizeof(verified_snapshot)) ||
+            memcmp(verified_snapshot,bytes+DATA_OFFSET,
+                   sizeof(verified_snapshot))!=0)
             return 0;
     }
     if (generation) *generation=last+1u;
