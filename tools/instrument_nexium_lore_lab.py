@@ -1,4 +1,4 @@
-"""Stage112: evidence-only pinned NeXium runner HID and framebuffer taps.
+"""Stage113: evidence-only pinned NeXium HID, framebuffer, and SD-chord taps.
 
 The genuine AArch64 NRO is NOT patched. The TEMPORARY emulator debug_boot
 Rust source is modified in CI, with fail-closed matching of both paths.
@@ -13,28 +13,34 @@ from instrument_nexium_frames import instrument as instrument_frames
 
 # Guest receiver frames, not host-clock timestamps. The source-game
 # animation rate / exact injected button sampling are NOT assumed.
-FRAMES = (30, 60, 130, 165, 215, 265, 305, 345, 395, 445, 485, 530)
+FRAMES = (30, 60, 130, 165, 215, 265, 305, 345, 395, 445, 485, 518, 540)
 HID_EVENTS = (
     (45, "buttons=DRIGHT"),
     (121, "buttons="),
-    (145, "buttons=L"),          # save in RAM
+    (145, "buttons=L"),           # RAM save
     (157, "buttons="),
-    (180, "buttons=B"),          # restart, still retaining saved RAM
+    (180, "buttons=B"),           # restart, retaining the RAM receipt
     (195, "buttons="),
-    (230, "buttons=R"),          # load prior snapshot
+    (230, "buttons=R"),           # RAM restore
     (245, "buttons="),
-    (275, "buttons=Y"),          # explicitly SYNTHETIC upgrade
+    (275, "buttons=Y"),           # explicitly SYNTHETIC upgrade
     (290, "buttons="),
-    (310, "buttons=DLEFT"),      # return to previsited gate
+    (310, "buttons=DLEFT"),       # return to previsited gate
     (350, "buttons="),
-    (365, "buttons=X"),          # fresh real NPAD X at gate
+    (365, "buttons=X"),           # fresh real NPAD X at gate
     (380, "buttons="),
-    (410, "buttons=DRIGHT"),     # return to hidden Bio
+    (410, "buttons=DRIGHT"),      # return to hidden Bio
     (439, "buttons="),
-    (460, "buttons=L"),          # save fully earned state
-    (475, "buttons="),
-    (497, "buttons=R"),          # restore; no duplicated lore rewards
+    (460, "buttons=ZL"),          # arm the opt-in SD save chord
+    (470, "buttons=ZL,L"),        # save fully earned state to SD
+    (480, "buttons=ZL"),
+    (490, "buttons="),
+    (500, "buttons=B"),           # reset so SD restore is distinguishable
     (510, "buttons="),
+    (520, "buttons=ZL"),
+    (530, "buttons=ZL,R"),        # attempt SD restore into reset session
+    (535, "buttons=ZL"),
+    (538, "buttons="),
 )
 
 

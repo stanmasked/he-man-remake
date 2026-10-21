@@ -71,6 +71,14 @@ compiles with GCC and Clang ASan/UBSan, then builds the **actual AArch64
 NRO** in the devkitPro container and verifies its NRO0 header. Successful
 cross-compilation is not itself guest/HID/PNG or Switch hardware proof.
 
+The pinned NeXium guest route also attempts **ZL+L SD save**, resets the
+session, then attempts **ZL+R SD restore**. Its real guest PNGs must show
+the SD-result indicator leaving the untouched state. A green result must
+restore the exact earned scene; a failed/unavailable result must leave the
+reset session unchanged. The CI report distinguishes a verified SD round-trip
+from a safe failure. Neither outcome alone proves Nintendo Switch hardware
+filesystem behavior or physical power-loss durability.
+
 Build locally where devkitPro/libnx are installed:
 
 ```sh

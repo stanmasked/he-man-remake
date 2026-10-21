@@ -1,4 +1,4 @@
-"""Fail-closed optical verification of REAL pinned NeXium lab guest frames.
+"""Fail-closed optical verification of REAL pinned NeXium lab guest frames, RAM saves and SD chord attempts.
 
 The source-authored NRO draws 640x360 fixed-color rectangles only.
 Read ONLY frame_rx PNG files and their logged absolute paths; do not
@@ -23,6 +23,7 @@ BIO = (205, 121, 224)
 ART = (219, 232, 105)
 SAVE = (255, 140, 104)
 HERO = (144, 220, 255)
+SD_FAILURE = (239, 119, 119)
 
 # Expected independent visual milestones (not asserted iOS positions):
 # format: (upgrade, opened_gate, bio, art, saved, earned_count, x_min, x_max)
@@ -38,7 +39,10 @@ STATES = {
     395: (1, 1, 0, 1, 1, 1, 95, 112),
     445: (1, 1, 1, 1, 1, 2, 140, 192),
     485: (1, 1, 1, 1, 1, 2, 140, 192),
-    530: (1, 1, 1, 1, 1, 2, 140, 192),
+    518: (0, 0, 0, 0, 1, 0, 15, 38),
+    # 540 is checked conditionally: successful SD restore reproduces 485;
+    # unavailable/rejected SD restore must preserve the reset state at 518.
+    540: (1, 1, 1, 1, 1, 2, 140, 192),
 }
 LIGHT_POINTS = ((30, 30), (84, 30), (138, 30), (192, 30), (246, 30))
 ACTIVE_COLORS = (GREEN, GREEN, BIO, ART, SAVE)
@@ -62,6 +66,15 @@ def inspect(rgb) -> dict:
     progress = [rgb.getpixel(point) for point in BARS]
     if any(color not in (BG, GREEN) for color in progress):
         raise ValueError("Guest lore counter bar has unknown source pixels")
+    sd_color = rgb.getpixel((430, 30))
+    if sd_color == GREY:
+        sd_status = 0
+    elif sd_color == GREEN:
+        sd_status = 1
+    elif sd_color == SD_FAILURE:
+        sd_status = 2
+    else:
+        raise ValueError("Guest SD result indicator has an unknown source color")
     count = (1 if progress[0] == GREEN else 0) + (
         1 if progress[1] == GREEN else 0
     )
@@ -74,7 +87,23 @@ def inspect(rgb) -> dict:
         "lights": tuple(lights),
         "collected_count": count,
         "native_player_x": native_x,
+        "sd_status": sd_status,
     }
+
+
+def normalized_digest(rgb) -> str:
+    """Hash the real guest image while masking only the SD-result light."""
+    raw = bytearray(rgb.tobytes())
+    if len(raw) != 640 * 360 * 3:
+        raise ValueError("Guest RGB buffer has unexpected byte length")
+    # The SD status rectangle is diagnostic output, not game-world state.
+    # Normalizing it lets us compare saved/restored scenes across both success
+    # and failure colors without hiding any gameplay pixels.
+    neutral = bytes(GREY) * 36
+    for y in range(22, 37):
+        start = (y * 640 + 420) * 3
+        raw[start:start + 36 * 3] = neutral
+    return hashlib.sha256(raw).hexdigest()
 
 
 def verify(folder: Path) -> dict:
@@ -116,40 +145,76 @@ def verify(folder: Path) -> dict:
                 raise ValueError("NeXium guest capture is not a PNG")
             rgb = file.convert("RGB")
             found = inspect(rgb)
-            digest = hashlib.sha256(rgb.tobytes()).hexdigest()
+            digest = normalized_digest(rgb)
         status = STATES[frame]
-        if found["lights"] != status[:5]:
-            raise ValueError(
-                f"Actual guest HUD did not follow expected save/lore route "
-                f"at frame {frame}: {found['lights']} != {status[:5]}"
-            )
-        if found["collected_count"] != status[5]:
-            raise ValueError(f"Native two-lore counter mismatched at {frame}")
-        if not status[6] <= found["native_player_x"] <= status[7]:
-            raise ValueError(
-                f"Native in-game player location failed at frame {frame}"
-            )
+        if frame != 540:
+            if found["lights"] != status[:5]:
+                raise ValueError(
+                    f"Actual guest HUD did not follow expected save/lore route "
+                    f"at frame {frame}: {found['lights']} != {status[:5]}"
+                )
+            if found["collected_count"] != status[5]:
+                raise ValueError(f"Native two-lore counter mismatched at {frame}")
+            if not status[6] <= found["native_player_x"] <= status[7]:
+                raise ValueError(
+                    f"Native in-game player location failed at frame {frame}"
+                )
         snapshots[frame] = found
         digests[frame] = digest
 
-    # Save slot remains alive across B reset, and load returns to same
-    # earned player progress. Endgame repeats to show no phantom extra
-    # rewards; final RAM save followed by RAM load renders same source
-    # scene with identical pixels rather than a mock verifier redraw.
+    # RAM save/reset/load remains independently checked.
     if digests[165] != digests[265]:
-        raise ValueError("Guest snapshot restore did not reproduce saved scene")
-    if digests[485] != digests[530]:
-        raise ValueError("Guest completed lore save/load was not pixel-stable")
+        raise ValueError("Guest RAM snapshot restore did not reproduce saved scene")
+    if digests[215] != digests[518]:
+        raise ValueError("Reset state changed while preparing the SD restore test")
     if digests[30] == digests[215]:
         # Save light turns blue after B restart: reset does not destroy RAM.
         raise ValueError("Guest reset incorrectly discarded local RAM save")
     if digests[345] == digests[395] or digests[395] == digests[445]:
         raise ValueError("Native attack/return did not affect guest pixels")
+
+    save_status = snapshots[485]["sd_status"]
+    pre_load_status = snapshots[518]["sd_status"]
+    load_status = snapshots[540]["sd_status"]
+    if save_status not in (1, 2):
+        raise ValueError("ZL+L did not reach a visible SD adapter result")
+    if pre_load_status != save_status:
+        raise ValueError("B reset unexpectedly changed the prior SD result")
+    if load_status not in (1, 2):
+        raise ValueError("ZL+R did not reach a visible SD adapter result")
+
+    if load_status == 1:
+        if save_status != 1:
+            raise ValueError("SD restore succeeded although this run's SD save failed")
+        expected = STATES[485]
+        if (snapshots[540]["lights"] != expected[:5] or
+            snapshots[540]["collected_count"] != expected[5] or
+            not expected[6] <= snapshots[540]["native_player_x"] <= expected[7]):
+            raise ValueError("Successful SD restore did not recover the earned state")
+        if digests[485] != digests[540]:
+            raise ValueError("SD save/load did not reproduce the saved guest scene")
+        sd_round_trip = True
+    else:
+        expected = STATES[518]
+        if (snapshots[540]["lights"] != expected[:5] or
+            snapshots[540]["collected_count"] != expected[5] or
+            not expected[6] <= snapshots[540]["native_player_x"] <= expected[7]):
+            raise ValueError("Failed SD restore mutated the reset guest session")
+        if digests[518] != digests[540]:
+            raise ValueError("Failed SD restore changed the reset guest scene")
+        sd_round_trip = False
+
     return {
         "authentic_pinned_nexium_frame_rx_pngs_validated": len(FRAMES),
         "guest_cpu_and_svc_execution_recorded": True,
         "real_native_wall_crusher_attack_and_two_collectibles": True,
         "guest_ram_save_reset_load_pixels_confirmed": True,
+        "guest_sd_save_attempt_observed": True,
+        "guest_sd_save_succeeded": save_status == 1,
+        "guest_sd_load_attempt_observed": True,
+        "guest_sd_load_succeeded": load_status == 1,
+        "guest_sd_round_trip_verified": sd_round_trip,
+        "guest_sd_failure_preserved_reset_session": not sd_round_trip,
         "real_frame_milestones": list(FRAMES),
         "original_ios_source_fidelity_verified": False,
         "hardware_nintendo_switch_execution_verified": False,
@@ -162,7 +227,7 @@ def main() -> int:
     args = parser.parse_args()
     result = verify(args.guest_folder)
     print(json.dumps(result, sort_keys=True, indent=2))
-    print("PASS: genuine pinned NeXium guest lore/saves route and PNG receipt")
+    print("PASS: genuine pinned NeXium guest RAM/SD-path diagnostic and PNG receipt; SD result is reported separately")
     return 0
 
 
