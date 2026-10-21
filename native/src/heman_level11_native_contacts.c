@@ -102,7 +102,16 @@ hm_lore_result hm_level11_accept_native_frame(
         applied |= result == HM_LORE_APPLIED;
         already |= result == HM_LORE_ALREADY_DONE;
     }
-    if (new_pickups & bio_bit) {
+    /* The core's HM_PICKUP bit is sticky even when the Bio is NOT yet
+     * earnable behind the locked gate. On a later genuine return with
+     * Wall Crusher and the gate opened, accept a CURRENT body overlap
+     * despite a prior native pickup bit. Never mint it from a distant
+     * old bit or a forged frame; the whole hm_step was independently
+     * replayed above. A new sweep crossing is also valid. */
+    if ((new_pickups & bio_bit) ||
+        ((after->picked & bio_bit) &&
+         at_sensor(world, after,
+                   &world->events[bindings->skeletor_bio_event]))) {
         result = hm_lore_collect(&candidate, HM_LORE_SKELETOR_BIO, 1u);
         if (result == HM_LORE_INVALID) return HM_LORE_INVALID;
         applied |= result == HM_LORE_APPLIED;
