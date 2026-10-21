@@ -501,10 +501,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
+          PYTHONPATH=tools python3 - <<'PY'
           import json
           from pathlib import Path
-          from tools.verify_nexium_sd_disk_receipt import audit_confined_sd
+          from verify_nexium_sd_disk_receipt import audit_confined_sd
           initial = json.loads(Path("boot-evidence/guest-sd-disk-receipt.json").read_text())
           disk, problem = audit_confined_sd(Path.cwd() / "boot-evidence/nexium-data")
           if problem or disk["slots"] != initial["emulator_sd_slots"]:
