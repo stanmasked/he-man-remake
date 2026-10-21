@@ -15,9 +15,10 @@ systematically tests:
 1. **All 120 incomplete write lengths (0 through 119):** each truncated
    newer record must be rejected as `wrong_length`; only generation 17
    is an eligible structural restore candidate.
-2. **A flipped bit at each of all 120 byte offsets:** a single changed bit
-   anywhere in the fully written newer record must make the outer envelope
-   invalid or otherwise fail structural decoding. The older valid record
+2. **All 960 individual bit flips across all 120 bytes:** every possible
+   bit position (eight bits per byte, including snapshot and outer/inner
+   checksums) is toggled independently. Each individual bit corruption
+   must invalidate the newer record and leave the older journal eligible. The older valid record
    must be the only remaining candidate.
 3. **Trailing garbage:** adding 1, 8 or 120 bytes is not a valid atomic
    journal write; the older generation remains selectable.
@@ -29,8 +30,9 @@ systematically tests:
    with an unavailable live guest world.
 
 The original synthetic older record must retain its byte-for-byte contents
-and SHA-256 on every iteration. The matrix samples **over 240 different
-new-record failure states**, not 240 host processes. Existing
+and SHA-256 on every iteration. The matrix checks **1,080 primary failure states** (120 truncated lengths
+plus 960 single-bit faults), in addition to other targeted corruptions.
+These are synthetic host file variants, **not 1,080 emulator processes**. Existing
 `test_switch_sd_journal_audit.py` and real guest stages remain distinct.
 
 These are structural tests of accidental corruption. FNV-1a is not a
