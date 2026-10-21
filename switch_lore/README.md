@@ -28,6 +28,8 @@ so the Switch application does not invent collision flags.
 | B | Restart the tutorial player/inventory, keeping the RAM save slot |
 | L | Save the current state in a **RAM-only** 96-byte receipt |
 | R | Load the RAM-only receipt (if one exists) |
+| ZL | **Experimental SD save** to two alternating `sdmc:/switch/heman_level11_lore_lab.{0,1}.bin` files |
+| ZR | **Experimental SD load** of newest compatible valid slot, with damaged-slot fallback |
 | Plus | Exit homebrew |
 
 At startup, the left→right course contains the open Concept Art item
@@ -78,8 +80,25 @@ make -C switch_lore clean all
 
 Output: `switch_lore/heman_level11_lore_lab.nro`.
 
-**Save is not persistent**: it exists in RAM until the application
-exits. The format is our own lab design, not an emulation or port of
+**L/R remains RAM-only** and is lost when the application exits. A
+separate, opt-in Stage113 **ZL/ZR** disk mechanism allows restoring
+progress after an application restart if the Switch's `sdmc:` filesystem
+is mounted and writable. The app does not access the SD card at startup.
+The two independent slot files each contain a versioned 128-byte record
+(sequence, existing canonical 96-byte receipt, damage-detection hash).
+Each new save overwrites the *older* slot; a damaged newest slot falls
+back to its earlier valid counterpart. Failures show a red status box
+at the right of the existing HUD without closing the game. Green means
+SD write succeeded, cyan means SD load succeeded. **File availability on
+actual Switch hardware or in NeXium has not yet been verified.**
+
+Redundant slots reduce the consequences of an interrupted write but
+are **not a guaranteed atomic transaction or power-loss-safe commit**
+on FAT/SD media. FNV-1a is not a signature. There is no original iOS
+persistence compatibility, and this remains optional test code.
+
+The existing 96-byte RAM save is our own lab design, not an emulation
+or port of commercial iOS save contents. The format is our own lab design, not an emulation or port of
 commercial iOS save contents. The game never opens the original IPA,
 writes commercial assets, saves private map locations or connects to
 the official level 1-1. No original paid upgrade/purchase system
