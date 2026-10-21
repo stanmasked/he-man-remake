@@ -85,7 +85,7 @@ def _role_indexes(native: dict) -> dict:
 
 
 def _bundle(bundle: dict, channel: str, expected_indices: dict,
-            root: Path, consumed_paths: set) -> dict:
+            root: Path, consumed_paths: set, consumed_digests: set) -> dict:
     if not isinstance(bundle, dict) or set(bundle) != BUNDLE_KEYS:
         raise ValueError("invalid private correspondence claim schema")
     if (type(bundle["schema_version"]) is not int or
@@ -112,11 +112,15 @@ def _bundle(bundle: dict, channel: str, expected_indices: dict,
         if record["original_contact_verified"] is not False:
             raise ValueError("unverified original gameplay contact cannot be asserted")
         object_digest = _sha(record["source_object_digest"], "source object digest")
+        artifact_digest = _sha(record["artifact_sha256"], "artifact sha256")
         source = _verified_artifact(root, record["artifact_file"],
-                                    record["artifact_sha256"])
+                                    artifact_digest)
         if source in consumed_paths:
             raise ValueError("evidence artifact reused across roles/channels")
+        if artifact_digest in consumed_digests:
+            raise ValueError("identical evidence bytes reused across claims")
         consumed_paths.add(source)
+        consumed_digests.add(artifact_digest)
         result[role] = object_digest
     if set(result) != set(ROLES) or len(set(result.values())) != len(ROLES):
         raise ValueError("source object IDs must be unique across all three roles")
@@ -134,8 +138,11 @@ def assess_private_correspondence(
         raise ValueError("private evidence root unavailable")
     indexes = _role_indexes(native)
     consumed = set()
-    first = _bundle(resource, CHANNELS[0], indexes, root, consumed)
-    second = _bundle(observation, CHANNELS[1], indexes, root, consumed)
+    consumed_digests = set()
+    first = _bundle(resource, CHANNELS[0], indexes, root, consumed,
+                    consumed_digests)
+    second = _bundle(observation, CHANNELS[1], indexes, root, consumed,
+                     consumed_digests)
     if first != second:
         raise ValueError("resource and observation source-object identities disagree")
     # No IDs/hashes/coordinates, filenames or indexes in report or stdout.
