@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import struct
 from pathlib import Path
@@ -51,6 +52,12 @@ def prepare_divergent_slots(source_root: Path, target_root: Path, first: dict) -
             entry["collected_mask"] != 3 or entry["collected_count"] != 2):
         raise ValueError("A completed two-collectible guest record is required")
     previous = read_confined_sd_slot_bytes(source_root, slot, entry["sha256"])
+    # A cleared pickup would otherwise immediately re-collect on the first
+    # native frame after restore. Art is at x=56 in this fictional level.
+    # Require a generous safety gap beyond actor half-width 5 + radius 4.
+    old_player_x = struct.unpack_from("<f", previous, 16 + 28)[0]
+    if not math.isfinite(old_player_x) or abs(old_player_x - 56.0) <= 12.0:
+        raise ValueError("Source saved hero overlaps synthetic Art pickup; fixture would auto-recollect")
     generation = entry["generation"]
     if not (0 < generation < (1 << 64) - 1):
         raise ValueError("Cannot generate newer journal without wraparound")
