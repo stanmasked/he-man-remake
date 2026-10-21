@@ -38,6 +38,7 @@
 - [x] Add a second source-identical host/Switch boot self-check covering combined movement, hazard respawn, combat defeat and atomic rollback.
 - [x] Add controller-triggered deterministic 180-frame runtime replay with a shared GCC/Clang/Switch fingerprint and nonmutating live-state contract.
 - [x] Boot independently authored synthetic Switch NROs in **NeXium** and verify genuine guest framebuffer and controller input (not physical Nintendo Switch proof). See [PR #54](https://github.com/stanmasked/he-man-remake/pull/54).
+- [x] Audit **private iOS v2.0.0** file pairing between medium and extra-large screen packs: all 39 level files identical, 213/214 ordinary .map files identical plus one distinct exceptional sky map. Local-only aggregate gate in [Stage137](stage137-private-ios-screen-pack-parity.md); no original level geometry or assets uploaded.
 - [ ] Document differences from iOS v2.0.0.
 
 No original IPA or extracted copyrighted resource may be committed, uploaded as Actions artifact, or placed in a public GitHub issue.
