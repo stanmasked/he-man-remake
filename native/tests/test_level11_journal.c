@@ -105,6 +105,9 @@ static void memory_tests(void) {
     /* Unsupported schema+checksum, a torn slot, and a non-authentic
      * original world seal must each fail closed or use valid fallback. */
     m.bytes[1][4u]=2u;
+    /* Keep the outer digest valid so this specifically tests unsupported
+     * schema rejection, rather than merely the checksum failure path. */
+    put64(m.bytes[1]+112u,fnv(m.bytes[1],112u));
     boot();
     assert(hm_level11_journal_restore(&game,&io,&generation));
     assert(generation==1u && game.lore.wall_crusher_unlocked==0u);
