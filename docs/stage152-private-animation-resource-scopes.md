@@ -79,10 +79,10 @@ The `local_reports/` folder is already gitignored. The original IPA
 and any extracted copyrighted sprites must not be placed in public
 GitHub/Actions, PR attachments or releases.
 
-The public regression suite adds **24 wholly synthetic cases**
+The public regression suite adds **25 wholly synthetic cases**
 covering resolution-specific differing/identical WADs, positive and
 negative class/state name matches, generic `idle` false positives,
-independent skeleton membership, source-name nonfuzzy matching,
+independent skeleton membership (including both `.skel2d` and `.skeleton2d` suffixes), source-name nonfuzzy matching,
 registry/skeleton parity failures, archive traversal/symlinks,
 malformed physics metadata, size guards and output privacy.
 
