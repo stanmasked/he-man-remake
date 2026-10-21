@@ -93,7 +93,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 "$TMP/test_level11_journal" cold-upgrade "$TMP/heman-progress"
 "$TMP/test_level11_journal" cold-read-upgrade "$TMP/heman-progress"
 # Corrupt newest slot and prove a brand-new process recovers old slot.
-printf '\\001' >> "$TMP/heman-progress.1"
+printf '\001' >> "$TMP/heman-progress.1"
 "$TMP/test_level11_journal" cold-read "$TMP/heman-progress"
 
 "$TMP/test_level11_snapshot"
