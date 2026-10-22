@@ -39,9 +39,9 @@ def sequence_record(symbol="SyntheticCut"):
     return bytes(out)
 
 
-def cut_record(texture="SyntheticTexture", tuple_index=0, trailing=b""):
+def cut_record(texture="SyntheticTexture", tuple_index=0, trailing=b"", xywh=(0, 0, 16, 16)):
     return (name("SyntheticCut") + name(texture) + struct.pack("<I", 1)
-            + struct.pack("<IIIII", tuple_index, 0, 0, 16, 16) + trailing)
+            + struct.pack("<iiiii", tuple_index, *xywh) + trailing)
 
 
 def texture_record(image="SyntheticImage", trailing=b""):
@@ -104,13 +104,23 @@ class SpriteResourceGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "tuple count does not match"):
             graph.parse_sprite_cut_record(cut_record(trailing=b"\x00"))
 
-    def test_cut_tuple_first_field_must_match_ordinal(self):
-        with self.assertRaisesRegex(ValueError, "zero-based ordinal"):
+    def test_cut_handle_must_match_zero_based_position(self):
+        with self.assertRaisesRegex(ValueError, "zero-based position"):
             graph.parse_sprite_cut_record(cut_record(tuple_index=1))
 
     def test_texture_record_requires_exact_eof(self):
         with self.assertRaisesRegex(ValueError, "trailing bytes"):
             graph.parse_texture_data_record(texture_record(trailing=b"\x00"))
+
+    def test_texture_record_requires_empty_auxiliary_string(self):
+        malformed = name("SyntheticTexture") + bytes([1]) + bytes(12) + name("not-empty") + name("SyntheticImage")
+        with self.assertRaisesRegex(ValueError, "auxiliary string is not empty"):
+            graph.parse_texture_data_record(malformed)
+
+    def test_cut_xywh_fields_are_signed(self):
+        record = cut_record(xywh=(12, -256, 214, 512))
+        key, texture, tuples = graph.parse_sprite_cut_record(record)
+        self.assertEqual(tuples, ((0, 12, -256, 214, 512),))
 
     def test_case_only_image_path_aliases_resolve_to_one_png(self):
         args = list(fixture(paths=(
