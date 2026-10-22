@@ -119,11 +119,67 @@ static void test_paused_player_ignores_scheduler_updates(void) {
     assert(state.elapsed_ticks == 40);
 }
 
+
+/* Stage181: model the original application-state gate separately from a
+   player-level pause. While the app-state gate is closed, HeloApp::_tick
+   does not dispatch GSAppDelegate::onTick, so the handler's wall-time
+   baseline remains at the last active callback. The first resumed handler
+   sees the full fabricated pause interval; the existing 66-ms cap limits
+   catch-up to four updates. This is a source-free model, not device timing. */
+static void test_application_state_pause_then_resume_clamps_stale_wall_time(void) {
+    static const int32_t boundaries[] = {0, 100000};
+    static const int32_t callback_ms[] = {16, 17, 17};
+    hm_sprite_clock_state state = {0, 0, -1};
+    int32_t accumulator = 0;
+    int32_t paused_wall_ms = 0;
+    uint32_t updates = 0u, total_updates = 0u;
+    uint32_t handler_calls = 0u, player_calls = 0u;
+    uint32_t i, j;
+
+    /* One active callback establishes the handler-side time baseline. */
+    assert(hm_app_tick_scheduler_advance(&accumulator, 16, &updates) ==
+           HM_APP_TICK_OK);
+    assert(updates == 1u && accumulator == 0);
+    ++handler_calls;
+    assert(hm_sprite_clock_step(boundaries, 1u, -1, &state,
+                                0.04f, 1.0f, 1, 128u) == HM_SPRITE_CLOCK_OK);
+    ++player_calls;
+    assert(state.elapsed_ticks == 40);
+
+    /* Thirty callbacks span exactly 500 fabricated ms (10 x 16/17/17).
+       With nonzero application state, the handler is not dispatched. */
+    for (i = 0u; i < 30u; ++i) {
+        paused_wall_ms += callback_ms[i % 3u];
+        /* Intentionally no scheduler call: the app-level gate is upstream. */
+    }
+    assert(paused_wall_ms == 500);
+    assert(handler_calls == 1u && player_calls == 1u);
+    assert(accumulator == 0 && state.elapsed_ticks == 40);
+
+    /* The first active callback observes the wall interval since the last
+       handler call; the 66-ms cap yields four 16-ms updates and 2 ms left. */
+    assert(hm_app_tick_scheduler_advance(&accumulator, paused_wall_ms,
+                                         &updates) == HM_APP_TICK_OK);
+    ++handler_calls;
+    assert(updates == 4u && accumulator == 2);
+    total_updates += updates;
+    for (j = 0u; j < updates; ++j) {
+        assert(hm_sprite_clock_step(boundaries, 1u, -1, &state,
+                                    0.04f, 1.0f, 1, 128u) ==
+               HM_SPRITE_CLOCK_OK);
+        ++player_calls;
+    }
+
+    assert(handler_calls == 2u && total_updates == 4u && player_calls == 5u);
+    assert(state.elapsed_ticks == 200);
+}
+
 int main(void) {
     test_one_second_combined_schedule();
     test_one_second_fixed_delta_budget_while_animation_active();
     test_stall_clamp_drives_at_most_four_player_updates();
     test_paused_player_ignores_scheduler_updates();
-    puts("PASS: 4 combined app-scheduler + sprite-clock scenarios");
+    test_application_state_pause_then_resume_clamps_stale_wall_time();
+    puts("PASS: 5 combined app-scheduler + sprite-clock scenarios");
     return 0;
 }
