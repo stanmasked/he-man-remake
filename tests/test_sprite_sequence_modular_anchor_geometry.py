@@ -113,14 +113,20 @@ class Stage165FabricatedModularAnchorTests(unittest.TestCase):
 
     def test_paired_extra_token_in_no_fit_record_is_observed(self):
         repos, wads, cuts = make_fake_packs()
-        # FakeReject already has a 65-byte tail and fails the Stage158
-        # candidate grammar. Insert an indexed name only in the
-        # second-screen tail without changing that upstream no-fit
-        # category or the record's total byte length.
-        replacement = string("CutB") + b"\xfe" * (65 - len(string("CutB")))
-        wads[SCREENS[1]] = wads[SCREENS[1]].replace(
-            b"\xfe" * 65, replacement, 1,
-        )
+        # Only mutate the FakeReject record, not an earlier synthetic
+        # run of FE bytes in FakeExtra. Both records contain FE spans.
+        name = string("FakeReject")
+        start = wads[SCREENS[1]].find(name)
+        self.assertGreaterEqual(start, 0)
+        tail_at = start + len(name) + 8 + 20 + 13 + len(first_cut())
+        payload = bytearray(wads[SCREENS[1]])
+        self.assertEqual(payload[tail_at:tail_at + 65], b"\xfe" * 65)
+        token = string("CutB")
+        payload[tail_at:tail_at + len(token)] = token
+        wads[SCREENS[1]] = bytes(payload)
+        # Stage158 still sees a 65-byte candidate tail and no full
+        # strict parse. Stage165 must notice extra lexical evidence in
+        # the second resolution pack without trusting it as a frame.
         report = self.report((repos, wads, cuts))
         self.assertEqual(report["by_firstword_and_declared_count"][
             "first_u32_one"]["one"][
