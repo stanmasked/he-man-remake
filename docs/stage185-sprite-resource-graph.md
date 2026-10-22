@@ -16,7 +16,8 @@ Both source resolution packs independently passed strict record-boundary checks 
 | Frames parsed | 7,889 |
 | Symbol references examined | 14,971 |
 | Symbol references matching the SpriteCut index | 13,432 |
-| Matched symbol handles resolving to a SpriteCut tuple | 13,431 / 13,432 |\n| Matched symbol handles not resolving to a tuple | 1 |
+| Matched symbol handles resolving to a SpriteCut tuple | 13,431 / 13,432 |
+| Matched symbol handles not resolving to a tuple | 1 |
 | Symbol handle fields differing between resolution packs | 4 (two sequences) |
 | Symbol references without a SpriteCut index match | 1,539 |
 | SpriteCut records | 1,156 |
