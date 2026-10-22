@@ -14,8 +14,6 @@ on:
       - 'raster/**'
       - 'native/src/**'
       - 'native/include/**'
-      - 'native/tests/**'
-      - 'native/run_tests.sh'
   workflow_dispatch:
 
 concurrency:
