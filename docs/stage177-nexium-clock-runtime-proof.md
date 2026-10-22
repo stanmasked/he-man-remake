@@ -51,12 +51,16 @@ authentic He-Man art or production actor animation.
 
 ## Next gate
 
-Wait for the dedicated cross-build and NeXium runtime workflow. If it
-fails, use the retained logs/PNGs to correct the runner or pixel assertions
-before connecting any original graphics. Production integration remains
-blocked on resolving the original timer/callback discrepancy.
+Three earlier NeXium runs passed all seven guest PNG checkpoints, including
+frame 300. A separate run exposed nondeterministic startup latency: the first
+frame arrived late and the 16-second capture budget ended before frame 300.
+The workflow now allows 40 seconds, with a host regression guarding that
+budget. The current PR-head rerun must still finish successfully before this
+gate is checked. If it fails, use retained logs/PNGs to correct the runner or
+pixel assertions before connecting original graphics. Production integration
+remains blocked on resolving the original timer/callback discrepancy.
 
 
 ## Host CI dependency
 
-The first full Python-suite run discovered that the new PNG fixture tests import Pillow, while the repository's generic test workflow did not install it. The workflow now explicitly installs Pillow before unit-test discovery. The initial failure occurred at test-module import (before the new assertions ran); the corrected full-suite run is pending.
+The first full Python-suite run discovered that the new PNG fixture tests import Pillow, while the generic test workflow did not install it. Pillow is now installed before test discovery. The corrected run passed all 1,809 tests on Python 3.10, 3.12 and 3.13; native C99 core and focused sprite-clock host checks also passed under GCC and Clang. These host results are distinct from the latest NeXium runtime rerun.
