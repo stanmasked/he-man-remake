@@ -29,6 +29,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_app_tick_scheduler.c" \
   "$ROOT/native/tests/test_app_tick_scheduler.c" \
   -o "$TMP/test_app_tick_scheduler"
+
+# Stage175: exercise the actual scheduler + sprite clock together, including
+# a full synthetic second, the wall-time cap, and pause/resume behavior.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_app_tick_scheduler.c" \
+  "$ROOT/native/src/heman_sprite_clock.c" \
+  "$ROOT/native/tests/test_tick_animation_integration.c" \
+  -lm -o "$TMP/test_tick_animation_integration"
+"$TMP/test_tick_animation_integration"
 "$TMP/test_app_tick_scheduler"
 "$TMP/test_sprite_clock"
 
