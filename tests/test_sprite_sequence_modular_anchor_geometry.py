@@ -111,19 +111,21 @@ class Stage165FabricatedModularAnchorTests(unittest.TestCase):
                 bucket["known_first_cut_records"],
             )
 
-    def test_paired_known_token_moved_only_in_second_pack(self):
+    def test_paired_extra_token_in_no_fit_record_is_observed(self):
         repos, wads, cuts = make_fake_packs()
-        # Second pack has same record length but no longer the same
-        # secondary token position/shape. This is evidence, not an error.
+        # FakeReject already has a 65-byte tail and fails the Stage158
+        # candidate grammar. Insert an indexed name only in the
+        # second-screen tail without changing that upstream no-fit
+        # category or the record's total byte length.
+        replacement = string("CutB") + b"\xfe" * (65 - len(string("CutB")))
         wads[SCREENS[1]] = wads[SCREENS[1]].replace(
-            b"\xcc" * 12 + string("CutB"),
-            b"\xcc" * 13 + string("CutB")[:-1],
+            b"\xfe" * 65, replacement, 1,
         )
         report = self.report((repos, wads, cuts))
         self.assertEqual(report["by_firstword_and_declared_count"][
-            "first_u32_one"]["two"][
+            "first_u32_one"]["one"][
                 "gap_geometry_identical_across_screen_packs"
-        ], 2)
+        ], 1)
 
     def test_bad_first_cut_pair_is_rejected_upstream(self):
         repos, wads, cuts = make_fake_packs()
