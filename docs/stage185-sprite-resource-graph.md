@@ -15,7 +15,7 @@ Both source resolution packs independently passed strict record-boundary checks 
 | Indexed sequence records parsed to exact EOF | 2,354 |
 | Frames parsed | 7,889 |
 | Symbol references examined | 14,971 |
-| Symbol references matching the SpriteCut index | 13,432 |
+| Symbol references matching the SpriteCut index | 13,432 |\n| Matched symbol handles resolving to a SpriteCut tuple | 13,431 / 13,432 |\n| Matched symbol handles not resolving to a tuple | 1 |
 | Symbol references without a SpriteCut index match | 1,539 |
 | SpriteCut records | 1,156 |
 | SpriteCut-to-TextureData links | 1,156 / 1,156 |
@@ -44,6 +44,8 @@ Added `src/heman_tools/sprite_cut_texture_image_graph.py`:
 - Original ARMv7 method inspection confirms the first field is a cut handle used by `SpriteRes::getCutForHandle`; in all 2,334 source tuples it equals the zero-based position.
 - Original `SpriteCut::buildTextCoord` uses fields 2–5 as signed `x`, `y`, `width` and `height` when calculating normalized texture coordinates.
 - Parses TextureData records as the indexed key, a 13-byte mixed-width scalar block, an empty auxiliary string, and the ImageData key. The scalar block is kept opaque because its individual fields' meanings are not needed to establish the graph.
+
+The original `Symbol::fileIn`/ `Symbol::getTexture` path also confirms that a Symbol's first signed integer after its resource name is passed as the SpriteCut handle. The audit extracts that handle only in memory and checks it against the matching resource's cut handles. Per resolution pack, **13,431 of 13,432** symbols whose resource names match the SpriteCut index resolve to a handle; one does not. The same single unresolved handle occurs in both packs. It is recorded as an original-data exception, not repaired or silently discarded.
 - Strictly parses the separate ImageData repository envelope, rejects path traversal and validates PNG headers without extracting images.
 - Resolves case-only aliases only when there is a unique matching archive member; ambiguous case-folded archive paths fail closed.
 - Emits aggregate-only JSON under the ignored local reports directory. No original asset bytes or identifiers are uploaded.
@@ -58,7 +60,7 @@ PYTHONPATH=src python -m heman_tools.sprite_cut_texture_image_graph \
 
 ## Synthetic-only regression tests
 
-`tests/test_sprite_cut_texture_image_graph.py` adds 15 fabricated-data tests for exact EOF, tuple counts and ordinals, missing graph links, unmatched symbols, path traversal, PNG validation, case-only aliases, ambiguous case-folded members, paired-pack consistency and output redaction.
+`tests/test_sprite_cut_texture_image_graph.py` adds 17 fabricated-data tests for exact EOF, tuple counts and ordinals, missing graph links, unmatched symbols, path traversal, PNG validation, case-only aliases, ambiguous case-folded members, paired-pack consistency and output redaction.
 
 These tests do not use the original IPA or original graphics. The private audit is not part of GitHub Actions.
 
