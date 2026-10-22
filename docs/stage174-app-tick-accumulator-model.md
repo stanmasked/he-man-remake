@@ -38,11 +38,14 @@ fabricated tests through native/run_tests.sh.
 
 A synthetic one-second schedule with 60 callback deltas patterned as
 20 × 16 ms and 40 × 17 ms totals exactly 1000 ms. The accumulator emits
-62 updates with 8 ms left over. Combined with the fixed 40-unit delta,
-that fixture advances 2480 animation-time units during its 1000 ms wall
-clock. This is an **apparent 2.48× ratio in the reconstructed path**,
-not a benchmark of a running original device. The 66-ms cap also means
-large stalls intentionally discard some elapsed wall time.
+62 updates with 8 ms left over. At 40 units per update, the scheduler
+*offers* 2480 units of player time over that interval if an animation is
+still active. The finite two-play test animation itself reaches its
+strict finished state after 37 updates and then holds, so its state does
+not accumulate the remaining offered time. This shows the apparent
+2.48× update/time-input ratio **while active**, not a benchmark of a
+running original device. The 66-ms cap also means large stalls
+intentionally discard some elapsed wall time.
 
 ## Synthetic Switch probe
 
