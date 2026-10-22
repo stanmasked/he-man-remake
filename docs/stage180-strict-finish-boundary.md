@@ -6,7 +6,7 @@ Stage180 is a verifier-only follow-up to Stage178, stacked on Stage179. A focuse
 
 - Require the exact screen-background RGB at the finish-strip sample for all pre-finish checkpoints: 6, 12, 18 and 30.
 - Keep exact finished-strip RGB checks at frames 36, 120 and 300.
-- Add a negative-control host test that injects a white finished strip at frame 30 and requires the verifier to reject it with the specific checkpoint in the error.
+- Add negative-control host cases that inject a white finished strip at each pre-finish checkpoint (frames 6, 12, 18 and 30); each must fail closed and identify the offending frame.
 - No guest NRO, production game logic, sprite-clock, or input behavior is modified.
 
 ## Verification
