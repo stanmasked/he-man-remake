@@ -51,32 +51,43 @@ host-side test-fixture checks, not captured emulator evidence.
 
 ## What this can prove
 
-A passing run proves that the isolated synthetic NRO executes under the
-patched NeXium CPU/runner and that its actual guest pixels match the
-deterministic synthetic clock model at the selected checkpoints. It does
-not prove the original iOS binary's runtime timing, nor validate authentic
-He-Man art or production actor animation.
+The successful current Stage177 PR-head run proves that the isolated synthetic
+NRO executes under the pinned, temporarily patched NeXium CPU/runner and that
+its actual guest pixels match the deterministic synthetic clock model at the
+selected checkpoints. Run [#39847718995](https://github.com/stanmasked/he-man-remake/actions/runs/39847718995)
+completed successfully: the runner reported 1,710 frames, 4,742,253,954 retired
+cycles and 8,475 SVCs, and the seven-checkpoint pixel verifier passed. The
+separate room-2 probe on the same revision also succeeded in
+[run #39847718972](https://github.com/stanmasked/he-man-remake/actions/runs/39847718972).
+These results do not prove the original iOS binary's runtime timing, nor
+validate authentic He-Man art or production actor animation.
 
 ## Next gate
 
-Four earlier NeXium runs passed all seven guest PNG checkpoints, including
-frame 300: [run A](https://github.com/stanmasked/he-man-remake/actions/runs/39839123724),
+The Stage177 synthetic guest-execution gate is now passed for PR head
+`ac456f9c2f4f26178e80a735b060977ae2b7994e`. Four earlier NeXium runs also
+passed all seven guest PNG checkpoints, including frame 300:
+[run A](https://github.com/stanmasked/he-man-remake/actions/runs/39839123724),
 [run B](https://github.com/stanmasked/he-man-remake/actions/runs/39839405439),
 [run C](https://github.com/stanmasked/he-man-remake/actions/runs/39842453357),
 and [run D](https://github.com/stanmasked/he-man-remake/actions/runs/39842587365).
-A separate run exposed nondeterministic startup latency: the first frame
-arrived late and the 16-second capture budget ended before frame 300. The
-workflow now allows 40 seconds, with a host regression guarding that budget.
-The current PR-head rerun must still finish successfully before this gate is
-checked. If it fails, use retained logs/PNGs to correct the runner or pixel
-assertions before connecting original graphics. Production integration remains
-blocked on resolving the original timer/callback discrepancy.
+A separate earlier run exposed nondeterministic startup latency: the first
+frame arrived late and the 16-second capture budget ended before frame 300.
+The workflow now allows 40 seconds, with a host regression guarding that budget.
+
+The remaining timing gate is independent: compare the original iOS runtime's
+timer/callback behavior with the recovered clock and scheduler before connecting
+original graphics or integrating the reconstructed clock into production
+gameplay. Stage178's exact-pixel CI and fresh guest run remain additional
+checks on its own branch.
 
 ## Host CI dependency
 
 The first full Python-suite run discovered that the new PNG fixture tests
 import Pillow, while the generic test workflow did not install it. Pillow is
-now installed before test discovery. The corrected run passed all 1,809 tests
-on Python 3.10, 3.12 and 3.13; native C99 core and focused sprite-clock host
-checks also passed under GCC and Clang. These host results are distinct from
-the latest NeXium runtime rerun.
+now installed before test discovery. Stage177's corrected run passed all 1,809
+tests on Python 3.10, 3.12 and 3.13; native C99 core and focused sprite-clock
+host checks also passed under GCC and Clang. Stage178 adds two host tests; its
+latest Python run passed 1,811 tests on Python 3.12, and the Python 3.10/3.13
+jobs plus GCC passed. Clang and Stage178's fresh NeXium run were still queued
+at the last status check.
