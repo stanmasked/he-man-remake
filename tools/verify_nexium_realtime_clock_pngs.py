@@ -12,7 +12,7 @@ from PIL import Image, ImageOps
 
 FRAME_INDICES = (30, 120, 300)
 LATE_FRAMES = (120, 300)
-WIDTH, HEIGHT = 640, 360
+SUPPORTED_SIZES = {(640, 360), (1280, 720)}
 REQUIRED_TOKENS = ("STARTUP", "COUNTER", "RESUME", "PASS")
 
 
@@ -32,14 +32,19 @@ def read_and_ocr(path: Path, scratch: Path, index: int) -> tuple[Image.Image, st
         if source.format != "PNG":
             raise ValueError(f"Guest frame {index} is not PNG")
         image = source.convert("RGB")
-    if image.size != (WIDTH, HEIGHT):
-        raise ValueError(f"Unexpected guest frame {index} dimensions: {image.size}")
+    if image.size not in SUPPORTED_SIZES:
+        raise ValueError(
+            f"Unexpected guest frame {index} dimensions: {image.size}; "
+            f"expected one of {sorted(SUPPORTED_SIZES)}"
+        )
 
-    # The guest's console font is small in a 640x360 capture. Upscale its
-    # upper status region with nearest-neighbor sampling before OCR.
-    crop = image.crop((0, 0, WIDTH, 250)).convert("L")
-    crop = ImageOps.autocontrast(crop)
-    crop = crop.resize((WIDTH * 4, 1000), Image.Resampling.NEAREST)
+    # libnx console output may be captured at 640x360 or native 1280x720.
+    # Crop the same upper 250/360 of the screen and normalize to 2560x1000.
+    crop_height = image.height * 250 // 360
+    crop = image.crop((0, 0, image.width, crop_height)).convert("L")
+    # Tesseract is more reliable with dark glyphs on a light background.
+    crop = ImageOps.invert(ImageOps.autocontrast(crop))
+    crop = crop.resize((2560, 1000), Image.Resampling.NEAREST)
     enlarged = scratch / f"clock-frame-{index:04}-ocr.png"
     crop.save(enlarged)
     result = subprocess.run(
