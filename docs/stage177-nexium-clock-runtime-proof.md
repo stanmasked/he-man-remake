@@ -25,6 +25,9 @@ per-callback update indicator (one update at frame 30 versus two at frame
 120). It fails closed if any expected guest frame is missing or a sampled
 pixel relationship is wrong.
 
+
+A native C99 timeline test now independently runs the exact 16/17/17-ms callback sequence through the production scheduler and sprite-clock sources for 300 guest callbacks. It locks the expected cumulative update counts and states at all seven capture checkpoints: 6, 12, 18, 30, 36, 120 and 300. This prevents the pixel verifier's expected timeline from drifting away from the C implementation.
+
 ## Isolation and privacy
 
 - NRO is built from the already existing synthetic C99 clock and scheduler.
