@@ -73,8 +73,12 @@ def verify(folder: Path) -> dict:
     # The screen background persists until the native strict-end predicate
     # emits the finished-state strip.
     finish_strip = {index: pixel[index][100, 352] for index in FRAME_INDICES}
-    if finish_strip[18] != SCREEN_BACKGROUND_RGB:
-        raise ValueError("Finished-state strip appeared before the strict end edge")
+    for index in (6, 12, 18, 30):
+        if finish_strip[index] != SCREEN_BACKGROUND_RGB:
+            raise ValueError(
+                "Finished-state strip appeared before the strict end edge "
+                f"at guest frame {index}"
+            )
     for index in (36, 120, 300):
         if finish_strip[index] != FINISHED_STRIP_RGB:
             raise ValueError(
