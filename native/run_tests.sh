@@ -14,6 +14,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_core.c" \
   -lm -o "$TMP/test_core"
 
+# Stage172: independently authored C99 sprite clock oracle. Synthetic
+# frame boundaries only; no proprietary resources or original traces.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_sprite_clock.c" \
+  "$ROOT/native/tests/test_sprite_clock.c" \
+  -lm -o "$TMP/test_sprite_clock"
+"$TMP/test_sprite_clock"
+
 # Stage 102: source-referenced, privately importable level 1-1 lore mechanics.
 # No original iOS map/geometry or commercial assets. Tested as pure C99.
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
