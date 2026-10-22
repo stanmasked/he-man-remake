@@ -75,7 +75,8 @@ jobs:
       CMAKE_POLICY_VERSION_MINIMUM: "3.5"
       RUST_BACKTRACE: "1"
       NEXIUM_CPU_BACKEND: rustarmic
-      NEXIUM_DEBUG_RUNNER_SECONDS: "16"
+      # First guest framebuffer can be delayed by headless SVC wake-up; allow frame 300.
+      NEXIUM_DEBUG_RUNNER_SECONDS: "40"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4

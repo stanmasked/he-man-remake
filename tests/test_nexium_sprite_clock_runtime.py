@@ -96,6 +96,13 @@ class SpriteClockRuntimeInstrumentationTests(unittest.TestCase):
             instrument(SOURCE.replace("frames += 1;", "frames += 2;", 1))
 
 
+class SpriteClockRuntimeWorkflowTests(unittest.TestCase):
+    def test_runner_window_covers_delayed_start_and_frame_300(self) -> None:
+        workflow = (ROOT / ".github/workflows/nexium-sprite-clock-probe.yml").read_text()
+        self.assertIn('NEXIUM_DEBUG_RUNNER_SECONDS: "40"', workflow)
+        self.assertIn("timeout --kill-after=6s 95s", workflow)
+
+
 class SpriteClockGuestPixelVerifierTests(unittest.TestCase):
     def test_valid_synthetic_guest_checkpoint_set(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
