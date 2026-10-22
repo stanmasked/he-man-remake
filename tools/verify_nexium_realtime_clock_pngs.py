@@ -66,16 +66,17 @@ def verify(folder: Path) -> dict:
                 folder / f"raster-frame-{index:04}.png", scratch, index
             )
             captures[index] = text
-            colors = len(set(image.resize((80, 45)).getdata()))
-            if colors < 8:
+            gray = image.convert("L")
+            ink_pixels = sum(1 for value in gray.getdata() if value > 48)
+            if ink_pixels < 250:
                 raise ValueError(
-                    f"Guest frame {index} lacks expected console color diversity: {colors}"
+                    f"Guest frame {index} has too little visible console output: {ink_pixels} ink pixels"
                 )
             details.append(
                 {
                     "frame": index,
                     "dimensions": list(image.size),
-                    "sample_colors": colors,
+                    "visible_ink_pixels": ink_pixels,
                     "pass_marker_detected": has_pass_marker(text),
                     "ocr_text": text.strip(),
                 }
