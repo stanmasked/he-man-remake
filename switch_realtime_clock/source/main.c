@@ -104,7 +104,7 @@ static int run_platform_selfcheck(selfcheck_report *report) {
     after_ticks = armGetSystemTick();
     report->pause_500ms_observed_ns =
         elapsed_counter_ns(before_ticks, after_ticks);
-    if (report->pause_500ms_observed_ns < UINT64_C(66000000)) return 3;
+    if (report->pause_500ms_observed_ns < UINT64_C(500000000)) return 3;
     if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates, 1,
                         &elapsed_ms, &updates)) return 4;
     report->first_resume_ms = elapsed_ms;
@@ -117,7 +117,7 @@ static int run_platform_selfcheck(selfcheck_report *report) {
     after_ticks = armGetSystemTick();
     report->pause_200ms_observed_ns =
         elapsed_counter_ns(before_ticks, after_ticks);
-    if (report->pause_200ms_observed_ns < UINT64_C(66000000)) return 6;
+    if (report->pause_200ms_observed_ns < UINT64_C(200000000)) return 6;
     if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates, 1,
                         &elapsed_ms, &updates)) return 7;
     report->second_resume_ms = elapsed_ms;
@@ -278,9 +278,13 @@ int main(void) {
             printf("Player-only pause callback: %ld ms, %lu scheduler updates\n",
                    (long)report.normal_callback_ms,
                    (unsigned long)report.player_paused_scheduler_updates);
-            printf("Self-check: app-gate resumes capped at %ld ms; final %lu updates\n",
-                   (long)HM_APP_TICK_MAX_ACCUMULATOR_MS,
-                   (unsigned long)report.total_updates);
+            printf("App-gate resumes: %ld ms and %ld ms (cap %ld ms)\n",
+                   (long)report.first_resume_ms, (long)report.second_resume_ms,
+                   (long)HM_APP_TICK_MAX_ACCUMULATOR_MS);
+            printf("Self-check: final %lu scheduler updates, %ld player ticks, %ld ms remainder\n",
+                   (unsigned long)report.total_updates,
+                   (long)report.final_player_ticks,
+                   (long)report.final_accumulator_ms);
             printf("B reset | + exit\n");
             consoleUpdate(NULL);
         }
