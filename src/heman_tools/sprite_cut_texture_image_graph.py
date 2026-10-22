@@ -2,9 +2,9 @@
 
 This module validates the resource-reference chain without exporting original
 resource identifiers, paths, image bytes, per-record fields, or private reports.
-The five-u32 SpriteCut tuples are preserved as opaque fields except that their
-first value is checked against the tuple's zero-based position. Their other
-field semantics are deliberately not inferred.
+The five signed SpriteCut fields are parsed as a cut handle and x/y/width/height.
+The original executable's fileIn/buildTextCoord/getCutForHandle behavior confirms
+that layout; the handle is checked against the source's zero-based position.
 """
 from __future__ import annotations
 
@@ -27,10 +27,10 @@ from .sprite_wad_record_intervals import _intervals
 MAX_IMAGE_ENTRIES = 5000
 MAX_IMAGE_REPO_BYTES = 1_000_000
 MAX_CUT_TUPLES = 2048
-TEXTURE_OPAQUE_HEADER_BYTES = 15
+TEXTURE_SCALAR_BLOCK_BYTES = 13
 _U16 = struct.Struct("<H")
 _U32 = struct.Struct("<I")
-_TUPLE5 = struct.Struct("<IIIII")
+_TUPLE5 = struct.Struct("<iiiii")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -96,23 +96,27 @@ def parse_sprite_cut_record(record: bytes) -> tuple[str, str, tuple[tuple[int, i
     tuples = tuple(_TUPLE5.unpack_from(record, at + i * _TUPLE5.size)
                    for i in range(count))
     if any(item[0] != ordinal for ordinal, item in enumerate(tuples)):
-        raise SpriteResourceGraphError("SpriteCut first tuple field is not its zero-based ordinal")
+        raise SpriteResourceGraphError("SpriteCut handle does not match its zero-based position")
     return key, texture_key, tuples
 
 
 def parse_texture_data_record(record: bytes) -> tuple[str, str, bytes]:
-    """Parse the texture key, opaque 15-byte block, and image key with exact EOF."""
+    """Parse the texture key, 13-byte mixed-width scalar block, empty string, and image key."""
     if type(record) is not bytes or len(record) > MAX_WAD_BYTES:
         raise SpriteResourceGraphError("Invalid TextureData record")
     key, at = _text(record, 0)
-    if at + TEXTURE_OPAQUE_HEADER_BYTES > len(record):
-        raise SpriteResourceGraphError("Truncated TextureData opaque block")
-    opaque = record[at:at + TEXTURE_OPAQUE_HEADER_BYTES]
-    at += TEXTURE_OPAQUE_HEADER_BYTES
+    if at + TEXTURE_SCALAR_BLOCK_BYTES + _U16.size > len(record):
+        raise SpriteResourceGraphError("Truncated TextureData scalar block or auxiliary string")
+    scalar_block = record[at:at + TEXTURE_SCALAR_BLOCK_BYTES]
+    at += TEXTURE_SCALAR_BLOCK_BYTES
+    auxiliary_units = _U16.unpack_from(record, at)[0]
+    at += _U16.size
+    if auxiliary_units != 0:
+        raise SpriteResourceGraphError("TextureData auxiliary string is not empty")
     image_key, at = _text(record, at)
     if at != len(record):
         raise SpriteResourceGraphError("TextureData record has trailing bytes")
-    return key, image_key, opaque
+    return key, image_key, scalar_block
 
 
 def _require_screen_pair(groups: tuple[dict[str, bytes], ...]) -> None:
@@ -273,7 +277,7 @@ def summarize_sprite_cut_texture_image_graph(
             "cut_records": len(cuts),
             "cut_to_texture_links": cut_to_texture,
             "cut_tuple_entries": tuple_count,
-            "cut_tuple_first_fields_matching_ordinals": tuple_count,
+            "cut_handle_fields_matching_positions": tuple_count,
             "texture_records": len(textures),
             "texture_to_image_links": texture_to_image,
             **cut_summary,
@@ -317,10 +321,11 @@ def summarize_sprite_cut_texture_image_graph(
             "texture_to_image_key_links_match": True,
             "image_repository_entries_match": True,
         },
-        "texture_opaque_header_bytes": TEXTURE_OPAQUE_HEADER_BYTES,
-        "sprite_cut_tuple_first_field_is_zero_based_ordinal": True,
-        "sprite_cut_tuple_remaining_field_semantics_verified": False,
-        "sprite_cut_tuples_confirmed_as_texture_rectangles": False,
+        "texture_mixed_width_scalar_block_bytes": TEXTURE_SCALAR_BLOCK_BYTES,
+        "texture_auxiliary_string_is_empty": True,
+        "sprite_cut_handle_matches_zero_based_position": True,
+        "sprite_cut_xywh_fields_confirmed_by_original_native_code": True,
+        "sprite_cut_tuples_confirmed_as_texture_rectangles": True,
         "original_actor_state_to_sequence_binding_verified": False,
         "original_animation_transform_and_render_order_verified": False,
         "original_animation_timebase_calibrated": False,
