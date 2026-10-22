@@ -140,6 +140,55 @@ def _parse_sequence_pack(repository: bytes, wad: bytes):
     return tuple(result)
 
 
+def _read_text_allow_empty(raw: bytes, at: int) -> tuple[str, int]:
+    if at + _U16.size > len(raw):
+        raise SpriteResourceGraphError("Truncated serialized symbol-name length")
+    units = _U16.unpack_from(raw, at)[0]
+    if units == 0:
+        return "", at + _U16.size
+    return _text(raw, at)
+
+
+def _parse_sequence_symbol_handle_refs(repository: bytes, wad: bytes):
+    """Read Symbol names and their first post-name s32 handle after strict full-record validation."""
+    rows = parse_sprite_repository(
+        repository, expected_label="SpriteSeqData", expected_wad="sprite/SpriteSeqData.wad")
+    records = _intervals(rows, wad)
+    result = []
+    for row, record in zip(rows, records):
+        item = _parse_native_sequence(record)
+        key, at = _text(record, 0)
+        if key != row.key or at + 12 > len(record):
+            raise SpriteIndexFormatError("SpriteSequence key/header mismatch during handle audit")
+        _, frame_count, _ = struct.unpack_from("<iii", record, at)
+        at += 12
+        refs = []
+        for _ in range(frame_count):
+            if at + 21 > len(record):
+                raise SpriteResourceGraphError("Truncated frame while extracting Symbol handles")
+            at += 16
+            at += 1
+            symbol_count = struct.unpack_from("<i", record, at)[0]
+            at += 4
+            for __ in range(symbol_count):
+                if at + 8 > len(record):
+                    raise SpriteResourceGraphError("Truncated Symbol prefix while extracting handles")
+                at += 8
+                name, at = _read_text_allow_empty(record, at)
+                if at + 68 > len(record):
+                    raise SpriteResourceGraphError("Truncated Symbol scalar tail while extracting handle")
+                handle = struct.unpack_from("<i", record, at)[0]
+                at += 68
+                refs.append((name, handle))
+        if at != len(record):
+            raise SpriteIndexFormatError("Symbol handle scan did not reach exact EOF")
+        expected_names = [name for frame in item.frames for name in frame.symbol_names]
+        if [name for name, _ in refs] != expected_names:
+            raise SpriteIndexFormatError("Symbol handle scan disagrees with strict native sequence parser")
+        result.append((key, tuple(refs)))
+    return tuple(result)
+
+
 def _parse_cut_pack(repository: bytes, wad: bytes):
     rows = parse_sprite_repository(
         repository, expected_label="SpriteCutData", expected_wad="sprite/SpriteResData.wad")
@@ -243,11 +292,14 @@ def summarize_sprite_cut_texture_image_graph(
 
     per_screen = {}
     private_sequences = {}
+    private_symbol_handle_refs = {}
     private_cuts = {}
     private_textures = {}
     private_images = {}
     for screen in SCREENS:
         sequences = _parse_sequence_pack(sequence_repositories[screen], sequence_wads[screen])
+        symbol_handle_refs_by_sequence = _parse_sequence_symbol_handle_refs(
+            sequence_repositories[screen], sequence_wads[screen])
         cuts = _parse_cut_pack(cut_repositories[screen], cut_wads[screen])
         textures = _parse_texture_pack(texture_repositories[screen], texture_wads[screen])
         images = parse_image_repository(image_repositories[screen])
@@ -265,7 +317,15 @@ def summarize_sprite_cut_texture_image_graph(
 
         symbol_names = [name for sequence in sequences for frame in sequence.frames
                         for name in frame.symbol_names]
+        handle_refs = [ref for _, refs in symbol_handle_refs_by_sequence for ref in refs]
+        if [name for name, _ in handle_refs] != symbol_names:
+            raise SpriteIndexFormatError("Flattened Symbol handle references disagree with sequence symbols")
         indexed_symbols = sum(name in cut_keys for name in symbol_names)
+        cut_handles = {key: {item[0] for item in tuples} for key, _, tuples in cuts}
+        resolved_symbol_handles = sum(
+            name in cut_handles and handle in cut_handles[name] for name, handle in handle_refs)
+        unresolved_symbol_handles = sum(
+            name in cut_handles and handle not in cut_handles[name] for name, handle in handle_refs)
         tuple_count = sum(len(tuples) for _, _, tuples in cuts)
         cut_summary = _resolve_image_paths(screen, images, image_member_headers[screen])
         per_screen[screen] = {
@@ -274,6 +334,9 @@ def summarize_sprite_cut_texture_image_graph(
             "symbol_references": len(symbol_names),
             "symbol_references_matching_cut_index": indexed_symbols,
             "symbol_references_without_cut_index_match": len(symbol_names) - indexed_symbols,
+            "symbol_handles_resolved_for_matched_resources": resolved_symbol_handles,
+            "symbol_handles_unresolved_for_matched_resources": unresolved_symbol_handles,
+            "symbol_handles_without_resource_match": len(symbol_names) - indexed_symbols,
             "cut_records": len(cuts),
             "cut_to_texture_links": cut_to_texture,
             "cut_tuple_entries": tuple_count,
@@ -283,6 +346,7 @@ def summarize_sprite_cut_texture_image_graph(
             **cut_summary,
         }
         private_sequences[screen] = sequences
+        private_symbol_handle_refs[screen] = symbol_handle_refs_by_sequence
         private_cuts[screen] = cuts
         private_textures[screen] = textures
         private_images[screen] = images
@@ -296,6 +360,9 @@ def summarize_sprite_cut_texture_image_graph(
             raise SpriteResourceGraphError("Paired sequence identity/frame counts differ")
         if any(a.symbol_names != b.symbol_names for a, b in zip(first.frames, second.frames)):
             raise SpriteResourceGraphError("Paired symbol references differ")
+
+    if private_symbol_handle_refs[left] != private_symbol_handle_refs[right]:
+        raise SpriteResourceGraphError("Paired Symbol handle references differ")
 
     left_cuts, right_cuts = private_cuts[left], private_cuts[right]
     if len(left_cuts) != len(right_cuts):
@@ -326,6 +393,10 @@ def summarize_sprite_cut_texture_image_graph(
         "sprite_cut_handle_matches_zero_based_position": True,
         "sprite_cut_xywh_fields_confirmed_by_original_native_code": True,
         "sprite_cut_tuples_confirmed_as_texture_rectangles": True,
+        "symbol_handle_field_confirmed_by_original_native_code": True,
+        "all_symbol_handles_resolve_for_matched_resources": all(
+            values["symbol_handles_unresolved_for_matched_resources"] == 0
+            for values in per_screen.values()),
         "original_actor_state_to_sequence_binding_verified": False,
         "original_animation_transform_and_render_order_verified": False,
         "original_animation_timebase_calibrated": False,
