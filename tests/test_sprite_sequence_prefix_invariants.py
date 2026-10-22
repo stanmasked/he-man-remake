@@ -126,7 +126,8 @@ class Stage156SequencePrefixInvariantsTests(unittest.TestCase):
     def test_diff_first_word_across_packs_fails_closed(self):
         repos,wads=fake_pairs()
         replace_field(repos,wads,SCREENS[1],1,0,123)
-        with self.assertRaisesRegex(SpriteIndexFormatError,"Stable sequence prefix"):
+        # Stage155 already detects first-word cross-pack divergence.
+        with self.assertRaisesRegex(SpriteIndexFormatError,"first remaining field differs"):
             self.report((repos,wads))
 
     def test_diff_fourth_word_across_packs_fails_closed(self):
