@@ -57,8 +57,6 @@ def summarize_sequence_prefix_invariants(
     second_equal = fourth_equal = fifth_equal = 0
     first_max = 0
     first_zero = 0
-    prefix_bytes_equal = 0
-    after_prefix_records = 0
     for i,row in enumerate(entries):
         decoded = []
         for pack in parts:
@@ -103,13 +101,6 @@ def summarize_sequence_prefix_invariants(
         first_zero += a[0] == 0
         first_max = max(first_max,a[0])
         all_equal += a == b
-        prefix_bytes_equal += (
-            parts[0][i][len(parts[0][i][:2])+0:0] ==
-            parts[1][i][len(parts[1][i][:2])+0:0]
-        ) if False else a == b
-        after_prefix_records += len(parts[0][i]) > (
-            len(parts[0][i]) - len(parts[0][i]) + 0
-        )  # replaced by actual body-length check below
 
     # Recompute this count without relying on the serialized source
     # item's per-record offsets in published output.
