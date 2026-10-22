@@ -29,6 +29,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_app_tick_scheduler.c" \
   "$ROOT/native/tests/test_app_tick_scheduler.c" \
   -o "$TMP/test_app_tick_scheduler"
+
+# Stage174: integrated accumulator-to-animation timing, still synthetic.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_app_tick_scheduler.c" \
+  "$ROOT/native/src/heman_sprite_clock.c" \
+  "$ROOT/native/tests/test_sprite_timing_integration.c" \
+  -lm -o "$TMP/test_sprite_timing_integration"
+"$TMP/test_sprite_timing_integration"
 "$TMP/test_app_tick_scheduler"
 "$TMP/test_sprite_clock"
 
