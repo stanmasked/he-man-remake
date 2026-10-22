@@ -35,6 +35,9 @@ pixel relationship is wrong.
 - Captures and logs are uploaded as a seven-day CI artifact, including
   diagnostic evidence on failure.
 
+
+The shared Python CI also exercises the frame instrumentation against a pinned-shape synthetic Rust fixture and tests the pixel verifier with fabricated 640×360 PNG checkpoints. Negative controls remove a required frame and corrupt the two-update indicator; both must fail closed. These are host-side test-fixture checks, not captured emulator evidence.
+
 ## What this can prove
 
 A passing run will prove that the isolated synthetic NRO executes under
