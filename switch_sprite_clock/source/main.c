@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "heman_sprite_clock.h"
+#include "heman_app_tick_scheduler.h"
 
 #define SCREEN_W 640u
 #define SCREEN_H 360u
@@ -31,6 +32,9 @@ int main(int argc, char **argv) {
     PadState pad;
     Result rc;
     hm_sprite_clock_state state = {0, 0, loop_setting};
+    static const int32_t callback_ms_pattern[] = {16, 17, 17};
+    int32_t wall_accumulator_ms = 0;
+    uint32_t callback_index = 0u;
     unsigned rate_index = 1u;
     int active = 1;
     int clock_error = 0;
@@ -50,7 +54,8 @@ int main(int argc, char **argv) {
 
     while (appletMainLoop()) {
         uint32_t row, col, stride = 0u;
-        uint32_t *pixels;
+        uint32_t *pixels, scheduled_updates = 0u, update_index;
+        int32_t synthetic_wall_delta_ms;
         uint64_t down;
         int finished = 0;
         padUpdate(&pad);
@@ -61,14 +66,27 @@ int main(int argc, char **argv) {
             state.frame_index = 0;
             state.elapsed_ticks = 0;
             state.remaining_replays = loop_setting;
+            wall_accumulator_ms = 0;
             clock_error = 0;
         }
         if (down & HidNpadButton_Y) rate_index = (rate_index + 1u) % 3u;
+        synthetic_wall_delta_ms =
+            callback_ms_pattern[callback_index % 3u];
+        ++callback_index;
         if (!clock_error &&
-            hm_sprite_clock_step(boundaries, 3u, loop_setting, &state,
-                                 0.04f, rates[rate_index],
-                                 active, 128u) != HM_SPRITE_CLOCK_OK) {
+            hm_app_tick_scheduler_advance(&wall_accumulator_ms,
+                                          synthetic_wall_delta_ms,
+                                          &scheduled_updates) != HM_APP_TICK_OK) {
             clock_error = 1;
+        }
+        for (update_index = 0u;
+             update_index < scheduled_updates && !clock_error;
+             ++update_index) {
+            if (hm_sprite_clock_step(boundaries, 3u, loop_setting, &state,
+                                     0.04f, rates[rate_index],
+                                     active, 128u) != HM_SPRITE_CLOCK_OK) {
+                clock_error = 1;
+            }
         }
         (void)hm_sprite_clock_is_finished(boundaries, 3u, loop_setting,
                                           &state, &finished);
@@ -91,6 +109,9 @@ int main(int argc, char **argv) {
         rect(pixels, stride, 40, 54, 600, 66, UINT32_C(0xff39465d));
         rect(pixels, stride, 40, 54, 40 + (int)(rate_index + 1u) * 80, 66,
              UINT32_C(0xffaa8be8));
+        rect(pixels, stride, 40, 76, 600, 84, UINT32_C(0xff39465d));
+        rect(pixels, stride, 40, 76, 40 + (int)scheduled_updates * 80, 84,
+             UINT32_C(0xffffd166));
         rect(pixels, stride, 120, 100, 520, 276,
              clock_error ? UINT32_C(0xffe84a5f) :
              (state.frame_index >= 0 && state.frame_index < 3 ?
