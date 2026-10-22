@@ -26,6 +26,10 @@ The parser does not force ambiguous groups into pairs. In particular, some alias
 - Of the 73 comparable aliases, 58 point to the same resource pair and 15 point to different pairs.
 - All 184 and 188 exact resource references resolve to keys in the original SpriteSequence repository. No key or alias is included in this report.
 
+### Executable-string cross-check
+
+Every distinct alias with a confirmed directional pair also occurs as an exact standalone ASCII string token in the original executable image: **77/77** aliases from the first window and **79/79** from the second, including all **75/75** shared aliases. This makes it unlikely that the alias labels are artifacts of the GO-data scanner. The remaining missing link is semantic: the static handle value used by each C++ state constructor has not yet been tied to its corresponding alias at runtime.
+
 This supports a data-driven alias-to-directional-sequence table and gives a concrete next target for runtime tracing. It does **not** yet prove which C++ player-state handle emits each alias, nor whether the serialized message dispatch reaches the expected component at runtime.
 
 ## Implementation and safeguards
