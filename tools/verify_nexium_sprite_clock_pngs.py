@@ -1,12 +1,32 @@
 """Fail-closed checks for synthetic sprite-clock guest frames captured by NeXium."""
 from __future__ import annotations
+
 import argparse
 import json
 from pathlib import Path
+
 from PIL import Image
 
 FRAME_INDICES = (6, 12, 18, 30, 36, 120, 300)
 WIDTH, HEIGHT = 640, 360
+
+# Exact RGB values sampled from a successful real NeXium guest-frame artifact.
+# libnx's packed uint32 framebuffer values appear byte-reversed in the PNG's
+# RGB channel order, so these are intentionally the observed PNG values.
+EXPECTED_CENTER_RGB = {
+    6: (209, 185, 71),    # synthetic frame 1
+    12: (91, 196, 122),   # synthetic frame 2
+    18: (72, 91, 216),    # replay wraps to synthetic frame 0
+    30: (91, 196, 122),   # synthetic frame 2
+    36: (91, 196, 122),
+    120: (91, 196, 122),
+    300: (91, 196, 122),
+}
+SCREEN_BACKGROUND_RGB = (55, 35, 24)
+BAR_BACKGROUND_RGB = (93, 70, 57)
+BAR_FILL_RGB = (102, 209, 255)
+FINISHED_STRIP_RGB = (240, 240, 240)
+
 
 def load_frame(folder: Path, index: int) -> Image.Image:
     path = folder / f"raster-frame-{index:04}.png"
@@ -20,65 +40,65 @@ def load_frame(folder: Path, index: int) -> Image.Image:
         raise ValueError(f"Unexpected frame {index} dimensions: {image.size}")
     return image
 
+
 def verify(folder: Path) -> dict:
     frames = {index: load_frame(folder, index) for index in FRAME_INDICES}
     pixel = {index: frames[index].load() for index in FRAME_INDICES}
 
-    # The synthetic NRO's center swatch must traverse frame 1 -> frame 2 ->
-    # frame 0 at the known scheduler boundaries, then hold frame 2 after finish.
+    # Check exact state colors, not merely that neighboring frames differ.
     center = {index: pixel[index][320, 180] for index in FRAME_INDICES}
-    if center[6] == center[12]:
-        raise ValueError("Frame 6 to 12 did not change the synthetic frame swatch")
-    if center[12] == center[18]:
-        raise ValueError("Frame 12 to 18 did not wrap to the first synthetic frame")
-    if center[18] == center[30]:
-        raise ValueError("Frame 18 to 30 did not advance back to the third frame")
-    for index in (36, 120, 300):
-        if center[index] != center[30]:
-            raise ValueError(f"Finished animation did not hold frame 2 at guest frame {index}")
+    for index, expected in EXPECTED_CENTER_RGB.items():
+        if center[index] != expected:
+            raise ValueError(
+                f"Unexpected synthetic swatch at frame {index}: "
+                f"got {center[index]}, expected {expected}"
+            )
 
-    # At frame 18 elapsed time has just wrapped to zero; by frame 12 the
-    # elapsed bar is filled partway. At frame 30 it is not yet full; frame
-    # 36 has passed the strict finish edge and clamps the progress bar to full.
+    # At frame 18 elapsed time has wrapped to zero; at frame 30 the progress
+    # bar is partial; frame 36 crosses the strict finish edge and fills it.
     progress_left = {index: pixel[index][140, 292] for index in FRAME_INDICES}
     progress_far = {index: pixel[index][450, 292] for index in FRAME_INDICES}
-    if progress_left[12] == progress_left[18]:
+    if progress_left[12] != BAR_FILL_RGB:
+        raise ValueError("Progress bar is not filled at the frame-12 checkpoint")
+    if progress_left[18] != BAR_BACKGROUND_RGB:
         raise ValueError("Progress bar did not reset at the finite replay boundary")
-    if progress_far[30] == progress_far[36]:
-        raise ValueError("Progress bar did not reach full width at animation finish")
-    if not (progress_far[36] == progress_far[120] == progress_far[300]):
-        raise ValueError("Progress bar changed after the animation had finished")
+    if progress_far[30] != BAR_BACKGROUND_RGB:
+        raise ValueError("Progress bar should still be partial at guest frame 30")
+    for index in (36, 120, 300):
+        if progress_far[index] != BAR_FILL_RGB:
+            raise ValueError(
+                f"Progress bar is not full and stable at guest frame {index}"
+            )
 
-    # A white strip is rendered only when the native strict-end predicate
-    # reports finished. Sample away from the other HUD elements.
+    # The screen background persists until the native strict-end predicate
+    # emits the finished-state strip.
     finish_strip = {index: pixel[index][100, 352] for index in FRAME_INDICES}
-    if finish_strip[18] == finish_strip[36]:
-        raise ValueError("Native finished-state strip did not appear after the strict end edge")
-    if not (finish_strip[36] == finish_strip[120] == finish_strip[300]):
-        raise ValueError("Finished-state strip was not stable in later guest frames")
+    if finish_strip[18] != SCREEN_BACKGROUND_RGB:
+        raise ValueError("Finished-state strip appeared before the strict end edge")
+    for index in (36, 120, 300):
+        if finish_strip[index] != FINISHED_STRIP_RGB:
+            raise ValueError(
+                f"Finished-state strip is absent or unstable at guest frame {index}"
+            )
 
-    # The per-callback update bar is one quantum wide at frame 30, two at
-    # frame 120 for the synthetic 16/17/17-ms pattern.
+    # The callback HUD shows one 80-pixel update quantum at frame 30 and two
+    # at frame 120. Verify exact fill/background colors at both edges.
     update_one = pixel[30][100, 80]
     update_two_edge_30 = pixel[30][190, 80]
     update_one_edge_120 = pixel[120][100, 80]
     update_two_edge_120 = pixel[120][190, 80]
-    if update_one == update_two_edge_30:
+    if update_one != BAR_FILL_RGB or update_one_edge_120 != BAR_FILL_RGB:
+        raise ValueError("First update-bar quantum has an unexpected pixel color")
+    if update_two_edge_30 != BAR_BACKGROUND_RGB:
         raise ValueError("Frame 30 update bar unexpectedly shows two catch-up updates")
-    if update_two_edge_30 == update_two_edge_120:
+    if update_two_edge_120 != BAR_FILL_RGB:
         raise ValueError("Frame 120 update bar did not show two catch-up updates")
-    if update_one != update_one_edge_120:
-        raise ValueError("The first update-bar quantum changed unexpectedly")
 
     result = {
         "captured_frames": list(FRAME_INDICES),
         "dimensions": [WIDTH, HEIGHT],
-        "center_swatch_transitions": {
-            "frame_6": list(center[6]),
-            "frame_12": list(center[12]),
-            "frame_18": list(center[18]),
-            "frame_30": list(center[30]),
-            "finished_frames_hold": [36, 120, 300],
+        "center_swatch_rgb": {
+            str(index): list(center[index]) for index in FRAME_INDICES
         },
         "progress_bar_reset_at_frame_18": True,
         "progress_bar_full_by_frame_36": True,
@@ -86,6 +106,7 @@ def verify(folder: Path) -> dict:
         "two_update_catchup_visible_at_frame_120": True,
     }
     return result
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -95,6 +116,7 @@ def main() -> int:
     print(json.dumps(result, indent=2, sort_keys=True))
     print("PASS: NeXium guest pixels match the synthetic sprite-clock timeline")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
