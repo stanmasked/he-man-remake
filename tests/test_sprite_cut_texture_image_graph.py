@@ -174,13 +174,14 @@ class SpriteResourceGraphTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Paired symbol references differ"):
             graph.summarize_sprite_cut_texture_image_graph(*args)
 
-    def test_paired_symbol_handles_must_match(self):
+    def test_resolution_specific_symbol_handles_are_reported(self):
         args = list(fixture())
         seq_wads = dict(args[1])
         seq_wads["screen-xlarge"] = sequence_record("SyntheticCut", symbol_handle=1)
         args[1] = seq_wads
-        with self.assertRaisesRegex(ValueError, "Paired Symbol handle references differ"):
-            graph.summarize_sprite_cut_texture_image_graph(*args)
+        report = graph.summarize_sprite_cut_texture_image_graph(*args)
+        self.assertEqual(report["paired_pack_checks"]["symbol_handle_field_differences_between_packs"], 1)
+        self.assertEqual(report["per_resolution_pack"]["screen-xlarge"]["symbol_handles_unresolved_for_matched_resources"], 1)
 
 
 if __name__ == "__main__":
