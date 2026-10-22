@@ -14,7 +14,7 @@ on:
       - 'native/tests/test_tick_animation_integration.c'
       - 'native/clock/heman_app_tick_clock.h'
       - 'native/clock/heman_app_tick_clock.c'
-      - 'native/tests/test_app_tick_clock.c'
+      - 'native/clock/test_app_tick_clock.c'
       - 'native/tests/test_sprite_clock_runtime_timeline.c'
   workflow_dispatch:
 
@@ -44,7 +44,7 @@ jobs:
           "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_sprite_clock.c native/tests/test_sprite_clock.c -lm -o /tmp/heman-clock-tests/test_sprite_clock
           "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_sprite_clock.c native/tests/test_sprite_clock_exhaustive.c -lm -o /tmp/heman-clock-tests/test_sprite_clock_exhaustive
           "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_app_tick_scheduler.c native/tests/test_app_tick_scheduler.c -o /tmp/heman-clock-tests/test_app_tick_scheduler
-          "$CC" "${FLAGS[@]}" "${INC[@]}" -Inative/clock native/clock/heman_app_tick_clock.c native/src/heman_app_tick_scheduler.c native/src/heman_sprite_clock.c native/tests/test_app_tick_clock.c -lm -o /tmp/heman-clock-tests/test_app_tick_clock
+          "$CC" "${FLAGS[@]}" "${INC[@]}" -Inative/clock native/clock/heman_app_tick_clock.c native/src/heman_app_tick_scheduler.c native/src/heman_sprite_clock.c native/clock/test_app_tick_clock.c -lm -o /tmp/heman-clock-tests/test_app_tick_clock
           "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_app_tick_scheduler.c native/src/heman_sprite_clock.c native/tests/test_tick_animation_integration.c -lm -o /tmp/heman-clock-tests/test_tick_animation_integration
           /tmp/heman-clock-tests/test_sprite_clock
           /tmp/heman-clock-tests/test_sprite_clock_exhaustive

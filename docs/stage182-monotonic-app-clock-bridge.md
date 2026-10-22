@@ -15,7 +15,7 @@ Stage182 introduces a portable boundary between a platform monotonic timestamp a
 
 Six synthetic C99 scenarios cover first-sample behavior, integer-millisecond conversion, the 66-ms edge, two pause/resume cycles with a carried accumulator remainder, timestamp regression, extreme uint64 deltas and invalid state. The repeated-pause integration case yields 11 bounded updates, a 3-ms accumulator remainder and 440 offered player-clock units from fabricated timestamps.
 
-The focused host workflow compiles this adapter under GCC and Clang with strict C99 warnings. The full native/run_tests.sh suite also includes it. No guest NRO or production loop is changed in this stage.
+The focused host workflow compiles this adapter under GCC and Clang with strict C99 warnings. The broad native/run_tests.sh suite is intentionally unchanged in this stage to avoid triggering unrelated Level1-1 workflows from a host-test-only path. No guest NRO or production loop is changed in this stage.
 
 ## Evidence boundary and next step
 
