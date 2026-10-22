@@ -8,7 +8,7 @@ Stage183 adds a second NRO dedicated to measuring a real libnx monotonic counter
 - Feed monotonic nanosecond samples to the Stage182 portable bridge, then pass its capped millisecond delta to the existing 16-ms app-tick scheduler and synthetic sprite clock.
 - During startup, skip clock sampling over actual 500-ms and 200-ms \`svcSleepThread\` calls. Each resumed dispatch must report 66 ms, schedule four updates, and retain a 2-ms accumulator remainder.
 - Immediately sample the same timestamp again and require zero elapsed milliseconds, proving that the resumed callback refreshed the clock baseline.
-- Sleep for another 16 ms and require a valid nonzero update, checking that normal dispatch resumes after the pause.
+- Sleep for 16 ms with the player clock paused: the scheduler must still consume one to four updates without changing player time. Then reactivate the player clock and require normal animation updates to resume.
 - Interactive A toggles the app-level gate (no sampling while disabled); X pauses only the player clock; B resets; Plus exits.
 
 ## Verification sequence
