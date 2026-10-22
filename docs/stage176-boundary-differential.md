@@ -16,8 +16,9 @@ and infinite playback.
 
 The test compares the C99 implementation to a separate reference state
 machine and checks result codes, selected frame, elapsed time, and replay
-counter. It executes **41,874 cases** and is wired into the shared runner,
-so the existing GCC and Clang jobs run it with strict C99 warnings.
+counter. It executes **41,874 cases**. A focused workflow compiles and runs
+this test alongside the existing clock/scheduler integration checks under
+both GCC and Clang, without adding it to the broad gameplay test runner.
 
 ## Owner-private boundary differential
 
