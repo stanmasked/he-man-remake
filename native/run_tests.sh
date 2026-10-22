@@ -21,6 +21,15 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_sprite_clock.c" \
   "$ROOT/native/tests/test_sprite_clock.c" \
   -lm -o "$TMP/test_sprite_clock"
+
+# Stage174: source-free reproduction of the original bounded app tick
+# accumulator (synthetic elapsed milliseconds only).
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_app_tick_scheduler.c" \
+  "$ROOT/native/tests/test_app_tick_scheduler.c" \
+  -o "$TMP/test_app_tick_scheduler"
+"$TMP/test_app_tick_scheduler"
 "$TMP/test_sprite_clock"
 
 # Stage 102: source-referenced, privately importable level 1-1 lore mechanics.
