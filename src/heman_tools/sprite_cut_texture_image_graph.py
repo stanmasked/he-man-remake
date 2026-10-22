@@ -81,7 +81,7 @@ def parse_image_repository(raw: bytes) -> tuple[tuple[str, str], ...]:
 
 
 def parse_sprite_cut_record(record: bytes) -> tuple[str, str, tuple[tuple[int, int, int, int, int], ...]]:
-    """Parse a cut key, texture key, count, and exact sequence of five-u32 tuples."""
+    """Parse a cut key, texture key, count, and exact sequence of five signed-int tuples."""
     if type(record) is not bytes or len(record) > MAX_WAD_BYTES:
         raise SpriteResourceGraphError("Invalid SpriteCut record")
     key, at = _text(record, 0)
