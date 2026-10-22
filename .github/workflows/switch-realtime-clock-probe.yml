@@ -1,0 +1,72 @@
+name: He-Man real-time app-clock Switch NRO
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/switch-realtime-clock-probe.yml'
+      - 'switch_realtime_clock/**'
+      - 'native/clock/heman_app_tick_clock.h'
+      - 'native/clock/heman_app_tick_clock.c'
+      - 'native/include/heman_app_tick_scheduler.h'
+      - 'native/src/heman_app_tick_scheduler.c'
+      - 'native/include/heman_sprite_clock.h'
+      - 'native/src/heman_sprite_clock.c'
+  workflow_dispatch:
+
+concurrency:
+  group: \${{ github.workflow }}-\${{ github.event_name }}-\${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-realtime-clock-nro:
+    name: Cross-compile isolated real-time clock probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original game assets in Git tracking
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git ls-files > /tmp/heman-tracked-paths.txt
+          if grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$' /tmp/heman-tracked-paths.txt; then
+            echo 'Original game assets are forbidden in this repository' >&2
+            exit 1
+          fi
+      - name: Verify devkitPro toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$DEVKITA64/bin/aarch64-none-elf-gcc"
+          test -x "$DEVKITPRO/tools/bin/elf2nro"
+          test -f "$DEVKITPRO/libnx/switch.specs"
+          "$DEVKITA64/bin/aarch64-none-elf-gcc" --version | head -n 1
+      - name: Build isolated real-time NRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_realtime_clock clean all
+          NRO=switch_realtime_clock/heman_realtime_clock_probe.nro
+          ELF=switch_realtime_clock/heman_realtime_clock_probe.elf
+          test -s "$NRO"
+          test -s "$ELF"
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h "$ELF" | grep -F AArch64
+          test "$(dd if="$NRO" bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum "$NRO"
+          wc -c "$NRO"
+      - name: Upload real-time clock probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-realtime-app-clock-probe-nro
+          path: switch_realtime_clock/heman_realtime_clock_probe.nro
+          if-no-files-found: error
+          retention-days: 7

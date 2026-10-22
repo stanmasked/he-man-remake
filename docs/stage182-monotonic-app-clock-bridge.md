@@ -19,6 +19,6 @@ The focused host workflow compiles this adapter under GCC and Clang with strict 
 
 ## Evidence boundary and next step
 
-This is a portable time-source bridge, not proof of original iOS callback delivery or a hardware Switch frame rate. It does not choose a libnx API, perform rendering, or change player timing. The next step is to wire a verified libnx monotonic source into an isolated real-time guest probe while keeping the deterministic frame oracle separate.
+This is a portable time-source bridge, not proof of original iOS callback delivery or a hardware Switch frame rate. It does not choose a libnx API, perform rendering, or change player timing. Stage183 wires libnx's monotonic system counter into a separate real-time guest probe while keeping the deterministic frame oracle separate. The new probe's cross-compilation is not runtime evidence; see [Stage183](stage183-realtime-switch-clock-probe.md).
 
 No IPA bytes, disassembly, original game art, extracted resources or private reports are included.
