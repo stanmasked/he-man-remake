@@ -361,8 +361,18 @@ def summarize_sprite_cut_texture_image_graph(
         if any(a.symbol_names != b.symbol_names for a, b in zip(first.frames, second.frames)):
             raise SpriteResourceGraphError("Paired symbol references differ")
 
-    if private_symbol_handle_refs[left] != private_symbol_handle_refs[right]:
-        raise SpriteResourceGraphError("Paired Symbol handle references differ")
+    symbol_handle_field_differences = 0
+    for first_sequence, second_sequence in zip(
+            private_symbol_handle_refs[left], private_symbol_handle_refs[right]):
+        if first_sequence[0] != second_sequence[0]:
+            raise SpriteResourceGraphError("Paired Symbol sequence keys differ")
+        first_refs, second_refs = first_sequence[1], second_sequence[1]
+        if len(first_refs) != len(second_refs):
+            raise SpriteResourceGraphError("Paired Symbol reference counts differ")
+        for first_ref, second_ref in zip(first_refs, second_refs):
+            if first_ref[0] != second_ref[0]:
+                raise SpriteResourceGraphError("Paired Symbol names differ")
+            symbol_handle_field_differences += first_ref[1] != second_ref[1]
 
     left_cuts, right_cuts = private_cuts[left], private_cuts[right]
     if len(left_cuts) != len(right_cuts):
@@ -387,6 +397,8 @@ def summarize_sprite_cut_texture_image_graph(
             "cut_keys_texture_links_and_tuple_counts_match": True,
             "texture_to_image_key_links_match": True,
             "image_repository_entries_match": True,
+            "symbol_names_match_across_packs": True,
+            "symbol_handle_field_differences_between_packs": symbol_handle_field_differences,
         },
         "texture_mixed_width_scalar_block_bytes": TEXTURE_SCALAR_BLOCK_BYTES,
         "texture_auxiliary_string_is_empty": True,
