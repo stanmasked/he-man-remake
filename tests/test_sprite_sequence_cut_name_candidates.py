@@ -136,11 +136,7 @@ class Stage157SequenceToCutNameControls(unittest.TestCase):
 
     def test_paired_resolution_specific_opaque_suffixes_can_differ(self):
         seqs,wads,cuts=artificial_sources()
-        for screen in SCREENS:
-            wads[screen]=wads[screen].replace(
-                b"synthetic",b"SYNTHETIC") if screen==SCREENS[1] else wads[screen]
-        # Replacement changes byte lengths: keep equal-length contents instead.
-        seqs,wads,cuts=artificial_sources()
+        # Alter only body bytes without changing record boundaries.
         wads[SCREENS[1]]=wads[SCREENS[1]].replace(
             b"synthetic",b"sYnThetic")
         r=self.report((seqs,wads,cuts))
