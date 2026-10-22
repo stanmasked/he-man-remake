@@ -1,0 +1,171 @@
+name: NeXium synthetic sprite-clock guest proof
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nexium-sprite-clock-probe.yml'
+      - 'switch_sprite_clock/**'
+      - 'native/src/heman_sprite_clock.c'
+      - 'native/include/heman_sprite_clock.h'
+      - 'native/src/heman_app_tick_scheduler.c'
+      - 'native/include/heman_app_tick_scheduler.h'
+      - 'tools/instrument_nexium_sprite_clock.py'
+      - 'tools/instrument_nexium_frames.py'
+      - 'tools/verify_nexium_sprite_clock_pngs.py'
+      - 'patches/nexium-nro-segment-file-origin.patch'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-sprite-clock-nro:
+    name: Build isolated asset-free sprite-clock NRO
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$'; then
+            echo 'Original game assets are forbidden in public CI' >&2
+            exit 1
+          fi
+      - name: Cross-compile the actual synthetic clock guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_sprite_clock clean all
+          NRO=switch_sprite_clock/heman_sprite_clock_probe.nro
+          ELF=switch_sprite_clock/heman_sprite_clock_probe.elf
+          test -s "$NRO"
+          test -s "$ELF"
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h "$ELF" | grep -F AArch64
+          test "$(dd if="$NRO" bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum "$NRO"
+          wc -c "$NRO"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-sprite-clock-runtime-nro
+          path: switch_sprite_clock/heman_sprite_clock_probe.nro
+          if-no-files-found: error
+          retention-days: 7
+
+  run-neXium-guest:
+    name: Verify actual guest frame transitions in patched NeXium
+    needs: build-sprite-clock-nro
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      RUST_BACKTRACE: "1"
+      NEXIUM_CPU_BACKEND: rustarmic
+      # First guest framebuffer can be delayed by headless SVC wake-up; allow frame 300.
+      NEXIUM_DEBUG_RUNNER_SECONDS: "40"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: heman-sprite-clock-runtime-nro
+          path: nros
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies used by pinned NeXium
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libgtk-3-dev libasound2-dev libpulse-dev libudev-dev libdbus-1-dev \
+            libibus-1.0-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev \
+            libboost-dev libvulkan1 mesa-vulkan-drivers python3-pil
+      - name: Checkout and patch pinned NeXium in a temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nexium-upstream
+          git -C /tmp/nexium-upstream init -q
+          git -C /tmp/nexium-upstream remote add origin https://github.com/nexium-emu/nexium.git
+          git -C /tmp/nexium-upstream fetch --depth 1 origin b6149f647f1b0824e450555beb6cfc16b6f0e075
+          git -C /tmp/nexium-upstream checkout -q --detach FETCH_HEAD
+          git -C /tmp/nexium-upstream submodule update --init --depth 1
+          git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_sprite_clock.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
+          mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
+      - name: Build patched NeXium guest runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          cargo build -p nexium-gui --bin debug_boot --no-default-features --features backend-rustarmic
+          test -x target/debug/debug_boot
+          cp target/debug/debug_boot "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+          sha256sum "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+      - name: Run synthetic clock NRO and validate guest pixels
+        shell: bash
+        run: |
+          set -euo pipefail
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/sprite-clock-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence"
+          export RUST_LOG="info,wgpu_core=warn"
+          NRO="$PWD/nros/heman_sprite_clock_probe.nro"
+          set +e
+          timeout --kill-after=6s 95s boot-evidence/debug_boot "$NRO" rustarmic runner \
+            >boot-evidence/sprite-clock-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/sprite-clock-exit-status.txt
+          tail -n 100 boot-evidence/sprite-clock-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Patched NeXium synthetic clock guest failed with status $code" >&2
+            exit 1
+          fi
+          python3 tools/verify_nexium_sprite_clock_pngs.py boot-evidence | tee boot-evidence/sprite-clock-report.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/sprite-clock-runner.log").read_text()
+          if "Production runner complete" not in log:
+              raise SystemExit("NeXium guest runner did not report normal completion")
+          matches = re.findall(r"cycles=(\d+) svcs=(\d+) frames=(\d+)", log)
+          if not matches:
+              raise SystemExit("No periodic guest execution reports were recorded")
+          cycles = max(int(row[0]) for row in matches)
+          svcs = max(int(row[1]) for row in matches)
+          print(f"Guest CPU progress: cycles={cycles}, SVCs={svcs}")
+          if cycles <= 0 or svcs <= 0:
+              raise SystemExit("No actual guest CPU/SVC progress was recorded")
+          print("PASS: NeXium ran the synthetic sprite-clock NRO and emitted guest frames")
+          PY
+      - name: Upload runtime evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-nexium-sprite-clock-runtime-evidence
+          path: |
+            boot-evidence/*.log
+            boot-evidence/*status.txt
+            boot-evidence/*.png
+            boot-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 7
