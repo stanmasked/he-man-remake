@@ -127,6 +127,51 @@ static void test_transition_budget_and_zero_total_guard(void) {
     assert(memcmp(&s, &before, sizeof s) == 0);
 }
 
+static void test_original_callback_delta_value_and_full_replay(void) {
+    const int32_t boundaries[] = {0, 240, 480, 720};
+    hm_sprite_clock_state state = {0, 0, 1};
+    int32_t converted = 0;
+    int finished = 0;
+    unsigned i;
+    assert(hm_sprite_tick_delta_i32(0.04f, 1.0f, &converted) ==
+           HM_SPRITE_CLOCK_OK);
+    assert(converted == 40);
+    for (i = 0u; i < 6u; ++i)
+        assert(hm_sprite_clock_step(boundaries, 3u, 1, &state,
+                                    0.04f, 1.0f, 1, 128u) ==
+               HM_SPRITE_CLOCK_OK);
+    assert(state.frame_index == 1 && state.elapsed_ticks == 240 &&
+           state.remaining_replays == 1);
+    for (i = 0u; i < 6u; ++i)
+        assert(hm_sprite_clock_step(boundaries, 3u, 1, &state,
+                                    0.04f, 1.0f, 1, 128u) ==
+               HM_SPRITE_CLOCK_OK);
+    assert(state.frame_index == 2 && state.elapsed_ticks == 480 &&
+           state.remaining_replays == 1);
+    for (i = 0u; i < 6u; ++i)
+        assert(hm_sprite_clock_step(boundaries, 3u, 1, &state,
+                                    0.04f, 1.0f, 1, 128u) ==
+               HM_SPRITE_CLOCK_OK);
+    assert(state.frame_index == 0 && state.elapsed_ticks == 0 &&
+           state.remaining_replays == 0);
+    for (i = 0u; i < 18u; ++i)
+        assert(hm_sprite_clock_step(boundaries, 3u, 1, &state,
+                                    0.04f, 1.0f, 1, 128u) ==
+               HM_SPRITE_CLOCK_OK);
+    assert(state.frame_index == 2 && state.elapsed_ticks == 720 &&
+           state.remaining_replays == 0);
+    assert(hm_sprite_clock_is_finished(boundaries, 3u, 1, &state,
+                                        &finished) == HM_SPRITE_CLOCK_OK);
+    assert(finished == 0);
+    assert(hm_sprite_clock_step(boundaries, 3u, 1, &state,
+                                0.04f, 1.0f, 1, 128u) ==
+           HM_SPRITE_CLOCK_OK);
+    assert(state.frame_index == 2 && state.elapsed_ticks == 760);
+    assert(hm_sprite_clock_is_finished(boundaries, 3u, 1, &state,
+                                        &finished) == HM_SPRITE_CLOCK_OK);
+    assert(finished == 1);
+}
+
 static void test_repeated_fractional_ticks_are_quantized_each_call(void) {
     const int32_t b[] = {0, 10000};
     hm_sprite_clock_state many = {0, 0, 0}, one = {0, 0, 0};
@@ -147,7 +192,8 @@ int main(void) {
     test_pause_invalid_delta_and_rollback();
     test_bounds_and_counter_validation();
     test_transition_budget_and_zero_total_guard();
+    test_original_callback_delta_value_and_full_replay();
     test_repeated_fractional_ticks_are_quantized_each_call();
-    puts("PASS: 9 synthetic C99 sprite-clock scenarios");
+    puts("PASS: 10 synthetic C99 sprite-clock scenarios");
     return 0;
 }
