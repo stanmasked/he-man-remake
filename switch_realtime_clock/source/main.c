@@ -23,6 +23,7 @@ typedef struct {
     int32_t second_resume_ms;
     int32_t normal_callback_ms;
     uint32_t total_updates;
+    uint32_t player_paused_scheduler_updates;
     int32_t final_accumulator_ms;
     int32_t final_player_ticks;
 } selfcheck_report;
@@ -60,6 +61,7 @@ static int dispatch_clock(hm_app_tick_clock_state *clock,
                           int32_t *accumulator_ms,
                           hm_sprite_clock_state *player,
                           uint32_t *total_updates,
+                          int playback_active,
                           int32_t *elapsed_ms_out,
                           uint32_t *updates_out) {
     uint64_t sample_ns = monotonic_ns();
@@ -70,7 +72,7 @@ static int dispatch_clock(hm_app_tick_clock_state *clock,
         HM_APP_TICK_CLOCK_OK) return 0;
     if (hm_app_tick_scheduler_advance(accumulator_ms, elapsed_ms, &updates) !=
         HM_APP_TICK_OK) return 0;
-    if (!apply_updates(player, updates, total_updates, 1)) return 0;
+    if (!apply_updates(player, updates, total_updates, playback_active)) return 0;
     if (hm_app_tick_clock_sample(clock, sample_ns, &zero_ms) !=
             HM_APP_TICK_CLOCK_OK || zero_ms != 0) return 0;
 
@@ -103,7 +105,7 @@ static int run_platform_selfcheck(selfcheck_report *report) {
     report->pause_500ms_observed_ns =
         elapsed_counter_ns(before_ticks, after_ticks);
     if (report->pause_500ms_observed_ns < UINT64_C(66000000)) return 3;
-    if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates,
+    if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates, 1,
                         &elapsed_ms, &updates)) return 4;
     report->first_resume_ms = elapsed_ms;
     if (elapsed_ms != HM_APP_TICK_MAX_ACCUMULATOR_MS || updates != 4u ||
@@ -123,18 +125,37 @@ static int run_platform_selfcheck(selfcheck_report *report) {
         accumulator_ms != 2 || total_updates != 8u ||
         player.elapsed_ticks != 320) return 8;
 
-    before_ticks = armGetSystemTick();
-    svcSleepThread(16000000LL);
-    after_ticks = armGetSystemTick();
-    if (elapsed_counter_ns(before_ticks, after_ticks) <
-        UINT64_C(16000000)) return 9;
-    if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates,
-                        &elapsed_ms, &updates)) return 10;
-    report->normal_callback_ms = elapsed_ms;
-    if (elapsed_ms < 16 || elapsed_ms > HM_APP_TICK_MAX_ACCUMULATOR_MS ||
-        updates == 0u || updates > HM_APP_TICK_MAX_STEPS_PER_CALLBACK ||
-        accumulator_ms < 0 || accumulator_ms >= HM_APP_TICK_QUANTUM_MS ||
-        player.elapsed_ticks != (int32_t)total_updates * 40) return 11;
+    {
+        const int32_t ticks_before_player_pause = player.elapsed_ticks;
+        before_ticks = armGetSystemTick();
+        svcSleepThread(16000000LL);
+        after_ticks = armGetSystemTick();
+        if (elapsed_counter_ns(before_ticks, after_ticks) <
+            UINT64_C(16000000)) return 9;
+        if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates,
+                            0, &elapsed_ms, &updates)) return 10;
+        report->normal_callback_ms = elapsed_ms;
+        report->player_paused_scheduler_updates = updates;
+        if (elapsed_ms < 16 || elapsed_ms > HM_APP_TICK_MAX_ACCUMULATOR_MS ||
+            updates == 0u ||
+            updates > (uint32_t)HM_APP_TICK_MAX_STEPS_PER_CALLBACK ||
+            accumulator_ms < 0 || accumulator_ms >= HM_APP_TICK_QUANTUM_MS ||
+            player.elapsed_ticks != ticks_before_player_pause) return 11;
+
+        before_ticks = armGetSystemTick();
+        svcSleepThread(16000000LL);
+        after_ticks = armGetSystemTick();
+        if (elapsed_counter_ns(before_ticks, after_ticks) <
+            UINT64_C(16000000)) return 12;
+        if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates,
+                            1, &elapsed_ms, &updates)) return 13;
+        if (elapsed_ms < 16 || elapsed_ms > HM_APP_TICK_MAX_ACCUMULATOR_MS ||
+            updates == 0u ||
+            updates > (uint32_t)HM_APP_TICK_MAX_STEPS_PER_CALLBACK ||
+            accumulator_ms < 0 || accumulator_ms >= HM_APP_TICK_QUANTUM_MS ||
+            player.elapsed_ticks !=
+                ticks_before_player_pause + (int32_t)updates * 40) return 14;
+    }
 
     report->total_updates = total_updates;
     report->final_accumulator_ms = accumulator_ms;
@@ -254,7 +275,10 @@ int main(void) {
             printf("Total updates: %lu | player ticks: %ld | frame: %ld\n",
                    (unsigned long)total_updates, (long)player.elapsed_ticks,
                    (long)player.frame_index);
-            printf("Self-check: resumes capped at %ld ms; final %lu updates\n",
+            printf("Player-only pause callback: %ld ms, %lu scheduler updates\n",
+                   (long)report.normal_callback_ms,
+                   (unsigned long)report.player_paused_scheduler_updates);
+            printf("Self-check: app-gate resumes capped at %ld ms; final %lu updates\n",
                    (long)HM_APP_TICK_MAX_ACCUMULATOR_MS,
                    (unsigned long)report.total_updates);
             printf("B reset | + exit\n");
