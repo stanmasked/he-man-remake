@@ -35,7 +35,7 @@ durations, loop flags, animation transitions or gameplay rules.
    Stage159 suffix categories `64`, `162`, `576`, `other`.
    If the first cut key is unknown, count the record but do not
    compare any opaque bytes.
-6. Publish only aggregate counts in six coarse categories: records,
+6. Publish only aggregate counts in coarse categories: records,
    compared pairs, byte-identical, 1–4 differing byte positions,
    5–16, 17–64 and 65+. No changed positions or original bytes,
    exact suffix lengths in the `other` category, names, raw header
