@@ -30,6 +30,16 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_app_tick_scheduler.c" \
   -o "$TMP/test_app_tick_scheduler"
 
+# Stage182: portable monotonic timestamp bridge into the bounded app scheduler.
+# Platform time acquisition is intentionally outside this host-only module.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" -I"$ROOT/native/clock" \
+  "$ROOT/native/clock/heman_app_tick_clock.c" \
+  "$ROOT/native/src/heman_app_tick_scheduler.c" \
+  "$ROOT/native/src/heman_sprite_clock.c" \
+  "$ROOT/native/tests/test_app_tick_clock.c" \
+  -lm -o "$TMP/test_app_tick_clock"
+
 # Stage175: exercise the actual scheduler + sprite clock together, including
 # a full synthetic second, the wall-time cap, and pause/resume behavior.
 "$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
@@ -40,6 +50,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   -lm -o "$TMP/test_tick_animation_integration"
 "$TMP/test_tick_animation_integration"
 "$TMP/test_app_tick_scheduler"
+"$TMP/test_app_tick_clock"
 "$TMP/test_sprite_clock"
 
 # Stage 102: source-referenced, privately importable level 1-1 lore mechanics.
