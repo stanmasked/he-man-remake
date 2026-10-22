@@ -111,6 +111,22 @@ static void test_bounds_and_counter_validation(void) {
     assert(hm_sprite_clock_advance(b, 1, 0, &s, HM_SPRITE_CLOCK_DEFAULT_MAX_STEPS + 1u) == HM_SPRITE_CLOCK_INVALID);
 }
 
+static void test_transition_budget_and_zero_total_guard(void) {
+    const int32_t short_loop[] = {0, 1, 2};
+    const int32_t all_zero[] = {0, 0, 0};
+    hm_sprite_clock_state s = {0, 1000, -1}, before = s;
+    assert(hm_sprite_clock_advance(short_loop, 2, -1, &s, 2u) ==
+           HM_SPRITE_CLOCK_LIMIT);
+    assert(memcmp(&s, &before, sizeof s) == 0);
+    s.frame_index = 0;
+    s.elapsed_ticks = 0;
+    s.remaining_replays = -1;
+    before = s;
+    assert(hm_sprite_clock_advance(all_zero, 2, -1, &s, 32u) ==
+           HM_SPRITE_CLOCK_RANGE);
+    assert(memcmp(&s, &before, sizeof s) == 0);
+}
+
 static void test_repeated_fractional_ticks_are_quantized_each_call(void) {
     const int32_t b[] = {0, 10000};
     hm_sprite_clock_state many = {0, 0, 0}, one = {0, 0, 0};
@@ -130,7 +146,8 @@ int main(void) {
     test_zero_duration_and_empty();
     test_pause_invalid_delta_and_rollback();
     test_bounds_and_counter_validation();
+    test_transition_budget_and_zero_total_guard();
     test_repeated_fractional_ticks_are_quantized_each_call();
-    puts("PASS: 8 synthetic C99 sprite-clock scenarios");
+    puts("PASS: 9 synthetic C99 sprite-clock scenarios");
     return 0;
 }
