@@ -61,11 +61,14 @@ def verify(folder: Path) -> dict:
     # frame 120 for the synthetic 16/17/17-ms pattern.
     update_one = pixel[30][100, 80]
     update_two_edge_30 = pixel[30][190, 80]
+    update_one_edge_120 = pixel[120][100, 80]
     update_two_edge_120 = pixel[120][190, 80]
     if update_one == update_two_edge_30:
         raise ValueError("Frame 30 update bar unexpectedly shows two catch-up updates")
-    if update_one != update_two_edge_120:
+    if update_two_edge_30 == update_two_edge_120:
         raise ValueError("Frame 120 update bar did not show two catch-up updates")
+    if update_one != update_one_edge_120:
+        raise ValueError("The first update-bar quantum changed unexpectedly")
 
     result = {
         "captured_frames": list(FRAME_INDICES),
