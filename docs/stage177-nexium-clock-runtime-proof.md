@@ -87,7 +87,8 @@ The first full Python-suite run discovered that the new PNG fixture tests
 import Pillow, while the generic test workflow did not install it. Pillow is
 now installed before test discovery. Stage177's corrected run passed all 1,809
 tests on Python 3.10, 3.12 and 3.13; native C99 core and focused sprite-clock
-host checks also passed under GCC and Clang. Stage178 adds two host tests; its
-latest Python run passed 1,811 tests on Python 3.12, and the Python 3.10/3.13
-jobs plus GCC passed. Clang and Stage178's fresh NeXium run were still queued
-at the last status check.
+host checks also passed under GCC and Clang. Stage178's current host CI has now
+passed all 1,811 tests on Python 3.10, 3.12 and 3.13, and native C99 under GCC
+and Clang. Its fresh exact-pixel NeXium guest run remains queued. Stage179 adds
+a separate long-animation test for the modeled fixed-delta budget while the
+animation stays active.
