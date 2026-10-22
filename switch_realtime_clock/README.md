@@ -12,7 +12,7 @@ The NRO is uploaded as a short-lived GitHub Actions artifact. Cross-compilation 
 
 ## Real-counter self-check
 
-At startup, the probe uses libnx \`armGetSystemTick()\`, \`armGetSystemTickFreq()\`, and \`armTicksToNs()\`. It samples the counter, deliberately stops dispatching the app clock for 500 ms, and then for 200 ms. Each resumed dispatch must observe a real elapsed interval of at least 66 ms, be capped to 66 ms, and consume four 16-ms scheduler updates with a 2-ms remainder. An additional 16-ms callback runs with the player clock paused: the app scheduler must still consume updates while player time remains unchanged. A final active callback checks normal animation resumption. The sprite clock advances by exactly 40 synthetic player-clock units per active scheduled update.
+At startup, the probe uses libnx \`armGetSystemTick()\`, \`armGetSystemTickFreq()\`, and \`armTicksToNs()\`. It samples the counter, deliberately stops dispatching the app clock for 500 ms, and then for 200 ms. Each observed counter interval must be at least as long as the requested sleep, then each resumed dispatch must be capped to 66 ms and consume four 16-ms scheduler updates with a 2-ms remainder. An additional 16-ms callback runs with the player clock paused: the app scheduler must still consume updates while player time remains unchanged. A final active callback checks normal animation resumption. The sprite clock advances by exactly 40 synthetic player-clock units per active scheduled update.
 
 This is a guest-side assertion, not yet an observed runtime result. A later NeXium run must show the startup self-check passing before we can claim the real counter and sleep behavior was verified in the emulator.
 
