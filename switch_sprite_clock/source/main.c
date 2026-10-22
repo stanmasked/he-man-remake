@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
         if (down & HidNpadButton_Y) rate_index = (rate_index + 1u) % 3u;
         if (!clock_error &&
             hm_sprite_clock_step(boundaries, 3u, loop_setting, &state,
-                                 1.0f / 60.0f, rates[rate_index],
+                                 0.04f, rates[rate_index],
                                  active, 128u) != HM_SPRITE_CLOCK_OK) {
             clock_error = 1;
         }
