@@ -1,0 +1,65 @@
+name: He-Man synthetic sprite clock Switch NRO
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/switch-sprite-clock-probe.yml'
+      - 'switch_sprite_clock/**'
+      - 'native/include/heman_sprite_clock.h'
+      - 'native/src/heman_sprite_clock.c'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-nro:
+    name: Cross-compile asset-free sprite clock NRO
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|lvl|map|shape|ps2d|caf|pvr|png|jpe?g|wav|mp3|ogg)$'; then
+            echo 'Original game assets are forbidden in public CI' >&2
+            exit 1
+          fi
+      - name: Verify cross-compiler and libnx
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x "$DEVKITA64/bin/aarch64-none-elf-gcc"
+          test -x "$DEVKITPRO/tools/bin/elf2nro"
+          test -f "$DEVKITPRO/libnx/switch.specs"
+      - name: Build isolated sprite clock NRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_sprite_clock clean all
+          test -s switch_sprite_clock/heman_sprite_clock_probe.elf
+          test -s switch_sprite_clock/heman_sprite_clock_probe.nro
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_sprite_clock/heman_sprite_clock_probe.elf | grep -F AArch64
+          magic="$(dd if=switch_sprite_clock/heman_sprite_clock_probe.nro bs=1 skip=16 count=4 2>/dev/null)"
+          test "$magic" = NRO0
+          sha256sum switch_sprite_clock/heman_sprite_clock_probe.nro
+          wc -c switch_sprite_clock/heman_sprite_clock_probe.nro
+      - name: Upload synthetic clock NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-sprite-clock-probe-nro
+          path: switch_sprite_clock/heman_sprite_clock_probe.nro
+          if-no-files-found: error
+          retention-days: 7
