@@ -158,6 +158,20 @@ class SpriteClockGuestPixelVerifierTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "two catch-up updates"):
                 verify(folder)
 
+    def test_finished_strip_appearing_before_strict_end_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            make_guest_fixture(folder)
+            path = folder / "raster-frame-0030.png"
+            with Image.open(path) as source:
+                image = source.convert("RGB")
+            image.putpixel((100, 352), WHITE)
+            image.save(path)
+            with self.assertRaisesRegex(
+                ValueError, "Finished-state strip appeared before the strict end edge at guest frame 30"
+            ):
+                verify(folder)
+
     def test_missing_guest_checkpoint_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             folder = Path(tmp)
