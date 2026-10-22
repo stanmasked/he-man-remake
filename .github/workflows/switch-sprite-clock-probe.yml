@@ -7,6 +7,8 @@ on:
       - 'switch_sprite_clock/**'
       - 'native/include/heman_sprite_clock.h'
       - 'native/src/heman_sprite_clock.c'
+      - 'native/include/heman_app_tick_scheduler.h'
+      - 'native/src/heman_app_tick_scheduler.c'
   workflow_dispatch:
 
 concurrency:
