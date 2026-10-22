@@ -17,6 +17,10 @@ The C99 integration test now distinguishes the two pause cases:
 
 The regression checks that the skipped period does not mutate the accumulator or player clock, and that resumed catch-up remains bounded. It does not add a production clock adapter or change the Switch NRO.
 
+## CI trigger scope
+
+The room-2 NeXium workflow builds its guest NROs from `switch_minimal`, `switch_raster`, `raster`, the native source/header files, and the Switch adapter sources. It does not compile `native/tests/**` or execute `native/run_tests.sh`. Those two broad path filters caused unrelated host-test-only edits to queue an expensive guest build. Stage181 removes those two triggers while retaining source and verifier paths used by the workflow. The workflow file itself remains an explicit trigger, so this PR still matches that path; future native test-only edits will not trigger the room-2 guest workflow by themselves.
+
 ## Verification boundary
 
 The test is compiled by `native/run_tests.sh` with strict C99 warnings under both GCC and Clang. It validates the source-free scheduler model only. Actual NeXium guest execution remains a separate gate, and original-device timing parity remains unmeasured.
