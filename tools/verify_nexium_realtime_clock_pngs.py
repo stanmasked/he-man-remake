@@ -99,7 +99,7 @@ def verify(folder: Path) -> dict:
 
     return {
         "captured_frames": list(FRAME_INDICES),
-        "dimensions": [WIDTH, HEIGHT],
+        "supported_dimensions": [list(size) for size in sorted(SUPPORTED_SIZES)],
         "required_tokens": list(REQUIRED_TOKENS),
         "pass_marker_frames": successful_frames,
         "frame_results": details,
