@@ -20,7 +20,7 @@ Both source resolution packs independently passed strict record-boundary checks 
 | SpriteCut records | 1,156 |
 | SpriteCut-to-TextureData links | 1,156 / 1,156 |
 | Five-u32 SpriteCut tuple entries | 2,334 |
-| First tuple fields matching zero-based ordinal | 2,334 / 2,334 |
+| Cut handles matching zero-based tuple position | 2,334 / 2,334 |
 | TextureData records linked to ImageData keys | 1,645 / 1,645 |
 | ImageData path entries resolved | 1,647 / 1,647 |
 | Unique PNG members validated | 1,644 |
@@ -58,7 +58,7 @@ PYTHONPATH=src python -m heman_tools.sprite_cut_texture_image_graph \
 
 ## Synthetic-only regression tests
 
-`tests/test_sprite_cut_texture_image_graph.py` adds 13 fabricated-data tests for exact EOF, tuple counts and ordinals, missing graph links, unmatched symbols, path traversal, PNG validation, case-only aliases, ambiguous case-folded members, paired-pack consistency and output redaction.
+`tests/test_sprite_cut_texture_image_graph.py` adds 15 fabricated-data tests for exact EOF, tuple counts and ordinals, missing graph links, unmatched symbols, path traversal, PNG validation, case-only aliases, ambiguous case-folded members, paired-pack consistency and output redaction.
 
 These tests do not use the original IPA or original graphics. The private audit is not part of GitHub Actions.
 
