@@ -37,7 +37,9 @@ the original iOS game's real callback cadence or animation pacing.
 
 ## Current verification
 
-The Python suite has passed 1,811 tests on Python 3.12, and the Python 3.10
-and 3.13 jobs plus native GCC have passed on the current Stage178 head. The
-Clang job and fresh Stage178 NeXium guest run are still queued. The PR remains
-Draft until those checks finish; no original IPA or game assets are included.
+All Stage178 host checks have passed on head
+`6951f858feee28618d8d33de56e3e8ef7534022c`: 1,811 Python tests on Python
+3.10, 3.12 and 3.13, plus native C99 under GCC and Clang. The fresh Stage178
+NeXium guest workflow is still queued; its actual guest PNGs must pass the
+exact-RGB oracle before the Stage178 runtime gate is complete. The PR remains
+Draft, and no original IPA or game assets are included.
