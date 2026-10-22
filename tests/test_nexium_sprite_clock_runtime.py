@@ -31,17 +31,18 @@ fn sample() {
 }
 """
 
-BACKGROUND = (20, 35, 55)
+BACKGROUND = (55, 35, 24)
+PANEL = (93, 70, 57)
 SWATCHES = {
-    6: (216, 91, 72),
-    12: (71, 185, 209),
-    18: (216, 91, 72),
-    30: (122, 196, 91),
-    36: (122, 196, 91),
-    120: (122, 196, 91),
-    300: (122, 196, 91),
+    6: (209, 185, 71),
+    12: (91, 196, 122),
+    18: (72, 91, 216),
+    30: (91, 196, 122),
+    36: (91, 196, 122),
+    120: (91, 196, 122),
+    300: (91, 196, 122),
 }
-YELLOW = (255, 209, 102)
+YELLOW = (102, 209, 255)
 WHITE = (240, 240, 240)
 
 
@@ -49,11 +50,21 @@ def make_guest_fixture(folder: Path) -> None:
     for index in FRAME_INDICES:
         image = Image.new("RGB", (640, 360), BACKGROUND)
         px = image.load()
+
         # The synthetic NRO's large center swatch.
         swatch = SWATCHES[index]
         for y in range(100, 276):
             for x in range(120, 520):
                 px[x, y] = swatch
+
+        # The bar backgrounds are visible even when their fill is empty.
+        for y in range(76, 84):
+            for x in range(40, 600):
+                px[x, y] = PANEL
+        for y in range(286, 300):
+            for x in range(130, 510):
+                px[x, y] = PANEL
+
         # Synthetic elapsed progress bar: elapsed=480 at frame 12,
         # zero after the first replay at 18, 520 at 30, then clamped full.
         if index == 12:
@@ -65,10 +76,12 @@ def make_guest_fixture(folder: Path) -> None:
         elif index in (36, 120, 300):
             for x in range(130, 510):
                 px[x, 292] = YELLOW
+
         # Native strict-finish strip.
         if index in (36, 120, 300):
             for x in range(40, 600):
                 px[x, 352] = WHITE
+
         # Per-callback update indicator: one quantum at frame 30, two at 120.
         if index == 30:
             for x in range(40, 120):
@@ -110,10 +123,26 @@ class SpriteClockGuestPixelVerifierTests(unittest.TestCase):
             make_guest_fixture(folder)
             result = verify(folder)
         self.assertEqual(result["captured_frames"], list(FRAME_INDICES))
+        self.assertEqual(result["center_swatch_rgb"]["6"], [209, 185, 71])
+        self.assertEqual(result["center_swatch_rgb"]["18"], [72, 91, 216])
         self.assertTrue(result["progress_bar_reset_at_frame_18"])
         self.assertTrue(result["progress_bar_full_by_frame_36"])
         self.assertTrue(result["finished_strip_stable_after_frame_36"])
         self.assertTrue(result["two_update_catchup_visible_at_frame_120"])
+
+    def test_wrong_center_swatch_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            folder = Path(tmp)
+            make_guest_fixture(folder)
+            path = folder / "raster-frame-0012.png"
+            with Image.open(path) as source:
+                image = source.convert("RGB")
+            image.putpixel((320, 180), BACKGROUND)
+            image.save(path)
+            with self.assertRaisesRegex(
+                ValueError, "Unexpected synthetic swatch at frame 12"
+            ):
+                verify(folder)
 
     def test_wrong_two_update_bar_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
