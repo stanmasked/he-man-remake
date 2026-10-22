@@ -8,6 +8,8 @@ from pathlib import Path
 from PIL import Image
 
 FRAME_INDICES = (6, 12, 18, 30, 36, 120, 300)
+PRE_FINISH_FRAMES = (6, 12, 18, 30)
+FINISHED_FRAMES = (36, 120, 300)
 WIDTH, HEIGHT = 640, 360
 
 # Exact RGB values sampled from a successful real NeXium guest-frame artifact.
@@ -64,7 +66,7 @@ def verify(folder: Path) -> dict:
         raise ValueError("Progress bar did not reset at the finite replay boundary")
     if progress_far[30] != BAR_BACKGROUND_RGB:
         raise ValueError("Progress bar should still be partial at guest frame 30")
-    for index in (36, 120, 300):
+    for index in FINISHED_FRAMES:
         if progress_far[index] != BAR_FILL_RGB:
             raise ValueError(
                 f"Progress bar is not full and stable at guest frame {index}"
@@ -73,9 +75,13 @@ def verify(folder: Path) -> dict:
     # The screen background persists until the native strict-end predicate
     # emits the finished-state strip.
     finish_strip = {index: pixel[index][100, 352] for index in FRAME_INDICES}
-    if finish_strip[18] != SCREEN_BACKGROUND_RGB:
-        raise ValueError("Finished-state strip appeared before the strict end edge")
-    for index in (36, 120, 300):
+    for index in PRE_FINISH_FRAMES:
+        if finish_strip[index] != SCREEN_BACKGROUND_RGB:
+            raise ValueError(
+                "Finished-state strip appeared before the strict end edge "
+                f"at guest frame {index}"
+            )
+    for index in FINISHED_FRAMES:
         if finish_strip[index] != FINISHED_STRIP_RGB:
             raise ValueError(
                 f"Finished-state strip is absent or unstable at guest frame {index}"
