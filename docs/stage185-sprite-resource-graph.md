@@ -29,14 +29,21 @@ The difference between 1,647 ImageData entries and 1,644 unique PNG members is e
 
 The 1,539 symbol references absent from the SpriteCut index are counted rather than treated as errors. Their role remains unknown and requires separate investigation.
 
+## Native field-semantics correction
+
+After the initial aggregate pass, a private read-only inspection of the original ARMv7 methods resolved the tuple semantics. `SpriteCut::fileIn` reads five signed integers; `SpriteRes::getCutForHandle` compares the first field to the requested handle; and `SpriteCut::buildTextCoord` uses the next four fields as x/y/width/height to calculate normalized texture coordinates. This corrects the earlier conservative statement that all four coordinate fields were opaque.
+
+A raw PNG-header bounds comparison still finds 43 rectangle tuples outside the `screen-med` PNG dimensions and 80 outside the `screen-xlarge` PNG dimensions. This remains an unresolved reconciliation between serialized coordinates and runtime texture dimensions/padding, not permission to clip, discard, or rewrite geometry.
+
 ## Parser and safeguards
 
 Added `src/heman_tools/sprite_cut_texture_image_graph.py`:
 
 - Uses the previously validated sequence parser and bounded repository/WAD interval checks.
-- Parses SpriteCut records as a texture key, count and exact sequence of five-u32 tuples; the first tuple field is checked against its zero-based position.
-- Treats the remaining four tuple fields as opaque. They are **not** asserted to be texture rectangles or assigned coordinate semantics.
-- Parses TextureData records with an exact 15-byte opaque block followed by the ImageData key; the block's meaning is not inferred.
+- Parses SpriteCut records as a texture key, count and exact sequence of five **signed** 32-bit fields per tuple.
+- Original ARMv7 method inspection confirms the first field is a cut handle used by `SpriteRes::getCutForHandle`; in all 2,334 source tuples it equals the zero-based position.
+- Original `SpriteCut::buildTextCoord` uses fields 2–5 as signed `x`, `y`, `width` and `height` when calculating normalized texture coordinates.
+- Parses TextureData records as the indexed key, a 13-byte mixed-width scalar block, an empty auxiliary string, and the ImageData key. The scalar block is kept opaque because its individual fields' meanings are not needed to establish the graph.
 - Strictly parses the separate ImageData repository envelope, rejects path traversal and validates PNG headers without extracting images.
 - Resolves case-only aliases only when there is a unique matching archive member; ambiguous case-folded archive paths fail closed.
 - Emits aggregate-only JSON under the ignored local reports directory. No original asset bytes or identifiers are uploaded.
@@ -59,8 +66,8 @@ These tests do not use the original IPA or original graphics. The private audit 
 
 Stage185 establishes a source resource-reference chain, not the final renderer. Still unverified:
 
-- the meaning of the remaining four tuple fields in SpriteCut records;
-- how SpriteCut tuple entries select or transform individual rendered frames;
+- reconciliation of some SpriteCut rectangles that exceed raw PNG IHDR dimensions with the original runtime's texture dimensions/padding; these values are not silently clipped;
+- how SpriteCut handles are selected by each original Symbol during animation and how the resulting texture coordinates affect actual rendered frames;
 - symbol transforms, anchors, blending and render order;
 - the actor-state-to-sequence binding;
 - authentic playback timing and visual parity in NeXium or on physical Switch hardware.
