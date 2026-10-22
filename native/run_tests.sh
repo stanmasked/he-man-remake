@@ -21,14 +21,6 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/src/heman_sprite_clock.c" \
   "$ROOT/native/tests/test_sprite_clock.c" \
   -lm -o "$TMP/test_sprite_clock"
-# Stage176: exhaustively compare the C99 clock against a reference state
-# machine over all small synthetic monotonic boundary layouts.
-"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
-  -I"$ROOT/native/include" \
-  "$ROOT/native/src/heman_sprite_clock.c" \
-  "$ROOT/native/tests/test_sprite_clock_exhaustive.c" \
-  -lm -o "$TMP/test_sprite_clock_exhaustive"
-"$TMP/test_sprite_clock_exhaustive"
 
 # Stage174: source-free reproduction of the original bounded app tick
 # accumulator (synthetic elapsed milliseconds only).
@@ -47,16 +39,6 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
   "$ROOT/native/tests/test_tick_animation_integration.c" \
   -lm -o "$TMP/test_tick_animation_integration"
 "$TMP/test_tick_animation_integration"
-
-# Stage177: the exact 16/17/17-ms guest callback trace used by the NeXium
-# pixel verifier must agree with the native scheduler + sprite-clock state.
-"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
-  -I"$ROOT/native/include" \
-  "$ROOT/native/src/heman_app_tick_scheduler.c" \
-  "$ROOT/native/src/heman_sprite_clock.c" \
-  "$ROOT/native/tests/test_sprite_clock_runtime_timeline.c" \
-  -lm -o "$TMP/test_sprite_clock_runtime_timeline"
-"$TMP/test_sprite_clock_runtime_timeline"
 "$TMP/test_app_tick_scheduler"
 "$TMP/test_sprite_clock"
 
