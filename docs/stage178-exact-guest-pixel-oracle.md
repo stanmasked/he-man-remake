@@ -21,9 +21,11 @@ used guessed RGB swatches rather than the colors actually observed in NeXium.
 
 The palette was checked against the retained Stage177 NeXium artifact from
 run [39842587365](https://github.com/stanmasked/he-man-remake/actions/runs/39842587365).
-All seven captured PNGs match the new exact sample oracle. This re-check uses
-actual synthetic guest captures, not original game assets or original-device
-timing data.
+All seven captured PNGs match the new exact sample oracle. The newer Stage177
+PR-head run also completed successfully: [run #39847718995](https://github.com/stanmasked/he-man-remake/actions/runs/39847718995)
+captured seven required checkpoints and passed the Stage177 verifier, including
+frame 300. The Stage178 exact-pixel assertions are now being checked on their
+own PR head.
 
 ## Scope and limits
 
@@ -33,5 +35,9 @@ A successful exact-pixel check proves the synthetic guest's sampled output
 matches the known synthetic state at these checkpoints; it does not establish
 the original iOS game's real callback cadence or animation pacing.
 
-The current Stage177 PR-head NeXium rerun remains a separate gate until its
-latest workflow finishes and the newly captured frames pass verification.
+## Current verification
+
+The Python suite has passed 1,811 tests on Python 3.12, and the Python 3.10
+and 3.13 jobs plus native GCC have passed on the current Stage178 head. The
+Clang job and fresh Stage178 NeXium guest run are still queued. The PR remains
+Draft until those checks finish; no original IPA or game assets are included.
