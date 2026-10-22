@@ -15,6 +15,10 @@ on:
       - 'patches/nexium-nro-segment-file-origin.patch'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
