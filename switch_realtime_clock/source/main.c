@@ -118,7 +118,7 @@ static int run_platform_selfcheck(selfcheck_report *report) {
     report->pause_200ms_observed_ns =
         elapsed_counter_ns(before_ticks, after_ticks);
     if (report->pause_200ms_observed_ns < UINT64_C(66000000)) return 6;
-    if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates,
+    if (!dispatch_clock(&clock, &accumulator_ms, &player, &total_updates, 1,
                         &elapsed_ms, &updates)) return 7;
     report->second_resume_ms = elapsed_ms;
     if (elapsed_ms != HM_APP_TICK_MAX_ACCUMULATOR_MS || updates != 4u ||
