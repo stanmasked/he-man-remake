@@ -19,7 +19,7 @@ Both source resolution packs independently passed strict record-boundary checks 
 | Symbol references without a SpriteCut index match | 1,539 |
 | SpriteCut records | 1,156 |
 | SpriteCut-to-TextureData links | 1,156 / 1,156 |
-| Five-u32 SpriteCut tuple entries | 2,334 |
+| Five-signed-int SpriteCut tuple entries | 2,334 |
 | Cut handles matching zero-based tuple position | 2,334 / 2,334 |
 | TextureData records linked to ImageData keys | 1,645 / 1,645 |
 | ImageData path entries resolved | 1,647 / 1,647 |
