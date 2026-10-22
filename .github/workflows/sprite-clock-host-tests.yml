@@ -1,0 +1,52 @@
+name: He-Man focused sprite-clock host verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/sprite-clock-host-tests.yml'
+      - 'native/include/heman_sprite_clock.h'
+      - 'native/include/heman_app_tick_scheduler.h'
+      - 'native/src/heman_sprite_clock.c'
+      - 'native/src/heman_app_tick_scheduler.c'
+      - 'native/tests/test_sprite_clock.c'
+      - 'native/tests/test_sprite_clock_exhaustive.c'
+      - 'native/tests/test_app_tick_scheduler.c'
+      - 'native/tests/test_tick_animation_integration.c'
+      - 'native/tests/test_sprite_clock_runtime_timeline.c'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sprite-clock-host:
+    name: Sprite-clock state machine (${{ matrix.compiler }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run source-only clock/scheduler checks
+        shell: bash
+        env:
+          CC: ${{ matrix.compiler }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/heman-clock-tests
+          FLAGS=(-std=c99 -O2 -Wall -Wextra -Werror -pedantic)
+          INC=(-Inative/include)
+          "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_sprite_clock.c native/tests/test_sprite_clock.c -lm -o /tmp/heman-clock-tests/test_sprite_clock
+          "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_sprite_clock.c native/tests/test_sprite_clock_exhaustive.c -lm -o /tmp/heman-clock-tests/test_sprite_clock_exhaustive
+          "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_app_tick_scheduler.c native/tests/test_app_tick_scheduler.c -o /tmp/heman-clock-tests/test_app_tick_scheduler
+          "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_app_tick_scheduler.c native/src/heman_sprite_clock.c native/tests/test_tick_animation_integration.c -lm -o /tmp/heman-clock-tests/test_tick_animation_integration
+          /tmp/heman-clock-tests/test_sprite_clock
+          /tmp/heman-clock-tests/test_sprite_clock_exhaustive
+          /tmp/heman-clock-tests/test_app_tick_scheduler
+          /tmp/heman-clock-tests/test_tick_animation_integration
+          if [ -f native/tests/test_sprite_clock_runtime_timeline.c ]; then
+            "$CC" "${FLAGS[@]}" "${INC[@]}" native/src/heman_app_tick_scheduler.c native/src/heman_sprite_clock.c native/tests/test_sprite_clock_runtime_timeline.c -lm -o /tmp/heman-clock-tests/test_sprite_clock_runtime_timeline
+            /tmp/heman-clock-tests/test_sprite_clock_runtime_timeline
+          fi
