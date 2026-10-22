@@ -19,11 +19,18 @@ def pair(alias: str, east: str, west: str) -> bytes:
     return field(alias) + field(east) + field(west)
 
 
+def duplicated_regions(data: bytes):
+    combined = data + data
+    split = len(data)
+    return combined, ((0, split), (split, len(combined)))
+
+
 class PlayerSequenceAliasCensusTests(unittest.TestCase):
     def test_single_alias_pair_is_counted_without_exporting_labels(self):
         data = pair("syntheticIdle", "synthetic.idle.e", "synthetic.idle.w")
+        combined, regions = duplicated_regions(data)
         report = summarize_directional_alias_regions(
-            data, ("synthetic.idle.e", "synthetic.idle.w"), ((0, len(data)), (0, len(data)))
+            combined, ("synthetic.idle.e", "synthetic.idle.w"), regions
         )
         region = report["regions"][0]
         self.assertEqual(region["sequence_reference_occurrences"], 2)
@@ -63,10 +70,11 @@ class PlayerSequenceAliasCensusTests(unittest.TestCase):
         data = (field("syntheticWalk")
                 + field("walk-a.e") + field("walk-a.w")
                 + field("walk-b.e") + field("walk-b.w"))
+        combined, regions = duplicated_regions(data)
         report = summarize_directional_alias_regions(
-            data,
+            combined,
             ("walk-a.e", "walk-a.w", "walk-b.e", "walk-b.w"),
-            ((0, len(data)), (0, len(data))),
+            regions,
         )
         self.assertEqual(report["regions"][0]["paired_alias_entry_occurrences"], 0)
         self.assertEqual(report["regions"][0]["ambiguous_alias_groups"], 1)
@@ -74,15 +82,17 @@ class PlayerSequenceAliasCensusTests(unittest.TestCase):
 
     def test_unassigned_reference_is_reported(self):
         data = field("orphan.e") + pair("syntheticIdle", "idle.e", "idle.w")
+        combined, regions = duplicated_regions(data)
         report = summarize_directional_alias_regions(
-            data, ("orphan.e", "idle.e", "idle.w"), ((0, len(data)), (0, len(data)))
+            combined, ("orphan.e", "idle.e", "idle.w"), regions
         )
         self.assertEqual(report["regions"][0]["unassigned_sequence_reference_occurrences"], 1)
 
     def test_resource_like_token_missing_from_index_is_reported(self):
         data = pair("syntheticIdle", "idle.e", "idle.w") + field("missing.e")
+        combined, regions = duplicated_regions(data)
         report = summarize_directional_alias_regions(
-            data, ("idle.e", "idle.w"), ((0, len(data)), (0, len(data)))
+            combined, ("idle.e", "idle.w"), regions
         )
         self.assertFalse(report["all_resource_like_tokens_match_sequence_index"])
         self.assertEqual(report["regions"][0]["unmatched_resource_like_token_count"], 1)
@@ -91,8 +101,9 @@ class PlayerSequenceAliasCensusTests(unittest.TestCase):
         data = pair("syntheticIdle", "idle.e", "idle.w") + pair(
             "syntheticIdle", "idle.e", "idle.w"
         )
+        combined, regions = duplicated_regions(data)
         report = summarize_directional_alias_regions(
-            data, ("idle.e", "idle.w"), ((0, len(data)), (0, len(data)))
+            combined, ("idle.e", "idle.w"), regions
         )
         self.assertEqual(report["regions"][0]["paired_alias_entry_occurrences"], 2)
         self.assertEqual(report["regions"][0]["unique_paired_aliases"], 1)
