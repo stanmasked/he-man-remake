@@ -29,6 +29,7 @@ speed or that a real device delivers perfectly regular callbacks.
 - native/include/heman_app_tick_scheduler.h
 - native/src/heman_app_tick_scheduler.c
 - native/tests/test_app_tick_scheduler.c
+- native/tests/test_sprite_timing_integration.c
 
 The new bounded C99 function receives a fabricated wall-clock delta and
 the saved accumulator remainder, then returns the number of 16-ms update
