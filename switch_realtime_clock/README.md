@@ -6,15 +6,15 @@ This is a separate, synthetic-only Nintendo Switch NRO for validating the real l
 
 The CI workflow uses the devkitPro Switch SDK and creates:
 
-\`switch_realtime_clock_probe/heman_realtime_clock_probe.nro\`
+`switch_realtime_clock_probe/heman_realtime_clock_probe.nro`
 
 The NRO is uploaded as a short-lived GitHub Actions artifact. Cross-compilation and NRO header checks do not establish that it runs correctly in NeXium or on hardware.
 
 ## Real-counter self-check
 
-At startup, the probe uses libnx \`armGetSystemTick()\`, \`armGetSystemTickFreq()\`, and \`armTicksToNs()\`. It samples the counter, deliberately stops dispatching the app clock for 500 ms, and then for 200 ms. Each observed counter interval must be at least as long as the requested sleep, then each resumed dispatch must be capped to 66 ms and consume four 16-ms scheduler updates with a 2-ms remainder. An additional 16-ms callback runs with the player clock paused: the app scheduler must still consume updates while player time remains unchanged. A final active callback checks normal animation resumption. The sprite clock advances by exactly 40 synthetic player-clock units per active scheduled update.
+At startup, the probe uses libnx `armGetSystemTick()`, `armGetSystemTickFreq()`, and `armTicksToNs()`. It samples the counter, deliberately stops dispatching the app clock for 500 ms, and then for 200 ms. Each observed counter interval must be at least as long as the requested sleep, then each resumed dispatch must be capped to 66 ms and consume four 16-ms scheduler updates with a 2-ms remainder. An additional 16-ms callback runs with the player clock paused: the app scheduler must still consume updates while player time remains unchanged. A final active callback checks normal animation resumption. The sprite clock advances by exactly 40 synthetic player-clock units per active scheduled update.
 
-This is a guest-side assertion, not yet an observed runtime result. A later NeXium run must show the startup self-check passing before we can claim the real counter and sleep behavior was verified in the emulator.
+The dedicated workflow now builds the NRO, runs it in a temporary checkout of pinned NeXium, captures genuine guest framebuffer PNGs, and uses OCR to require the startup PASS marker in a late guest frame. The workflow result is the evidence gate; cross-compilation alone is not runtime proof.
 
 ## Interactive checks
 
@@ -23,4 +23,4 @@ This is a guest-side assertion, not yet an observed runtime result. A later NeXi
 - **B** resets the synthetic clock state and establishes a fresh baseline.
 - **+** exits.
 
-The existing deterministic Stage172 sprite-clock NRO and its exact-pixel oracle are unchanged. The real-time probe has its own directory, Makefile, artifact and CI workflow.
+The existing deterministic Stage172 sprite-clock NRO and its exact-pixel oracle are unchanged. The real-time probe has its own directory, Makefile, NRO build artifact, NeXium runtime job, and retained evidence artifact. The runtime check is isolated from the deterministic Stage172 pixel oracle.
