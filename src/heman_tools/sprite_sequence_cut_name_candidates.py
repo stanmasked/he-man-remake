@@ -106,7 +106,10 @@ def summarize_sequence_cut_name_candidates(
         for relative in TEST_OFFSETS:
             parsed=[_source_token(rec,base+relative)
                     for rec,base in zip(rows,positions)]
-            if parsed[0]!=parsed[1]:
+            # Only the predeclared +13 hypothesis makes a parity claim.
+            # Negative controls inspect arbitrary resolution-specific body
+            # bytes, so their incidental decoding may differ between packs.
+            if relative==CANDIDATE_OFFSET and parsed[0]!=parsed[1]:
                 raise SpriteIndexFormatError("Source nested UTF-16 candidate differs across screen packs")
             status,token=parsed[0]
             tally=control[str(relative)]
