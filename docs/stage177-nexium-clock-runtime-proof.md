@@ -55,3 +55,8 @@ Wait for the dedicated cross-build and NeXium runtime workflow. If it
 fails, use the retained logs/PNGs to correct the runner or pixel assertions
 before connecting any original graphics. Production integration remains
 blocked on resolving the original timer/callback discrepancy.
+
+
+## Host CI dependency
+
+The first full Python-suite run discovered that the new PNG fixture tests import Pillow, while the repository's generic test workflow did not install it. The workflow now explicitly installs Pillow before unit-test discovery. The initial failure occurred at test-module import (before the new assertions ran); the corrected full-suite run is pending.
