@@ -30,11 +30,11 @@ def image_repo(rows):
     return bytes(out)
 
 
-def sequence_record(symbol="SyntheticCut"):
+def sequence_record(symbol="SyntheticCut", symbol_handle=0):
     out = bytearray(name("SyntheticSequence") + struct.pack("<iii", 0, 1, 0))
     out += struct.pack("<iiii", 0, 10, 0, 0) + b"\x00" + struct.pack("<i", 1)
     out += struct.pack("<ii", 0, 0) + name(symbol)
-    out += struct.pack("<4i", 0, 0, 0, 0) + struct.pack("<6f", 0, 0, 0, 0, 0, 0)
+    out += struct.pack("<4i", symbol_handle, 0, 0, 0) + struct.pack("<6f", 0, 0, 0, 0, 0, 0)
     out += struct.pack("<7i", 0, 0, 0, 0, 0, 0, 0)
     return bytes(out)
 
@@ -49,8 +49,8 @@ def texture_record(image="SyntheticImage", trailing=b""):
 
 
 def fixture(symbol="SyntheticCut", cut_texture="SyntheticTexture", texture_image="SyntheticImage",
-            paths=(("SyntheticImage", "/textures/synthetic.png"),), member_headers=None):
-    seq = sequence_record(symbol)
+            paths=(("SyntheticImage", "/textures/synthetic.png"),), member_headers=None, symbol_handle=0):
+    seq = sequence_record(symbol, symbol_handle)
     cut = cut_record(cut_texture)
     tex = texture_record(texture_image)
     repos = {
@@ -91,6 +91,13 @@ class SpriteResourceGraphTests(unittest.TestCase):
         med = report["per_resolution_pack"]["screen-med"]
         self.assertEqual(med["symbol_references_matching_cut_index"], 0)
         self.assertEqual(med["symbol_references_without_cut_index_match"], 1)
+
+    def test_unresolved_symbol_handle_is_reported_not_fabricated(self):
+        report = graph.summarize_sprite_cut_texture_image_graph(*fixture(symbol_handle=1))
+        med = report["per_resolution_pack"]["screen-med"]
+        self.assertEqual(med["symbol_handles_resolved_for_matched_resources"], 0)
+        self.assertEqual(med["symbol_handles_unresolved_for_matched_resources"], 1)
+        self.assertFalse(report["all_symbol_handles_resolve_for_matched_resources"])
 
     def test_missing_cut_texture_link_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "missing TextureData key"):
@@ -165,6 +172,14 @@ class SpriteResourceGraphTests(unittest.TestCase):
         seq_wads["screen-xlarge"] = sequence_record("DifferentSymbol")
         args[1] = seq_wads
         with self.assertRaisesRegex(ValueError, "Paired symbol references differ"):
+            graph.summarize_sprite_cut_texture_image_graph(*args)
+
+    def test_paired_symbol_handles_must_match(self):
+        args = list(fixture())
+        seq_wads = dict(args[1])
+        seq_wads["screen-xlarge"] = sequence_record("SyntheticCut", symbol_handle=1)
+        args[1] = seq_wads
+        with self.assertRaisesRegex(ValueError, "Paired Symbol handle references differ"):
             graph.summarize_sprite_cut_texture_image_graph(*args)
 
 
