@@ -54,7 +54,7 @@ def artificial_sources(*, change_nested_pack=False):
                 else:
                     nested=b""  # Structural header + ending word only
                 if change_nested_pack and screen==SCREENS[1] and seqname=="SeqMatched":
-                    nested=b"\x98"*13+string("OtherCutName")+b"synthetic"
+                    nested=b"\x98"*13+string("OtherCut12")+b"synthetic"
                 data=five_words+nested+struct.pack("<I",0)
             blob=(string(seqname)+struct.pack("<II",0,count)+data)
             offsets.append(cursor)
