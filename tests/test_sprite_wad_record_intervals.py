@@ -205,7 +205,7 @@ class Stage154WadIntervalTests(unittest.TestCase):
         report=json.dumps(self.report())
         for private in ("MadeUpOne","MadeUpTwo","MadeUpThree",
                         "FakeSheetReference","IndirectFrameName",
-                        "fake-cut-a","fake-a","frame-a","offsets"):
+                        "fake-cut-a","fake-a","frame-a","per_item_offset_1234"):
             self.assertNotIn(private,report)
         self.assertFalse(json.loads(report)["source_record_keys_raw_bytes_offsets_and_sprites_in_report"])
 
