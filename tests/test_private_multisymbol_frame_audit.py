@@ -356,6 +356,12 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             )
             self.assertEqual(report["source_symbol_count"], 2)
             self.assertEqual(report["cpu_frame_packet_count"], 2)
+            self.assertEqual(
+                report["symbol_local_transform_summary"]["symbol_count"], 2
+            )
+            self.assertFalse(
+                report["symbol_local_transform_summary"]["raw_transform_values_exported"]
+            )
             self.assertEqual(report["native_texture_filter_mode_counts_by_unique_texture"],
                              {"nearest": 0, "linear": 1, "unsupported_mipmap": 0})
             self.assertEqual(report["unique_textures_with_alpha_transform_enabled"], 1)
