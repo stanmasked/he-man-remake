@@ -94,10 +94,10 @@ class ZeroPaddingModelTests(unittest.TestCase):
         self.assertEqual(padded[:4], bytes([1, 2, 3, 4]))
         self.assertEqual(padded[4:], bytes(len(padded) - 4))
 
-    def test_power_of_two_rows_require_no_padding(self):
-        rows = (bytes(range(12)), bytes(range(12, 24)))
-        padded, dimensions = pad_decoded_png_rows_zero_fill(rows, 4, 2, 3)
-        self.assertEqual(dimensions, (4, 2))
+    def test_power_of_two_rows_require_no_padding_above_minimum_edge(self):
+        rows = tuple(bytes(range(i * 12, (i + 1) * 12)) for i in range(4))
+        padded, dimensions = pad_decoded_png_rows_zero_fill(rows, 4, 4, 3)
+        self.assertEqual(dimensions, (4, 4))
         self.assertEqual(padded, b"".join(rows))
 
     def test_decoded_row_count_must_match_height(self):
