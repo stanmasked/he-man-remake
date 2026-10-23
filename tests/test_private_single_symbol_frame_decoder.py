@@ -113,6 +113,13 @@ class PrivateSingleSymbolFrameDecoderTests(unittest.TestCase):
                 ((16, 16), (16, 16)), ((0, 0), (0, 0)), active_mask=0,
             )
 
+    def test_multi_symbol_packet_summary_enforces_bounded_limit(self):
+        oversized = tuple(object() for _ in range(1025))
+        with self.assertRaisesRegex(PrivateFrameDecodeError, "bounded command limit"):
+            _assemble_private_symbol_frame_packet_summary(
+                oversized, (), (), (), active_mask=0,
+            )
+
     def test_sequence_frame_resolves_single_symbol_and_handle(self):
         parsed = parse_single_symbol_frame(sequence_record((("SyntheticCut", 7),)), 0)
         self.assertEqual(parsed["symbol_count"], 1)

@@ -50,7 +50,7 @@ _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 class PrivateFrameDecodeError(ValueError):
-    """A single-symbol crop cannot be resolved without guessing."""
+    """Private frame decoding or packet assembly failed without guessing."""
 
 
 def parse_symbol_frame(record: bytes, frame_index: int) -> dict:
@@ -105,6 +105,7 @@ def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
     if selected["symbol_count"] != 1:
         raise PrivateFrameDecodeError("Only a single-symbol frame is supported")
     return selected
+
 
 def resolve_alias_pair(
     go_data: bytes, sequence_keys: set[str] | frozenset[str],
@@ -223,6 +224,8 @@ def _assemble_private_symbol_frame_packet_summary(
     count = len(symbols)
     if count > MAX_SYMBOL_FRAME_COMMANDS:
         raise PrivateFrameDecodeError("Frame exceeds the bounded command limit")
+    if any(not isinstance(symbol, dict) for symbol in symbols):
+        raise PrivateFrameDecodeError("Every frame Symbol must be a mapping")
     if any(not isinstance(values, (tuple, list)) or len(values) != count
            for values in (rectangles, png_dimensions, wrap_codes)):
         raise PrivateFrameDecodeError("Resolved frame metadata must parallel every Symbol")
@@ -305,6 +308,7 @@ def _assemble_private_symbol_packet_summary(
             "Isolated frame did not produce exactly one ordered packet"
         )
     return report
+
 
 def audit_private_single_symbol_crop(
     ipa: Path, regions: tuple[tuple[int, int], tuple[int, int]], alias: str,
