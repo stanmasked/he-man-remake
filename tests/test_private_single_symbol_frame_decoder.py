@@ -13,7 +13,9 @@ from heman_tools.private_single_symbol_frame_decoder import (
     parse_single_symbol_frame,
     resolve_alias_pair,
     select_cut_rectangle,
+    parse_symbol_frame,
     _assemble_private_symbol_packet_summary,
+    _assemble_private_symbol_frame_packet_summary,
 )
 
 
@@ -48,6 +50,76 @@ def png_bytes(size=(8, 8)):
 
 
 class PrivateSingleSymbolFrameDecoderTests(unittest.TestCase):
+    def test_multi_symbol_parser_preserves_every_symbol_in_source_order(self):
+        record = sequence_record((("SyntheticCutA", 7), ("SyntheticCutB", 8),
+                                  ("SyntheticCutC", 9)))
+        parsed = parse_symbol_frame(record, 0)
+        self.assertEqual(parsed["symbol_count"], 3)
+        self.assertEqual([item["name"] for item in parsed["symbols"]],
+                         ["SyntheticCutA", "SyntheticCutB", "SyntheticCutC"])
+        self.assertEqual([item["cut_handle"] for item in parsed["symbols"]], [7, 8, 9])
+        self.assertEqual(parsed["frame_index"], 0)
+
+    def test_multi_symbol_packet_summary_preserves_order_and_mask_skips(self):
+        symbols = (
+            {"name": "SyntheticA", "serialized_fields": (7, 0, 10, 20),
+             "transform_values": (1, 1, 1, 1, 1, 1),
+             "serialized_tail": (0, 0, 0, 0, -1, -1, 0)},
+            {"name": "SyntheticB", "serialized_fields": (8, 0, 30, 40),
+             "transform_values": (1, 1, 1, 1, 1, 1),
+             "serialized_tail": (0, 0, 0, 0, -1, -1, 0)},
+            {"name": "SyntheticC", "serialized_fields": (9, 0, 50, 60),
+             "transform_values": (1, 1, 1, 1, 1, 1),
+             "serialized_tail": (0, 0, 0, 0, -1, -1, 4)},
+        )
+        report = _assemble_private_symbol_frame_packet_summary(
+            symbols,
+            ((0, 0, 8, 4), (2, 1, 4, 2), (1, 2, 3, 3)),
+            ((16, 16), (16, 16), (16, 16)),
+            ((0, 0), (0, 0), (0, 0)),
+            active_mask=4,
+        )
+        self.assertEqual(report["frame_symbol_count"], 3)
+        self.assertEqual(report["cpu_frame_packet_count"], 2)
+        self.assertEqual(report["cpu_frame_packet_vertex_count"], 8)
+        self.assertEqual(report["cpu_frame_packet_uv_pair_count"], 8)
+        self.assertEqual(report["cpu_frame_packet_color_channel_count"], 8)
+        self.assertEqual(report["masked_symbol_count"], 1)
+        self.assertTrue(report["cpu_frame_packet_source_order_preserved"])
+        self.assertTrue(report["cpu_frame_packet_finite"])
+        self.assertFalse(report["full_frame_composition_verified"])
+        self.assertNotIn("SyntheticA", str(report))
+
+    def test_multi_symbol_packet_summary_fails_closed_on_late_unsupported_tween(self):
+        good = {"name": "SyntheticA", "serialized_fields": (7, 0, 0, 0),
+                "transform_values": (1, 1, 1, 1, 1, 1),
+                "serialized_tail": (0, 0, 0, 0, -1, -1, 0)}
+        bad = {"name": "SyntheticB", "serialized_fields": (8, 0, 0, 0),
+               "transform_values": (1, 1, 1, 1, 1, 1),
+               "serialized_tail": (99, 0, 0, 0, -1, -1, 0)}
+        with self.assertRaisesRegex(PrivateFrameDecodeError, "without guessing"):
+            _assemble_private_symbol_frame_packet_summary(
+                (good, bad), ((0, 0, 8, 4), (0, 0, 8, 4)),
+                ((16, 16), (16, 16)), ((0, 0), (0, 0)), active_mask=0,
+            )
+
+    def test_multi_symbol_packet_summary_requires_parallel_metadata(self):
+        symbol = {"name": "SyntheticA", "serialized_fields": (7, 0, 0, 0),
+                  "transform_values": (1, 1, 1, 1, 1, 1),
+                  "serialized_tail": (0, 0, 0, 0, -1, -1, 0)}
+        with self.assertRaisesRegex(PrivateFrameDecodeError, "parallel every Symbol"):
+            _assemble_private_symbol_frame_packet_summary(
+                (symbol, symbol), ((0, 0, 8, 4),),
+                ((16, 16), (16, 16)), ((0, 0), (0, 0)), active_mask=0,
+            )
+
+    def test_multi_symbol_packet_summary_enforces_bounded_limit(self):
+        oversized = tuple(object() for _ in range(1025))
+        with self.assertRaisesRegex(PrivateFrameDecodeError, "bounded command limit"):
+            _assemble_private_symbol_frame_packet_summary(
+                oversized, (), (), (), active_mask=0,
+            )
+
     def test_sequence_frame_resolves_single_symbol_and_handle(self):
         parsed = parse_single_symbol_frame(sequence_record((("SyntheticCut", 7),)), 0)
         self.assertEqual(parsed["symbol_count"], 1)
