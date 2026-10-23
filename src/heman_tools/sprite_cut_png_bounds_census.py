@@ -203,7 +203,9 @@ def audit_private_cut_bounds(ipa: Path) -> dict:
             dimensions_cache = {}
             census = {}
             for cut_key, cut_record in cut_records.items():
-                texture_key, tuples = parse_sprite_cut_record(cut_record)
+                parsed_cut_key, texture_key, tuples = parse_sprite_cut_record(cut_record)
+                if parsed_cut_key != cut_key:
+                    raise SpriteCutBoundsError("Indexed SpriteCut record key mismatch")
                 if texture_key not in texture_records:
                     raise SpriteCutBoundsError("Missing TextureData resource link")
                 parsed_texture, image_key, _ = parse_texture_data_record(
