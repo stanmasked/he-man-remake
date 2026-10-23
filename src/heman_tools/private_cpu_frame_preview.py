@@ -27,7 +27,10 @@ from .symbol_frame_render_plan import (
     build_symbol_frame_render_plan,
 )
 from .symbol_render_contract import SymbolRenderContract
-from .native_texture_upload_gate import (\n    NativeTextureUploadError, plan_native_texture_upload, prepare_native_cpu_texture,\n)\nfrom .textured_quad_reference import (
+from .native_texture_upload_gate import (
+    NativeTextureUploadError, plan_native_texture_upload, prepare_native_cpu_texture,
+)
+from .textured_quad_reference import (
     FrameBlendState,
     RasterProjection,
     TexturePixels,
