@@ -79,6 +79,12 @@ class SymbolMeshGeometryTests(unittest.TestCase):
         self.assertFalse(mirrored.front_face_flip)
         self.assertEqual(mirrored.vertices[0], (2.0, -1.0))
 
+    def test_player_negative_scale_does_not_recompute_native_winding_flag(self):
+        player = PlayerTransform(scale_x=-1.0)
+        result = build_symbol_quad_geometry(command(), 4, 2, player)
+        self.assertTrue(result.front_face_flip)
+        self.assertEqual(result.vertices[0], (2.0, -1.0))
+
     def test_zero_and_negative_dimensions_are_preserved(self):
         zero = build_symbol_quad_geometry(command(), 0, 4)
         negative = build_symbol_quad_geometry(command(), -4, 2)
