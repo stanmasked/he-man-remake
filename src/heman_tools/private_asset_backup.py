@@ -366,7 +366,7 @@ def main(argv=None) -> int:
     print(
         "Stage216 private archive verified locally: "
         + ", ".join(
-            f"{screen}={manifest['screen_packs'][screen]['file_count']} members"
+            f"{screen}={(manifest['shared_resources'] if screen == SHARED else manifest['screen_packs'][screen])['file_count']} members"
             for screen in PACK_KEYS
         )
         + "; Google Drive upload and readback still pending."
