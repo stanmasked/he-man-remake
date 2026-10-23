@@ -156,6 +156,12 @@ class TexturedQuadReferenceTests(unittest.TestCase):
             projection=RasterProjection(),frame_blend=FrameBlendState())
         self.assertEqual((result.packets_considered,result.packets_with_coverage),(2,2))
 
+    def test_unrepresentably_large_integer_fails_closed(self):
+        packet = _packet(xy=(10**1000, 0, 0, 1, 1, 1, 1, 0))
+        texture = TexturePixels(1,1,bytes((255,255,255,255)),0,0)
+        with self.assertRaisesRegex(TexturedQuadRenderError, "finite and representable"):
+            _render(packet, texture)
+
     def test_clear_color_requires_byte_channels(self):
         with self.assertRaisesRegex(TexturedQuadRenderError, "four byte channels"):
             render_textured_frame([],{},width=1,height=1,projection=RasterProjection(),

@@ -32,10 +32,15 @@ class TexturedQuadRenderError(ValueError):
 
 
 def _finite(value: object, field: str) -> float:
-    if (isinstance(value, bool) or not isinstance(value, (int, float))
-            or not math.isfinite(value)):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise TexturedQuadRenderError(f"{field} must be a finite number")
-    result = float(value)
+    try:
+        finite = math.isfinite(value)
+        result = float(value)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise TexturedQuadRenderError(f"{field} must be finite and representable") from exc
+    if not finite or not math.isfinite(result):
+        raise TexturedQuadRenderError(f"{field} must be a finite number")
     if abs(result) > MAX_ABS_COORDINATE:
         raise TexturedQuadRenderError(f"{field} exceeds the bounded coordinate range")
     return result

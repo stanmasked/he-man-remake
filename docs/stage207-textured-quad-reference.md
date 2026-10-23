@@ -12,7 +12,7 @@ Turn Stage201's CPU packet list into a deterministic RGBA reference image while 
 - Only filter selector 0 is accepted: nearest sampling selects floor(u*width) and floor(v*height), then applies clamp-to-edge or modulo repeat independently on S and T. Out-of-range UVs are preserved and sampled through the selected wrap mode.
 - Packets are blended in strictly increasing native source order. A packet's per-Symbol blend override takes precedence over explicit frame-level FrameBlendState; otherwise frame factors are used. Default factors are GL_ONE / GL_ONE_MINUS_SRC_ALPHA.
 - The blend equation applies GLES glBlendFunc factors per RGBA channel and clamps/quantizes after each packet to model an RGBA8 target. Input texture RGB is not premultiplied a second time; the actual decoded/uploaded alpha representation still needs separate source-path confirmation before visual-parity claims.
-- Invalid packet layout, missing textures, unsupported filters/factors, non-finite values, non-affine quads and sample-budget overflow fail closed before a result image is returned.
+- Invalid packet layout, missing textures, unsupported filters/factors, non-finite or unrepresentably large values, non-affine quads and sample-budget overflow fail closed before a result image is returned. Quad coverage uses a deterministic half-open affine rule; exact GLES triangle-edge ownership and face-culling state are not modeled.
 
 ## Synthetic verification
 
