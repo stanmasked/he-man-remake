@@ -129,3 +129,5 @@ No original IPA or extracted copyrighted resource may be committed, uploaded as 
 - [ ] Test stable frame pacing, memory, handheld/docked input and rendering on Nintendo Switch hardware; verify real-game parity privately.
 
 **Status boundary:** Successful NeXium NRO proofs establish that the independent synthetic prototype boots and responds to inputs. They **do not establish** a playable remake of the original commercial iOS game. Never publish IPA bytes, extracted assets or private reports to GitHub.
+
+- [ ] Stage193 adds a synthetic-only residual UV classifier that separates outside-allocated SpriteCut coordinates by axis and tracks paired-screen changes without guessing GL wrap modes or modifying source data. The private baseline remains 5/16 allocated-extents overruns plus one invalid tuple per pack, pending native GL-state and actual-use analysis. See [Stage193](stage193-residual-uv-triage.md).
