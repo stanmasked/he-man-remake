@@ -151,13 +151,17 @@ def audit_private_multisymbol_frame(
             ("meta/TextureData.repo", MAX_REPO_BYTES),
             ("meta/ImageData.repo", MAX_IMAGE_REPO_BYTES),
         ):
-            first = _read_source_member(archive, index, root + relative, maximum)
-            second = _read_source_member(
+            med_index = _read_source_member(
+                archive, index, PREFIX + SCREENS[0] + "/" + relative, maximum
+            )
+            xlarge_index = _read_source_member(
                 archive, index, PREFIX + SCREENS[1] + "/" + relative, maximum
             )
-            if first != second:
+            if med_index != xlarge_index:
                 raise PrivateFrameDecodeError("Paired resource repository indexes differ")
-            resource_payloads[relative] = first
+            resource_payloads[relative] = _read_source_member(
+                archive, index, root + relative, maximum
+            )
 
         sequence_repo = source_sequence_repo[screen]
         sequence_wad = _read_source_member(
