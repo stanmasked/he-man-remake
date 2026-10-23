@@ -74,7 +74,17 @@ endif
 # The ordinary raster NRO and all existing probe configurations stay unchanged.
 ifeq ($(TEXTURE_PROBE),1)
 TARGET := heman_texture_probe
-SOURCES := source/texture_probe.c $(ROOT)/native/src/heman_textured_quad_reference.c
+SOURCES := source/texture_probe.c $(ROOT)/native/src/heman_textured_quad_reference.c \
+           $(ROOT)/native/src/heman_native_png_upload.c
+endif
+# Stage224 opt-in native allocated-texture check on the same synthetic
+# software-framebuffer guest; does NOT prove hardware GPU texture submission.
+ifeq ($(PNG_PADDING_PROBE),1)
+ifneq ($(TEXTURE_PROBE),1)
+$(error PNG_PADDING_PROBE requires TEXTURE_PROBE=1)
+endif
+TARGET := heman_png_padding_probe
+CFLAGS += -DHM_NATIVE_PADDING_PROBE=1
 endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib

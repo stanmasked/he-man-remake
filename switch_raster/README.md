@@ -195,3 +195,27 @@ make -C switch_raster clean all TEXTURE_PROBE=1
 ```
 
 This creates `switch_raster/heman_texture_probe.nro` without replacing the ordinary `heman_raster_probe.nro` source or gameplay. The probe runs the portable Stage208 C99 CPU reference against a newly authored 8×4 RGBA texture, writes the result to the 640×360 libnx software framebuffer, and checks its own expected sample points before startup. The patched NeXium workflow captures guest frames 30, 120 and 300 and validates checker colors plus clear-background pixels. This verifies the CPU reference and framebuffer path only; it is not a GPU texture-upload path, original-game rendering or hardware proof. No original IPA or extracted resources are used.
+
+
+## Stage224 — synthetic native allocated-PNG CPU upload guest
+
+A separate opt-in NRO checks the original iOS source-audited zero-padding
+**algorithm**, implemented as portable C99 over invented RGB/RGBA buffers.
+It is not shipped with, or sourced from, original commercial textures.
+
+```sh
+make -C switch_raster clean all TEXTURE_PROBE=1 PNG_PADDING_PROBE=1
+# output: switch_raster/heman_png_padding_probe.nro
+```
+
+The guest fills a 4×4 allocated texture from a 3×2 synthetic RGB PNG
+sample using `hm_native_png_prepare_rgba`, validates allocated stride,
+right/bottom black pixels, the exact C99 textured-quad CPU render and
+draws a separate visible 64×64 panel into the libnx 640×360 framebuffer.
+The existing Stage209 checker remains independent. The standalone Stage224
+GitHub Actions workflow validates the AArch64/NRO0 build and keeps a short
+lived NRO artifact. The native host C99 checks run under GCC and Clang;
+Python/C99 tests compare 48 invented RGB/RGBA/wrap/filter combinations
+byte-for-byte. A passing host test or NRO compile is **not** proof of
+NeXium execution or GPU texture upload: this still uses the software
+framebuffer, not native deko3d sampling.

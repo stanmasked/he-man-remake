@@ -1,0 +1,56 @@
+name: He-Man Stage224 synthetic native PNG padding NRO
+on:
+  pull_request:
+    paths:
+      - 'native/include/heman_native_png_upload.h'
+      - 'native/src/heman_native_png_upload.c'
+      - 'native/tests/test_native_png_upload.c'
+      - 'switch_raster/**'
+      - '.github/workflows/switch-native-png-padding.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  padded-texture-switch:
+    name: Compile synthetic native padded PNG Switch guest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original commercial content
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|ogg|wav|mp3|pvr)$'; then
+            echo "Original source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Compile opt-in Stage224 C99 CPU-upload framebuffer NRO
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_raster clean all TEXTURE_PROBE=1 PNG_PADDING_PROBE=1
+          test -s switch_raster/heman_png_padding_probe.elf
+          test -s switch_raster/heman_png_padding_probe.nro
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_raster/heman_png_padding_probe.elf | grep -F AArch64
+          test "$(dd if=switch_raster/heman_png_padding_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_raster/heman_png_padding_probe.nro
+      - name: Store synthetic test NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage224-synthetic-png-padding-nro
+          path: switch_raster/heman_png_padding_probe.nro
+          if-no-files-found: error
+          retention-days: 7
