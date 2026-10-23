@@ -33,6 +33,7 @@ from .sprite_sequence_native_loader_structure import (
 )
 from .sprite_wad_record_intervals import _intervals
 
+MAX_GO_BYTES = 8_000_000
 MAX_PNG_BYTES = 32_000_000
 _U32 = struct.Struct("<I")
 _I32 = struct.Struct("<i")
