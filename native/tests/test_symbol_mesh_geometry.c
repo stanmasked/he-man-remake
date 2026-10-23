@@ -154,6 +154,32 @@ static void test_geometry_overflow_fails_closed(void) {
            HM_SYMBOL_MESH_NONFINITE_GEOMETRY);
 }
 
+static void test_uv_corner_order_matches_native_sprite_cut(void) {
+    hm_symbol_draw_command c = make_command();
+    float uv[8];
+    c.u0 = -0.25f;
+    c.v0 = 0.125f;
+    c.u1 = 1.25f;
+    c.v1 = 0.875f;
+    assert(hm_symbol_mesh_expand_uvs(&c, uv) == HM_SYMBOL_MESH_OK);
+    assert(uv[0] == -0.25f && uv[1] == 0.125f);
+    assert(uv[2] == -0.25f && uv[3] == 0.875f);
+    assert(uv[4] == 1.25f && uv[5] == 0.875f);
+    assert(uv[6] == 1.25f && uv[7] == 0.125f);
+}
+
+static void test_uv_expansion_failure_leaves_output_unchanged(void) {
+    hm_symbol_draw_command c = make_command();
+    float uv[8];
+    float before[8];
+    memset(uv, 0x5a, sizeof uv);
+    memcpy(before, uv, sizeof uv);
+    c.alpha = NAN;
+    assert(hm_symbol_mesh_expand_uvs(&c, uv) == HM_SYMBOL_MESH_INVALID_DRAW_COMMAND);
+    assert(memcmp(uv, before, sizeof uv) == 0);
+    assert(hm_symbol_mesh_expand_uvs(&c, NULL) == HM_SYMBOL_MESH_INVALID_ARGUMENT);
+}
+
 static void test_uvs_are_not_clipped_or_modified(void) {
     hm_symbol_draw_command c = make_command();
     hm_symbol_quad_geometry g;
@@ -172,6 +198,8 @@ int main(void) {
     test_invalid_inputs_leave_output_unchanged();
     test_geometry_overflow_fails_closed();
     test_uvs_are_not_clipped_or_modified();
+    test_uv_corner_order_matches_native_sprite_cut();
+    test_uv_expansion_failure_leaves_output_unchanged();
     puts("Stage199 C99 Symbol mesh geometry tests passed");
     return 0;
 }

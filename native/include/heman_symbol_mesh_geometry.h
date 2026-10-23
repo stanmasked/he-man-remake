@@ -41,8 +41,18 @@ typedef enum hm_symbol_mesh_status {
 } hm_symbol_mesh_status;
 
 /*
+ * Expand the four native SpriteCut UV endpoints into the same vertex order as
+ * the XY fan: (u0,v0), (u0,v1), (u1,v1), (u1,v0). Values outside [0,1] are
+ * preserved. out_uv receives eight binary32 values only on success.
+ */
+hm_symbol_mesh_status hm_symbol_mesh_expand_uvs(
+    const hm_symbol_draw_command *command,
+    float out_uv[8]
+);
+
+/*
  * Build a centered quad from the original signed SpriteCut width/height.
- * Serialized Symbol offsets denote the unscaled top-left corner. Native local
+ * Serialized Symbol offsets locate the unscaled top-left corner. Native local
  * points are scaled and rotated around the origin, then translated by
  * (offset_x + cut_width/2, offset_y + cut_height/2).
  * SpritePlayer transform order: rotate about pivot -> scale about pivot ->

@@ -1,12 +1,13 @@
 """Synthetic regressions for Stage199 native quad geometry."""
 import math
 import unittest
+from dataclasses import replace
 
 from heman_tools.native_sprite_cut_uv import NativeSpriteCutUV
 from heman_tools.symbol_frame_render_plan import SymbolDrawCommand, PlayerTransform
 from heman_tools.symbol_render_contract import SymbolTweenSelectors
 from heman_tools.symbol_mesh_geometry import (
-    SymbolMeshGeometryError, build_symbol_quad_geometry,
+    SymbolMeshGeometryError, build_symbol_quad_geometry, expand_native_uv_corners,
 )
 
 
@@ -92,6 +93,23 @@ class SymbolMeshGeometryTests(unittest.TestCase):
         self.assertEqual(zero.vertices[2][0], 0.0)
         self.assertEqual(negative.vertices[0], (0.0, 0.0))
         self.assertEqual(negative.vertices[2], (-4.0, 2.0))
+
+    def test_native_uv_corner_order_matches_sprite_cut_array(self):
+        item = replace(
+            command(),
+            uv=NativeSpriteCutUV(-0.25, 0.125, 1.25, 0.875, 8, 8, 0, 0,
+                                 "GL_CLAMP_TO_EDGE", "GL_CLAMP_TO_EDGE"),
+        )
+        self.assertEqual(
+            expand_native_uv_corners(item),
+            ((-0.25, 0.125), (-0.25, 0.875),
+             (1.25, 0.875), (1.25, 0.125)),
+        )
+
+    def test_uv_expansion_rejects_invalid_command(self):
+        item = replace(command(), vertex_rgba=(1.0, 1.0, float("nan"), 1.0))
+        with self.assertRaises(SymbolMeshGeometryError):
+            expand_native_uv_corners(item)
 
     def test_out_of_range_uvs_are_not_modified(self):
         item = command()

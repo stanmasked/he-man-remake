@@ -55,17 +55,7 @@ class SymbolQuadGeometry:
         return tuple(value for point in self.vertices for value in point)
 
 
-def build_symbol_quad_geometry(
-    command: SymbolDrawCommand,
-    cut_width: int,
-    cut_height: int,
-    player_transform: PlayerTransform | None = None,
-) -> SymbolQuadGeometry:
-    """Build a centered quad and apply native local then player transforms.
-
-    Signed zero/negative SpriteCut dimensions and scales are preserved. UV
-    endpoints remain on the command and are not clipped or synthesized here.
-    """
+def _validate_command(command: SymbolDrawCommand) -> None:
     if not isinstance(command, SymbolDrawCommand):
         raise SymbolMeshGeometryError("command must be a SymbolDrawCommand")
     if type(command.source_order) is not int or not 0 <= command.source_order <= (1 << 32) - 1:
@@ -92,6 +82,36 @@ def build_symbol_quad_geometry(
             raise SymbolMeshGeometryError("blend_override must be a pair of non-negative int32 values")
     if type(command.symbol_mask) is not int or not -(1 << 31) <= command.symbol_mask <= (1 << 31) - 1:
         raise SymbolMeshGeometryError("symbol_mask must be a signed 32-bit integer")
+    for field in ("rotation_degrees", "offset_x", "offset_y", "scale_x", "scale_y"):
+        _f32(getattr(command, field), field)
+
+
+def expand_native_uv_corners(
+    command: SymbolDrawCommand,
+) -> tuple[tuple[float, float], tuple[float, float],
+           tuple[float, float], tuple[float, float]]:
+    """Match SpriteCut::buildTextCoord's four UV pairs in native vertex order."""
+    _validate_command(command)
+    uv = command.uv
+    u0, v0, u1, v1 = (
+        _f32(uv.u0, "u0"), _f32(uv.v0, "v0"),
+        _f32(uv.u1, "u1"), _f32(uv.v1, "v1"),
+    )
+    return ((u0, v0), (u0, v1), (u1, v1), (u1, v0))
+
+
+def build_symbol_quad_geometry(
+    command: SymbolDrawCommand,
+    cut_width: int,
+    cut_height: int,
+    player_transform: PlayerTransform | None = None,
+) -> SymbolQuadGeometry:
+    """Build a centered quad and apply native local then player transforms.
+
+    Signed zero/negative SpriteCut dimensions and scales are preserved. UV
+    endpoints remain on the command and are not clipped or synthesized here.
+    """
+    _validate_command(command)
     for name, value in (("cut_width", cut_width), ("cut_height", cut_height)):
         if type(value) is not int or not -(1 << 31) <= value <= (1 << 31) - 1:
             raise SymbolMeshGeometryError(f"{name} must be a signed 32-bit integer")
