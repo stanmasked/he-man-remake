@@ -134,6 +134,8 @@ def summarize_resolution_parity(
     xl_dims = xlarge_details["png_dimensions"]
     med_wraps = med_details["wrap_codes"]
     xl_wraps = xlarge_details["wrap_codes"]
+    med_filters = med_details["filter_modes"]
+    xl_filters = xlarge_details["filter_modes"]
 
     same_count = len(med_symbols) == len(xl_symbols)
     identity_visual_match, offsets_double = _same_symbol_fields(med_details, xlarge_details)
