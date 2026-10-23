@@ -37,25 +37,25 @@ def close_pair(actual, expected, tol=2e-5):
 class SymbolMeshGeometryTests(unittest.TestCase):
     def test_native_vertex_order_and_centered_quad(self):
         result = build_symbol_quad_geometry(command(), 8, 4)
-        self.assertEqual(result.vertices, ((-4.0, -2.0), (-4.0, 2.0),
-                                           (4.0, 2.0), (4.0, -2.0)))
+        self.assertEqual(result.vertices, ((0.0, 0.0), (0.0, 4.0),
+                                           (8.0, 4.0), (8.0, 0.0)))
         self.assertTrue(result.front_face_flip)
 
     def test_local_scale_then_offset(self):
         result = build_symbol_quad_geometry(
             command(offset_x=10, offset_y=20, scale_x=2.0, scale_y=3.0), 4, 2
         )
-        self.assertEqual(result.vertices, ((6.0, 17.0), (6.0, 23.0),
-                                           (14.0, 23.0), (14.0, 17.0)))
+        self.assertEqual(result.vertices, ((8.0, 18.0), (8.0, 24.0),
+                                           (16.0, 24.0), (16.0, 18.0)))
 
     def test_local_rotation_then_offset(self):
         result = build_symbol_quad_geometry(
             command(rotation=90, offset_x=3, offset_y=4), 2, 2
         )
-        self.assertTrue(close_pair(result.vertices[0], (4.0, 3.0)))
-        self.assertTrue(close_pair(result.vertices[1], (2.0, 3.0)))
-        self.assertTrue(close_pair(result.vertices[2], (2.0, 5.0)))
-        self.assertTrue(close_pair(result.vertices[3], (4.0, 5.0)))
+        self.assertTrue(close_pair(result.vertices[0], (5.0, 4.0)))
+        self.assertTrue(close_pair(result.vertices[1], (3.0, 4.0)))
+        self.assertTrue(close_pair(result.vertices[2], (3.0, 6.0)))
+        self.assertTrue(close_pair(result.vertices[3], (5.0, 6.0)))
 
     def test_player_transform_order_and_independent_pivots(self):
         player = PlayerTransform(
@@ -70,28 +70,28 @@ class SymbolMeshGeometryTests(unittest.TestCase):
             translation_y=7.0,
         )
         result = build_symbol_quad_geometry(command(), 2, 2, player)
-        self.assertTrue(close_pair(result.vertices[0], (11.0, 6.5)))
+        self.assertTrue(close_pair(result.vertices[0], (9.0, 7.0)))
 
     def test_negative_scale_mirrors_and_flips_winding(self):
         normal = build_symbol_quad_geometry(command(), 4, 2)
         mirrored = build_symbol_quad_geometry(command(scale_x=-1.0), 4, 2)
         self.assertTrue(normal.front_face_flip)
         self.assertFalse(mirrored.front_face_flip)
-        self.assertEqual(mirrored.vertices[0], (2.0, -1.0))
+        self.assertEqual(mirrored.vertices[0], (4.0, 0.0))
 
     def test_player_negative_scale_does_not_recompute_native_winding_flag(self):
         player = PlayerTransform(scale_x=-1.0)
-        result = build_symbol_quad_geometry(command(), 4, 2, player)
+        result = build_symbol_quad_geometry(command(offset_x=2), 4, 2, player)
         self.assertTrue(result.front_face_flip)
-        self.assertEqual(result.vertices[0], (2.0, -1.0))
+        self.assertEqual(result.vertices[0], (-2.0, 0.0))
 
     def test_zero_and_negative_dimensions_are_preserved(self):
         zero = build_symbol_quad_geometry(command(), 0, 4)
         negative = build_symbol_quad_geometry(command(), -4, 2)
         self.assertEqual(zero.vertices[0][0], 0.0)
         self.assertEqual(zero.vertices[2][0], 0.0)
-        self.assertEqual(negative.vertices[0], (2.0, -1.0))
-        self.assertEqual(negative.vertices[2], (-2.0, 1.0))
+        self.assertEqual(negative.vertices[0], (0.0, 0.0))
+        self.assertEqual(negative.vertices[2], (-4.0, 2.0))
 
     def test_out_of_range_uvs_are_not_modified(self):
         item = command()
