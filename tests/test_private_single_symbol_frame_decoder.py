@@ -13,6 +13,7 @@ from heman_tools.private_single_symbol_frame_decoder import (
     parse_single_symbol_frame,
     resolve_alias_pair,
     select_cut_rectangle,
+    _assemble_private_symbol_packet_summary,
 )
 
 
@@ -53,6 +54,46 @@ class PrivateSingleSymbolFrameDecoderTests(unittest.TestCase):
         self.assertEqual(parsed["symbols"][0]["name"], "SyntheticCut")
         self.assertEqual(parsed["symbols"][0]["cut_handle"], 7)
         self.assertTrue(all(v == 1.0 for v in parsed["symbols"][0]["transform_values"]))
+
+    def test_parser_retains_exact_serialized_symbol_fields_for_private_assembly(self):
+        parsed = parse_single_symbol_frame(sequence_record((("SyntheticCut", 7),)), 0)
+        symbol = parsed["symbols"][0]
+        self.assertEqual(symbol["serialized_fields"], (7, 0, 0, 0))
+        self.assertEqual(symbol["serialized_tail"], (0, 0, 0, 0, 0, 0, 0))
+
+    def test_private_packet_summary_contains_only_aggregate_evidence(self):
+        symbol = {
+            "name": "SyntheticCut",
+            "cut_handle": 7,
+            "serialized_fields": (7, 0, -3, -5),
+            "transform_values": (1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+            "serialized_tail": (1, 1, 1, 1, -1, -1, 0),
+        }
+        report = _assemble_private_symbol_packet_summary(
+            symbol, (0, 0, 8, 4), (16, 16), (0, 0)
+        )
+        self.assertTrue(report["cpu_frame_packet_assembled"])
+        self.assertEqual(report["cpu_frame_packet_count"], 1)
+        self.assertEqual(report["cpu_frame_packet_vertex_count"], 4)
+        self.assertEqual(report["cpu_frame_packet_uv_pair_count"], 4)
+        self.assertTrue(report["cpu_frame_packet_source_order_preserved"])
+        self.assertTrue(report["cpu_frame_packet_finite"])
+        self.assertFalse(report["full_frame_composition_verified"])
+        self.assertFalse(report["original_runtime_pixel_parity_verified"])
+        self.assertNotIn("SyntheticCut", str(report))
+
+    def test_private_packet_summary_rejects_unsupported_tween_without_guessing(self):
+        symbol = {
+            "name": "SyntheticCut",
+            "cut_handle": 7,
+            "serialized_fields": (7, 0, 0, 0),
+            "transform_values": (1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+            "serialized_tail": (99, 1, 1, 1, -1, -1, 0),
+        }
+        with self.assertRaisesRegex(PrivateFrameDecodeError, "without guessing"):
+            _assemble_private_symbol_packet_summary(
+                symbol, (0, 0, 8, 4), (16, 16), (0, 0)
+            )
 
     def test_out_of_range_frame_fails_closed(self):
         with self.assertRaisesRegex(PrivateFrameDecodeError, "outside the sequence"):
