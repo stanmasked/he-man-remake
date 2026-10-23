@@ -579,3 +579,14 @@ mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
   "$ROOT/native/tests/test_symbol_mesh_geometry.c" \
   -lm -o "$TMP/test_symbol_mesh_geometry"
 "$TMP/test_symbol_mesh_geometry"
+
+# Stage201: bounded transactional assembly of source-ordered native Symbol
+# packets from already-resolved cut extents. No GPU or original assets.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic -ffp-contract=off \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_symbol_draw_plan.c" \
+  "$ROOT/native/src/heman_symbol_mesh_geometry.c" \
+  "$ROOT/native/src/heman_symbol_frame_assembler.c" \
+  "$ROOT/native/tests/test_symbol_frame_assembler.c" \
+  -lm -o "$TMP/test_symbol_frame_assembler"
+"$TMP/test_symbol_frame_assembler"
