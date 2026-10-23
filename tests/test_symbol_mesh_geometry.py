@@ -95,9 +95,8 @@ class SymbolMeshGeometryTests(unittest.TestCase):
         self.assertEqual(before, (-0.25, 0.0, 1.25, 1.0))
 
     def test_player_transform_nonfinite_rejected(self):
-        player = PlayerTransform(scale_x=float("nan"))
-        with self.assertRaises(SymbolMeshGeometryError):
-            build_symbol_quad_geometry(command(), 4, 2, player)
+        with self.assertRaises(ValueError):
+            PlayerTransform(scale_x=float("nan"))
 
     def test_cut_dimensions_require_signed_32_bit_integers(self):
         with self.assertRaisesRegex(SymbolMeshGeometryError, "signed 32-bit"):
