@@ -33,6 +33,7 @@ from .sprite_cut_texture_image_graph import (
     parse_texture_data_record,
 )
 from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
+from .native_render_state_contract import decode_texture_filter_mode
 from .sprite_repo_wad_index import MAX_REPO_BYTES, MAX_WAD_BYTES, parse_sprite_repository
 from .sprite_wad_record_intervals import _intervals
 from .symbol_frame_assembler import MAX_SYMBOL_FRAME_COMMANDS
@@ -230,6 +231,7 @@ def audit_private_multisymbol_frame(
         rectangles = []
         png_dimensions = []
         wrap_codes = []
+        filter_modes = []
         resolved_links = []
         dimensions_by_member = {}
         resolved_symbol_count = 0
@@ -276,6 +278,7 @@ def audit_private_multisymbol_frame(
             rectangles.append(rectangle)
             png_dimensions.append(dimensions)
             wrap_codes.append(decode_texture_wrap_codes(scalar_block))
+            filter_modes.append(decode_texture_filter_mode(scalar_block))
             resolved_links.append((symbol["name"], texture_key, image_key, image_path))
             resolved_symbol_count += 1
 
@@ -291,6 +294,7 @@ def audit_private_multisymbol_frame(
             "rectangles": tuple(rectangles),
             "png_dimensions": tuple(png_dimensions),
             "wrap_codes": tuple(wrap_codes),
+            "filter_modes": tuple(filter_modes),
             "resolved_links": tuple(resolved_links),
         })
     return {
@@ -305,6 +309,10 @@ def audit_private_multisymbol_frame(
         "all_sprite_rectangles_in_bounds": True,
         "all_resource_links_resolved_uniquely": True,
         "all_source_pngs_validated": True,
+        "native_texture_filter_mode_counts": {
+            "nearest": filter_modes.count(0),
+            "linear": filter_modes.count(1),
+        },
         "active_mask_source": "CLI argument or default zero; not recovered from runtime",
         "runtime_active_mask_verified": False,
         "sprite_player_transform_used_identity_for_isolated_test": True,

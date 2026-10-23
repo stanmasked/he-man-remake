@@ -25,6 +25,11 @@ from heman_tools.private_single_symbol_frame_decoder import PrivateFrameDecodeEr
 from heman_tools.private_multisymbol_resolution_parity import (
     audit_private_multisymbol_resolution_parity,
 )
+from heman_tools.native_render_state_contract import (
+    GL_LINEAR, GL_LINEAR_MIPMAP_NEAREST, GL_NEAREST, NATIVE_DEFAULT_PLAYER_BLEND,
+    NativeRenderStateError, decode_texture_filter_mode, resolve_texture_sampling_state,
+)
+from heman_tools.texture_sampling_mode_census import audit_private_texture_sampling_modes
 
 
 def png_bytes(size=(8, 8)):
@@ -76,7 +81,8 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                                   ("SyntheticCutB", 30, 0)),
                                rectangles=((0, 0, 8, 8), (8, 0, 8, 8)),
                                scale_xs=None,
-                               resolution_scale=2):
+                               resolution_scale=2,
+                               xlarge_filter_mode=None):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
     east_record = _sequence_record(east_key, symbols, scale_xs)
     west_record = _sequence_record(west_key, symbols, scale_xs)
@@ -115,11 +121,18 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
         "sprite/SpriteResData.wad",
     )
 
-    scalar = bytearray(13)
-    scalar[10] = 0
-    scalar[11] = 0
-    texture_record = (_string("SyntheticTexture") + bytes(scalar)
-                      + _string("") + _string("SyntheticImage"))
+    scalar_med = bytearray(13)
+    scalar_med[10] = 0
+    scalar_med[11] = 0
+    scalar_xlarge = bytearray(scalar_med)
+    if xlarge_filter_mode is not None:
+        scalar_xlarge[12] = xlarge_filter_mode
+    texture_record_by_screen = {
+        SCREENS[0]: _string("SyntheticTexture") + bytes(scalar_med)
+                    + _string("") + _string("SyntheticImage"),
+        SCREENS[1]: _string("SyntheticTexture") + bytes(scalar_xlarge)
+                    + _string("") + _string("SyntheticImage"),
+    }
     texture_repo = _indexed_repo(
         "TextureData", (("SyntheticTexture", 0),), "textureData/TextureData.wad"
     )
@@ -138,7 +151,7 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
             archive.writestr(root + "meta/SpriteCutData.repo", cut_repo)
             archive.writestr(root + "sprite/SpriteResData.wad", cut_wad_by_screen[screen])
             archive.writestr(root + "meta/TextureData.repo", texture_repo)
-            archive.writestr(root + "textureData/TextureData.wad", texture_record)
+            archive.writestr(root + "textureData/TextureData.wad", texture_record_by_screen[screen])
             archive.writestr(root + "meta/ImageData.repo", image_repo)
             archive.writestr(root + "textures/synthetic.png", image)
     return ((0, split), (split, len(go)))
@@ -251,6 +264,50 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertTrue(report["checks"]["normalized_uvs_match"])
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
             self.assertNotIn("SyntheticCutA", json.dumps(report))
+
+    def test_native_texture_filter_contract_and_full_pack_census(self):
+        nearest = bytes(13)
+        linear = bytearray(13)
+        linear[12] = 1
+        self.assertEqual(decode_texture_filter_mode(nearest), 0)
+        self.assertEqual(decode_texture_filter_mode(bytes(linear)), 1)
+        self.assertEqual(resolve_texture_sampling_state(0).min_filter, GL_NEAREST)
+        self.assertEqual(resolve_texture_sampling_state(0).mag_filter, GL_NEAREST)
+        self.assertFalse(resolve_texture_sampling_state(0).generate_mipmaps)
+        linear_state = resolve_texture_sampling_state(1)
+        self.assertEqual((linear_state.min_filter, linear_state.mag_filter),
+                         (GL_LINEAR, GL_LINEAR))
+        self.assertFalse(linear_state.generate_mipmaps)
+        mip_state = resolve_texture_sampling_state(2)
+        self.assertEqual(mip_state.min_filter, GL_LINEAR_MIPMAP_NEAREST)
+        self.assertTrue(mip_state.generate_mipmaps)
+        self.assertEqual(NATIVE_DEFAULT_PLAYER_BLEND, (1, 0x0303))
+        invalid = bytearray(13)
+        invalid[12] = 2
+        with self.assertRaises(NativeRenderStateError):
+            decode_texture_filter_mode(bytes(invalid))
+
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "sampling-census.ipa"
+            _synthetic_multisymbol_ipa(ipa)
+            report = audit_private_texture_sampling_modes(ipa)
+            self.assertTrue(report["paired_sampling_metadata_match"])
+            self.assertEqual(report["texture_record_count_per_pack"], 1)
+            self.assertEqual(report["per_pack"]["screen-med"]["filter_mode_counts"],
+                             {"nearest": 1, "linear": 0})
+            self.assertFalse(report["original_runtime_pixel_parity_verified"])
+
+    def test_paired_resolution_audit_rejects_filter_mode_mismatch(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "filter-mismatch.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa, xlarge_filter_mode=1)
+            report = audit_private_multisymbol_resolution_parity(
+                ipa, regions, "syntheticIdle", 0, "east", 0, active_mask=0
+            )
+            self.assertFalse(report["paired_resolution_parity_verified"])
+            self.assertFalse(report["checks"]["native_texture_filter_modes_match"])
+            self.assertTrue(report["checks"]["native_texture_wrap_codes_match"])
+            self.assertNotIn("SyntheticTexture", json.dumps(report))
 
     def test_negative_horizontal_scale_is_accepted_as_finite_mirrored_geometry(self):
         with TemporaryDirectory() as directory:

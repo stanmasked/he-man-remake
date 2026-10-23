@@ -20,12 +20,12 @@ The CLI internally resolves `screen-med` and `screen-xlarge` independently, then
 
 ## Original-IPA result — 23 October 2026
 
-The exact paired-resolution audit completed locally for the same eight-Symbol frame in both east and west directions. All 12 parity checks passed in each direction:
+The exact paired-resolution audit completed locally for the same eight-Symbol frame in both east and west directions. All 13 parity checks passed in each direction:
 
 - Eight Symbols resolved and eight CPU packets assembled in each screen pack.
 - Every resource link resolved uniquely, all referenced PNGs decoded, all SpriteCut rectangles stayed in bounds, and all CPU packet values were finite.
 - Symbol identity and non-position visual fields match; serialized X/Y offsets, SpriteCut rectangles, referenced PNG dimensions, and CPU XY geometry scale exactly 2× in the xlarge pack.
-- The resolved Symbol → SpriteCut → TextureData → ImageData identity chain and native texture wrap codes match; normalized UVs, source order, RGBA values, blend overrides, and winding flags match across packs.
+- The resolved Symbol → SpriteCut → TextureData → ImageData identity chain, native texture wrap codes, and native texture filter selectors match; normalized UVs, source order, RGBA values, blend overrides, and winding flags match across packs.
 - The audit uses an explicit active mask of zero and an identity SpritePlayer transform; live runtime state was not recovered.
 
 A synthetic negative control with an unscaled second pack was also exercised locally and correctly failed the 2× scale checks. The corresponding committed regression is included in the Stage205 test suite.

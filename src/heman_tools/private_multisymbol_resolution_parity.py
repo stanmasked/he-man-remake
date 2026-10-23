@@ -38,6 +38,7 @@ def _pack_summary(report: dict) -> dict:
         "all_sprite_rectangles_in_bounds",
         "all_resource_links_resolved_uniquely",
         "all_source_pngs_validated",
+        "native_texture_filter_mode_counts",
         "cpu_frame_packet_count",
         "cpu_frame_packet_vertex_count",
         "cpu_frame_packet_uv_pair_count",
@@ -145,6 +146,7 @@ def summarize_resolution_parity(
         and all(_double_tuple(a, b) for a, b in zip(med_dims, xl_dims))
     )
     wraps_match = med_wraps == xl_wraps and len(med_wraps) == len(xl_wraps)
+    filter_modes_match = med_filters == xl_filters and len(med_filters) == len(xl_filters)
     resource_chain_match = (
         med_details.get("resolved_links") == xlarge_details.get("resolved_links")
         and len(med_details.get("resolved_links", ())) == len(med_symbols)
@@ -186,6 +188,7 @@ def summarize_resolution_parity(
         "sprite_cut_rectangles_scale_exactly_2x": rectangles_double,
         "source_png_dimensions_scale_exactly_2x": dimensions_double,
         "native_texture_wrap_codes_match": wraps_match,
+        "native_texture_filter_modes_match": filter_modes_match,
         "normalized_uvs_match": uv_match,
         "cpu_xy_geometry_scales_exactly_2x": geometry_double,
         "packet_source_order_matches": source_order_match,
