@@ -97,7 +97,14 @@ class C99TexturedQuadParityTests(unittest.TestCase):
             str(root / "native" / "src" / "heman_textured_quad_reference.c"),
             "-lm", "-o", str(library_path),
         ]
-        subprocess.run(command, check=True, capture_output=True, text=True)
+        try:
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or exc.stdout or "compiler returned no diagnostic text").strip()
+            raise AssertionError(
+                "Could not compile the C99 textured-quad parity oracle; "
+                f"command={command!r}\\n{detail}"
+            ) from exc
         cls._library = ctypes.CDLL(str(library_path))
         cls._library.hm_textured_quad_reference_render.argtypes = [
             ctypes.POINTER(CDraw), ctypes.c_size_t,
