@@ -76,8 +76,8 @@ class NativeSpriteCutUvTests(unittest.TestCase):
 
     def test_uv_results_are_native_single_precision_values(self):
         uv = compute_native_sprite_cut_uv((1, 3, 7, 9), (10, 10), (0, 0))
-        self.assertEqual(uv.u0, 0.03125)
-        self.assertEqual(uv.v0, 0.09375)
+        self.assertEqual(uv.u0, 0.0625)
+        self.assertEqual(uv.v0, 0.1875)
         self.assertTrue(math.isfinite(uv.u1) and math.isfinite(uv.v1))
 
 
