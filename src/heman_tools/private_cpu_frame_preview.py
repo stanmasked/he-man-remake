@@ -27,7 +27,7 @@ from .symbol_frame_render_plan import (
     build_symbol_frame_render_plan,
 )
 from .symbol_render_contract import SymbolRenderContract
-from .textured_quad_reference import (
+from .native_texture_upload_gate import (\n    NativeTextureUploadError, plan_native_texture_upload, prepare_native_cpu_texture,\n)\nfrom .textured_quad_reference import (
     FrameBlendState,
     RasterProjection,
     TexturePixels,
@@ -114,14 +114,18 @@ def render_private_cpu_frame_preview(
                 wrap_codes=wraps[order],
                 texture_slot=order,
             ))
-            width, height = dimensions[order]
-            textures_by_slot[order] = TexturePixels(
-                width,
-                height,
-                texture_rgba[order],
-                wraps[order][0],
-                wraps[order][1],
-                filter_mode_code=filters[order],
+            # Stage222: native UVs divide by allocated powers-of-two.
+            # Raw PNG rows cannot masquerade as the allocated surface.
+            # Until native padding pixels are independently recovered,
+            # any padded source texture fails closed instead of silently
+            # distorting the CPU preview's texture sampling.
+            layout = plan_native_texture_upload(
+                dimensions[order],
+                tuple(wraps[order]),
+                filters[order],
+            )
+            textures_by_slot[order] = prepare_native_cpu_texture(
+                layout, texture_rgba[order],
             )
         plan = build_symbol_frame_render_plan(
             tuple(layers),
@@ -187,6 +191,11 @@ def render_private_cpu_frame_preview(
         )
     except PrivateCPUFramePreviewError:
         raise
+    except NativeTextureUploadError as exc:
+        raise PrivateCPUFramePreviewError(
+            "Native texture upload is unresolved: original padding or sampler data "
+            "is required; do not render misleading raw-PNG texture coordinates"
+        ) from exc
     except (KeyError, IndexError, TypeError, ValueError, OverflowError) as exc:
         if isinstance(exc, TexturedQuadRenderError):
             raise PrivateCPUFramePreviewError(
@@ -239,6 +248,9 @@ def render_private_cpu_frame_preview(
         ),
         "output_width": rendered.width,
         "output_height": rendered.height,
+        "native_allocated_texture_dimensions_verified": True,
+        "native_padding_texels_required_without_evidence": False,
+        "native_texture_sampling_uses_allocated_dimensions": True,
         "gpu_submission_verified": False,
         "original_runtime_pixel_parity_verified": False,
         "full_scene_placement_verified": False,
