@@ -19,13 +19,11 @@ from .sprite_cut_texture_image_graph import (
     parse_sprite_cut_record, parse_texture_data_record,
 )
 from .sprite_repo_wad_index import (
-    MAX_REPO_BYTES, MAX_WAD_BYTES, SpriteIndexFormatError,
+    MAX_REPO_BYTES, MAX_WAD_BYTES,
     parse_sprite_repository,
 )
 from .sprite_wad_record_intervals import _intervals
-from .sprite_cut_runtime_texture_bounds import (
-    SpriteCutBoundsError, classify_allocated_cut,
-)
+from .sprite_cut_runtime_texture_bounds import classify_allocated_cut
 
 _TEXTURE_WRAP_CODES = {0: "clamp_to_edge", 1: "repeat"}
 
@@ -129,7 +127,6 @@ def summarize_wrap_bounds(
         ("screen-xlarge", xlarge_rows, xlarge_wraps),
     ):
         groups = defaultdict(Counter)
-        texture_pairs = Counter(wraps.values())
         for ref, (rectangle, png_dims) in rows.items():
             mode_pair = tuple(texture_wrap_mode(code) for code in wraps[ref])
             group = groups[mode_pair]
