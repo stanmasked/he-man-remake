@@ -86,8 +86,14 @@ def audit_private_multisymbol_frame(
     frame_index: int,
     *,
     active_mask: int = 0,
+    source_screen_group: str = SCREENS[0],
+    _private_details: list | None = None,
 ) -> dict:
-    """Resolve every Symbol in one original frame and assemble aggregate CPU evidence."""
+    """Resolve one original frame and assemble aggregate CPU evidence.
+
+    _private_details is an internal local-only out-parameter for paired-pack
+    comparisons. Its contents must never be serialized or sent to GitHub.
+    """
     if not ipa.is_file():
         raise ValueError("Owner-private original IPA missing")
     if type(variant) is not int or variant not in (0, 1):
@@ -96,6 +102,10 @@ def audit_private_multisymbol_frame(
         raise PrivateFrameDecodeError("Direction must be east or west")
     if type(active_mask) is not int or not _S32_MIN <= active_mask <= _S32_MAX:
         raise PrivateFrameDecodeError("Active mask must be a signed 32-bit integer")
+    if source_screen_group not in SCREENS:
+        raise PrivateFrameDecodeError("Unsupported source screen group")
+    if _private_details is not None and type(_private_details) is not list:
+        raise PrivateFrameDecodeError("Private detail collector must be a list")
     if not isinstance(regions, tuple) or len(regions) != 2:
         raise PrivateFrameDecodeError("Exactly two component regions are required")
     for region in regions:
@@ -133,7 +143,7 @@ def audit_private_multisymbol_frame(
         if source_sequence_repo[SCREENS[0]] != source_sequence_repo[SCREENS[1]]:
             raise PrivateFrameDecodeError("Paired SpriteSequence indexes differ")
 
-        screen = SCREENS[0]
+        screen = source_screen_group
         root = PREFIX + screen + "/"
         resource_payloads = {}
         for relative, maximum in (
@@ -267,6 +277,15 @@ def audit_private_multisymbol_frame(
         symbols, tuple(rectangles), tuple(png_dimensions), tuple(wrap_codes),
         active_mask=active_mask,
     )
+    if _private_details is not None:
+        # Retain private values only in caller memory for paired-pack comparison.
+        # They are deliberately absent from the public aggregate report.
+        _private_details.append({
+            "symbols": tuple(symbols),
+            "rectangles": tuple(rectangles),
+            "png_dimensions": tuple(png_dimensions),
+            "wrap_codes": tuple(wrap_codes),
+        })
     return {
         "classification": "private_multisymbol_frame_packet_audit",
         "source_screen_group": screen,
@@ -301,6 +320,8 @@ def main(argv=None) -> int:
     parser.add_argument("--frame", type=int, default=0)
     parser.add_argument("--active-mask", type=_parse_active_mask, default=0,
                         help="auditor-supplied signed 32-bit mask (decimal or 0x-prefixed)")
+    parser.add_argument("--screen", choices=SCREENS, default=SCREENS[0],
+                        help="source resolution pack to audit (default: screen-med)")
     parser.add_argument("--report-out", required=True, type=Path)
     args = parser.parse_args(argv)
     if len(args.region) != 2:
@@ -309,6 +330,7 @@ def main(argv=None) -> int:
     report = audit_private_multisymbol_frame(
         args.ipa, tuple(args.region), args.alias, args.variant, args.direction,
         args.frame, active_mask=args.active_mask,
+        source_screen_group=args.screen,
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n",
