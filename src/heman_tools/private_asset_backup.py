@@ -203,6 +203,11 @@ def build_private_backup(
                         "uncompressed_bytes": sum(x["bytes"] for x in records),
                         "files": records,
                     }
+                # ZIP CRC alone cannot detect a legitimate in-place replacement
+                # of the source while this operation is running. Pin the exact
+                # source bytes both before and after all three archives are read.
+                if ipa.stat().st_size != expected_source_bytes or _sha256_file(ipa) != source_sha:
+                    raise PrivateBackupError("Original IPA changed while private backup was being assembled")
                 manifest = {
                     "schema": "heman_private_asset_backup_v1",
                     "stage": 216,
