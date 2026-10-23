@@ -67,6 +67,30 @@ def build_symbol_quad_geometry(
     """
     if not isinstance(command, SymbolDrawCommand):
         raise SymbolMeshGeometryError("command must be a SymbolDrawCommand")
+    if type(command.source_order) is not int or not 0 <= command.source_order <= (1 << 32) - 1:
+        raise SymbolMeshGeometryError("source_order must be an unsigned 32-bit integer")
+    if type(command.cut_handle) is not int or not -(1 << 31) <= command.cut_handle <= (1 << 31) - 1:
+        raise SymbolMeshGeometryError("cut_handle must be a signed 32-bit integer")
+    if not isinstance(command.uv, object):
+        raise SymbolMeshGeometryError("uv metadata is missing")
+    for field in ("u0", "v0", "u1", "v1"):
+        _f32(getattr(command.uv, field), "uv " + field)
+    if not isinstance(command.vertex_rgba, (tuple, list)) or len(command.vertex_rgba) != 4:
+        raise SymbolMeshGeometryError("vertex_rgba must contain four channels")
+    for channel in command.vertex_rgba:
+        value = _f32(channel, "vertex_rgba")
+        if value < 0.0 or value > 1.0:
+            raise SymbolMeshGeometryError("vertex_rgba channel must be in [0, 1]")
+    if type(command.draw_enabled) is not bool:
+        raise SymbolMeshGeometryError("draw_enabled must be boolean")
+    if command.blend_override is not None:
+        if (not isinstance(command.blend_override, tuple)
+                or len(command.blend_override) != 2
+                or any(type(value) is not int or not 0 <= value <= (1 << 31) - 1
+                       for value in command.blend_override)):
+            raise SymbolMeshGeometryError("blend_override must be a pair of non-negative int32 values")
+    if type(command.symbol_mask) is not int or not -(1 << 31) <= command.symbol_mask <= (1 << 31) - 1:
+        raise SymbolMeshGeometryError("symbol_mask must be a signed 32-bit integer")
     for name, value in (("cut_width", cut_width), ("cut_height", cut_height)):
         if type(value) is not int or not -(1 << 31) <= value <= (1 << 31) - 1:
             raise SymbolMeshGeometryError(f"{name} must be a signed 32-bit integer")
