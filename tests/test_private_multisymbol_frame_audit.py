@@ -125,10 +125,12 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
     scalar_med = bytearray(13)
     scalar_med[10] = 0
     scalar_med[11] = 0
-    scalar_med[12] = filter_mode
+    scalar_med[6:10] = struct.pack("<i", filter_mode)
+    scalar_med[12] = 0
     scalar_xlarge = bytearray(scalar_med)
     if xlarge_filter_mode is not None:
-        scalar_xlarge[12] = xlarge_filter_mode
+        scalar_xlarge[6:10] = struct.pack("<i", xlarge_filter_mode)
+        scalar_xlarge[12] = 0
     texture_record_by_screen = {
         SCREENS[0]: _string("SyntheticTexture") + bytes(scalar_med)
                     + _string("") + _string("SyntheticImage"),
@@ -270,7 +272,8 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
     def test_native_texture_filter_contract_and_full_pack_census(self):
         nearest = bytes(13)
         linear = bytearray(13)
-        linear[12] = 1
+        linear[6:10] = struct.pack("<i", 1)
+        linear[12] = 0
         self.assertEqual(decode_texture_filter_mode(nearest), 0)
         self.assertEqual(decode_texture_filter_mode(bytes(linear)), 1)
         self.assertEqual(resolve_texture_sampling_state(0).min_filter, GL_NEAREST)
@@ -285,7 +288,7 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
         self.assertTrue(mip_state.generate_mipmaps)
         self.assertEqual(NATIVE_DEFAULT_PLAYER_BLEND, (1, 0x0303))
         invalid = bytearray(13)
-        invalid[12] = 2
+        invalid[6:10] = struct.pack("<i", 3)
         with self.assertRaises(NativeRenderStateError):
             decode_texture_filter_mode(bytes(invalid))
 
