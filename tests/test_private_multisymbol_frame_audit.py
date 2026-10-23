@@ -158,7 +158,7 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
         for rectangle in ((0, 0, 0, 1), (-1, 0, 1, 1), (0, -1, 1, 1)):
             with self.subTest(rectangle=rectangle), self.assertRaises(PrivateFrameDecodeError):
                 _require_rectangle_in_bounds(rectangle, (8, 8))
-\n
+
     def test_original_ipa_cli_path_resolves_and_assembles_synthetic_multisymbol_frame(self):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "synthetic.ipa"
