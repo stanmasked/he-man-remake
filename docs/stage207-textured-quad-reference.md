@@ -16,8 +16,8 @@ Turn Stage201's CPU packet list into a deterministic RGBA reference image while 
 
 ## Synthetic verification
 
-tests/test_textured_quad_reference.py covers normalized nearest sampling, independent S/T wrap modes, out-of-range UVs, premultiplied-alpha blending, per-Symbol and frame-level blend states, source ordering, explicit projection, malformed packets, missing resources and strict unsupported-state rejection.
+tests/test_textured_quad_reference.py covers nearest and linear sampling, texel-center interpolation, clamp/repeat seam behavior, independent S/T wrap modes, out-of-range UVs, premultiplied-alpha blending, per-Symbol and frame-level blend states, source ordering, explicit projection, malformed packets, missing resources and strict unsupported-state rejection.
 
 ## Evidence boundary
 
-This stage supplies an asset-free software reference renderer only. It does not load the original IPA, prove PNG row orientation or premultiplication, infer live projection/player state, submit GPU commands, test the Switch framebuffer, or establish original-runtime pixel parity. Stage212 corrected the metadata offsets: the alpha-transform flag is byte 5 and filter mode is the signed 32-bit value at bytes 6–9. Linear sampling remains a required follow-up. Stage208 can compare this reference with a small native C99 implementation over shared synthetic vectors before connecting output to the Switch framebuffer path.
+This stage supplies an asset-free software reference renderer only. Linear interpolation is a deterministic CPU model; it does not establish exact GLES fixed-point interpolation precision. It does not load the original IPA, prove PNG row orientation or premultiplication, infer live projection/player state, submit GPU commands, test the Switch framebuffer, or establish original-runtime pixel parity. Stage212 corrected the metadata offsets: the alpha-transform flag is byte 5 and filter mode is the signed 32-bit value at bytes 6–9. Linear sampling remains a required follow-up. Stage208 can compare this reference with a small native C99 implementation over shared synthetic vectors before connecting output to the Switch framebuffer path.
