@@ -26,7 +26,7 @@ Both screen packs contain 1,645 indexed TextureData records. Every record has fi
 | T: clamp-to-edge | 1,632 | 1,632 |
 | T: repeat | 13 | 13 |
 
-The TextureData repository indexes and WAD bytes match across the two packs. The local census also verified that all filter selector values are boolean and that the wrap-mode distributions match. The aggregate report does not include texture names, paths, offsets, source bytes or hashes.
+The TextureData repository indexes and WAD bytes match across the two packs. The local census also verified that all filter selector values are boolean and that the wrap-mode distributions match. The aggregate report does not include texture names, paths, offsets, source bytes or hashes. The reproducible owner-local entry point is `PYTHONPATH=src python -m heman_tools.texture_sampling_mode_census --ipa /secure/local/path/He-Man-v2.0.0.ipa --out local_reports/texture_sampling.json`.
 
 ## Native blend state
 
