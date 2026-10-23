@@ -24,6 +24,47 @@ static int hm_finite(float value) {
     return isfinite(value) != 0;
 }
 
+static hm_symbol_mesh_status hm_validate_draw_command(
+    const hm_symbol_draw_command *command
+) {
+    hm_symbol_draw_command checked;
+    if (command == NULL) {
+        return HM_SYMBOL_MESH_INVALID_ARGUMENT;
+    }
+    checked = *command;
+    /* A helper accepts one item from any position in a larger source list. */
+    checked.source_order = 0u;
+    if (hm_symbol_draw_plan_validate(&checked, 1u) != HM_SYMBOL_DRAW_PLAN_OK) {
+        return HM_SYMBOL_MESH_INVALID_DRAW_COMMAND;
+    }
+    return HM_SYMBOL_MESH_OK;
+}
+
+hm_symbol_mesh_status hm_symbol_mesh_expand_uvs(
+    const hm_symbol_draw_command *command,
+    float out_uv[8]
+) {
+    float result[8];
+    hm_symbol_mesh_status status;
+    if (command == NULL || out_uv == NULL) {
+        return HM_SYMBOL_MESH_INVALID_ARGUMENT;
+    }
+    status = hm_validate_draw_command(command);
+    if (status != HM_SYMBOL_MESH_OK) {
+        return status;
+    }
+    result[0] = command->u0;
+    result[1] = command->v0;
+    result[2] = command->u0;
+    result[3] = command->v1;
+    result[4] = command->u1;
+    result[5] = command->v1;
+    result[6] = command->u1;
+    result[7] = command->v0;
+    memcpy(out_uv, result, sizeof result);
+    return HM_SYMBOL_MESH_OK;
+}
+
 static int hm_player_transform_finite(const hm_symbol_player_transform *t) {
     return hm_finite(t->rotation_degrees) &&
            hm_finite(t->rotation_pivot_x) &&
@@ -67,7 +108,6 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
     const hm_symbol_player_transform *player_transform,
     hm_symbol_quad_geometry *out_geometry
 ) {
-    hm_symbol_draw_command checked;
     hm_symbol_player_transform identity;
     const hm_symbol_player_transform *player = player_transform;
     hm_symbol_quad_geometry result;
@@ -87,10 +127,7 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
     if (command == NULL || out_geometry == NULL) {
         return HM_SYMBOL_MESH_INVALID_ARGUMENT;
     }
-    checked = *command;
-    /* This function accepts a single command from any source-order position. */
-    checked.source_order = 0u;
-    if (hm_symbol_draw_plan_validate(&checked, 1u) != HM_SYMBOL_DRAW_PLAN_OK) {
+    if (hm_validate_draw_command(command) != HM_SYMBOL_MESH_OK) {
         return HM_SYMBOL_MESH_INVALID_DRAW_COMMAND;
     }
     if (player == NULL) {
