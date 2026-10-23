@@ -142,8 +142,8 @@ def _png_ihdr_dimensions(archive: ZipFile, info) -> tuple[int, int]:
     return width, height
 
 
-def audit_private_cut_bounds(ipa: Path) -> dict:
-    """Inspect both owner-private iOS resolution packs; report aggregates."""
+def _load_private_cut_rows(ipa: Path) -> tuple[dict, dict]:
+    """Load private paired cut/PNG geometry in memory; never serialize these rows."""
     if not ipa.is_file():
         raise SpriteCutBoundsError("Original IPA not available locally")
     paths = (
@@ -225,7 +225,13 @@ def audit_private_cut_bounds(ipa: Path) -> dict:
             paired[screen] = census
         if repositories[0] != repositories[1]:
             raise SpriteCutBoundsError("Original paired resource indexes differ")
-        return summarize_paired_cut_bounds(paired[SCREENS[0]], paired[SCREENS[1]])
+        return paired[SCREENS[0]], paired[SCREENS[1]]
+
+
+def audit_private_cut_bounds(ipa: Path) -> dict:
+    """Inspect both owner-private iOS resolution packs; return aggregates only."""
+    medium, extra_large = _load_private_cut_rows(ipa)
+    return summarize_paired_cut_bounds(medium, extra_large)
 
 
 def main(argv=None) -> int:
