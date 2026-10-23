@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import stat
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 import warnings
-from zipfile import ZipFile, ZIP_DEFLATED
+from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED, ZipInfo
 
 from heman_tools.physics_shape_census import PREFIX, SCREENS
 from heman_tools.private_asset_backup import (
@@ -131,6 +132,68 @@ class PrivateAssetBackupTests(unittest.TestCase):
         make_synthetic_ipa(self.ipa, duplicate=True)
         with self.assertRaisesRegex(PrivateBackupError, "duplicate"):
             self._backup()
+
+    def test_corrupted_source_member_crc_refuses_backup(self):
+        with ZipFile(self.ipa, "w", compression=ZIP_STORED) as source:
+            source.writestr(
+                PREFIX + SCREENS[0] + "/textures/synthetic.png",
+                b"original-good-bytes-0000",
+            )
+            source.writestr(
+                PREFIX + SCREENS[1] + "/textures/synthetic.png",
+                b"original-good-bytes-0000",
+            )
+        with ZipFile(self.ipa, "r") as source:
+            info = source.getinfo(PREFIX + SCREENS[0] + "/textures/synthetic.png")
+            local_data_offset = (
+                info.header_offset + 30 + len(info.filename.encode("utf-8"))
+                + len(info.extra)
+            )
+        with self.ipa.open("r+b") as damaged:
+            damaged.seek(local_data_offset)
+            byte = damaged.read(1)
+            damaged.seek(local_data_offset)
+            damaged.write(bytes([byte[0] ^ 1]))
+        with self.assertRaisesRegex(PrivateBackupError, "integrity test failed"):
+            self._backup()
+        self.assertFalse((self.output / MANIFEST_NAME).exists())
+
+    def test_unsafe_path_refused_even_with_complete_resolution_packs(self):
+        make_synthetic_ipa(self.ipa)
+        with ZipFile(self.ipa, "a") as source:
+            source.writestr(
+                PREFIX + SCREENS[0] + "/../escape.txt",
+                b"synthetic-unsafe-traversal",
+            )
+        with self.assertRaisesRegex(PrivateBackupError, "unsafe ZIP member paths"):
+            self._backup()
+        self.assertFalse((self.output / MANIFEST_NAME).exists())
+
+    def test_unix_symlink_member_refused(self):
+        make_synthetic_ipa(self.ipa)
+        with ZipFile(self.ipa, "a") as source:
+            link = ZipInfo(PREFIX + "LinkToOriginal")
+            link.create_system = 3
+            link.external_attr = (stat.S_IFLNK | 0o777) << 16
+            source.writestr(link, b"../../outside")
+        with self.assertRaisesRegex(PrivateBackupError, "Encrypted or symlink"):
+            self._backup()
+        self.assertFalse((self.output / MANIFEST_NAME).exists())
+
+    def test_missing_shared_files_still_yields_valid_empty_archive(self):
+        with ZipFile(self.ipa, "w", compression=ZIP_DEFLATED) as source:
+            for screen in SCREENS:
+                source.writestr(
+                    PREFIX + screen + "/sprite/synthetic.wad",
+                    b"fake-test-data",
+                )
+        manifest = self._backup()
+        self.assertEqual(manifest["shared_resources"]["file_count"], 0)
+        with ZipFile(self.output / OUTPUT_FILENAMES[SHARED], "r") as shared:
+            self.assertEqual(shared.namelist(), [])
+        self.assertEqual(len(verify_private_backup(
+            self.output / MANIFEST_NAME, self.output,
+        )), 3)
 
     def test_non_zip_source_rejected(self):
         self.ipa.write_bytes(b"not-a-valid-IPA")
