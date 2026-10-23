@@ -21,6 +21,9 @@ from heman_tools.private_multisymbol_frame_audit import (
     main,
 )
 from heman_tools.private_single_symbol_frame_decoder import PrivateFrameDecodeError
+from heman_tools.private_multisymbol_resolution_parity import (
+    audit_private_multisymbol_resolution_parity,
+)
 
 
 def png_bytes(size=(8, 8)):
@@ -42,7 +45,7 @@ def _indexed_repo(label, rows, target):
     return bytes(out)
 
 
-def _sequence_record(key, symbols, scale_xs=None):
+def _sequence_record(key, symbols, scale_xs=None, *, offset_scale=1):
     if scale_xs is None:
         scale_xs = (1.0,) * len(symbols)
     if len(scale_xs) != len(symbols):
@@ -51,7 +54,7 @@ def _sequence_record(key, symbols, scale_xs=None):
     out += struct.pack("<4i", 0, 100, 0, 0) + b"\x00" + struct.pack("<i", len(symbols))
     for (name, offset_x, mask), scale_x in zip(symbols, scale_xs):
         out += struct.pack("<ii", 0, 0) + _string(name)
-        out += struct.pack("<4i", 0, 0, offset_x, 12)
+        out += struct.pack("<4i", 0, 0, offset_x * offset_scale, 12 * offset_scale)
         out += struct.pack("<6f", 1, 1, 1, 1, scale_x, 1)
         out += struct.pack("<7i", 0, 0, 0, 0, -1, -1, mask)
     return bytes(out)
@@ -71,11 +74,19 @@ def _image_repo():
 def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                                   ("SyntheticCutB", 30, 0)),
                                rectangles=((0, 0, 8, 8), (8, 0, 8, 8)),
-                               scale_xs=None):
+                               scale_xs=None,
+                               resolution_scale=2):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
     east_record = _sequence_record(east_key, symbols, scale_xs)
     west_record = _sequence_record(west_key, symbols, scale_xs)
-    sequence_wad = east_record + west_record
+    east_record_xlarge = _sequence_record(east_key, symbols, scale_xs,
+                                          offset_scale=resolution_scale)
+    west_record_xlarge = _sequence_record(west_key, symbols, scale_xs,
+                                          offset_scale=resolution_scale)
+    sequence_wad_by_screen = {
+        SCREENS[0]: east_record + west_record,
+        SCREENS[1]: east_record_xlarge + west_record_xlarge,
+    }
     sequence_repo = _indexed_repo(
         "SpriteSeqData",
         ((east_key, 0), (west_key, len(east_record))),
@@ -84,7 +95,14 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
 
     cut_records = tuple(_cut_record(name, "SyntheticTexture", rect)
                         for (name, _, _), rect in zip(symbols, rectangles))
-    cut_wad = b"".join(cut_records)
+    cut_records_xlarge = tuple(
+        _cut_record(name, "SyntheticTexture", tuple(value * resolution_scale for value in rect))
+        for (name, _, _), rect in zip(symbols, rectangles)
+    )
+    cut_wad_by_screen = {
+        SCREENS[0]: b"".join(cut_records),
+        SCREENS[1]: b"".join(cut_records_xlarge),
+    }
     cut_offsets = []
     at = 0
     for record in cut_records:
@@ -108,15 +126,16 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
     go = (_string("syntheticIdle") + _string(east_key) + _string(west_key)
           + _string("syntheticOther") + _string(east_key) + _string(west_key))
     split = len(_string("syntheticIdle") + _string(east_key) + _string(west_key))
-    image = png_bytes((16, 16))
     with ZipFile(path, "w") as archive:
         for screen in SCREENS:
             root = PREFIX + screen + "/"
+            scale = 1 if screen == SCREENS[0] else resolution_scale
+            image = png_bytes((16 * scale, 16 * scale))
             archive.writestr(root + "go/default", go)
             archive.writestr(root + "meta/SpriteSeqData.repo", sequence_repo)
-            archive.writestr(root + "sprite/SpriteSeqData.wad", sequence_wad)
+            archive.writestr(root + "sprite/SpriteSeqData.wad", sequence_wad_by_screen[screen])
             archive.writestr(root + "meta/SpriteCutData.repo", cut_repo)
-            archive.writestr(root + "sprite/SpriteResData.wad", cut_wad)
+            archive.writestr(root + "sprite/SpriteResData.wad", cut_wad_by_screen[screen])
             archive.writestr(root + "meta/TextureData.repo", texture_repo)
             archive.writestr(root + "textureData/TextureData.wad", texture_record)
             archive.writestr(root + "meta/ImageData.repo", image_repo)
@@ -199,6 +218,22 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
                 self.assertNotIn("SyntheticCut", json.dumps(saved))
             finally:
                 report_path.unlink(missing_ok=True)
+
+    def test_paired_resolution_audit_confirms_uv_and_geometry_scaling(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "paired-resolution.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa)
+            report = audit_private_multisymbol_resolution_parity(
+                ipa, regions, "syntheticIdle", 0, "east", 0, active_mask=0
+            )
+            self.assertTrue(report["paired_resolution_parity_verified"])
+            self.assertTrue(all(report["checks"].values()))
+            self.assertEqual(report["screen_med"]["cpu_frame_packet_count"], 2)
+            self.assertEqual(report["screen_xlarge"]["cpu_frame_packet_count"], 2)
+            self.assertTrue(report["screen_med"]["all_source_pngs_validated"])
+            self.assertTrue(report["screen_xlarge"]["all_source_pngs_validated"])
+            self.assertFalse(report["original_runtime_pixel_parity_verified"])
+            self.assertFalse(report["private_resource_details_exported"])
 
     def test_negative_horizontal_scale_is_accepted_as_finite_mirrored_geometry(self):
         with TemporaryDirectory() as directory:
