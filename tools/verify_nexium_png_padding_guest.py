@@ -13,7 +13,10 @@ from pathlib import Path
 
 from PIL import Image
 
-from verify_nexium_texture_quad_pngs import check_frames as check_base_frames
+if __package__:
+    from .verify_nexium_texture_quad_pngs import check_frames as check_base_frames
+else:
+    from verify_nexium_texture_quad_pngs import check_frames as check_base_frames
 
 FRAMES = (30, 120, 300)
 PANEL_LEFT, PANEL_TOP, CELL = 16, 16, 16
