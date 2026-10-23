@@ -51,21 +51,3 @@ jobs:
         run: sh native/run_tests.sh "${{ matrix.compiler }}"
       - name: Record synthetic mask CPU benchmark (non-gating)
         run: sh native/bench_mask_step.sh gcc
-
-  stage214-source-snapshot:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 206
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Package tracked source only for local private validation
-        shell: bash
-        run: |
-          set -euo pipefail
-          git archive --format=tar.gz --prefix=he-man-remake/ HEAD > /tmp/he-man-remake-source.tar.gz
-          test -s /tmp/he-man-remake-source.tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: stage214-source-snapshot
-          path: /tmp/he-man-remake-source.tar.gz
-          if-no-files-found: error
-          retention-days: 1
