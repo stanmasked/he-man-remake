@@ -235,6 +235,22 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
             self.assertFalse(report["private_resource_details_exported"])
 
+    def test_paired_resolution_audit_rejects_unscaled_xlarge_pack(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "unscaled.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa, resolution_scale=1)
+            report = audit_private_multisymbol_resolution_parity(
+                ipa, regions, "syntheticIdle", 0, "east", 0, active_mask=0
+            )
+            self.assertFalse(report["paired_resolution_parity_verified"])
+            self.assertFalse(report["checks"]["serialized_symbol_offsets_scale_exactly_2x"])
+            self.assertFalse(report["checks"]["sprite_cut_rectangles_scale_exactly_2x"])
+            self.assertFalse(report["checks"]["source_png_dimensions_scale_exactly_2x"])
+            self.assertFalse(report["checks"]["cpu_xy_geometry_scales_exactly_2x"])
+            self.assertTrue(report["checks"]["normalized_uvs_match"])
+            self.assertFalse(report["original_runtime_pixel_parity_verified"])
+            self.assertNotIn("SyntheticCutA", json.dumps(report))
+
     def test_negative_horizontal_scale_is_accepted_as_finite_mirrored_geometry(self):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "mirrored.ipa"
