@@ -569,3 +569,13 @@ mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
   "$ROOT/native/tests/test_symbol_draw_plan.c" \
   -lm -o "$TMP/test_symbol_draw_plan"
 "$TMP/test_symbol_draw_plan"
+
+# Stage199: construct the native four-vertex Symbol fan and apply the verified
+# local and SpritePlayer transform order. No GPU or original assets involved.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic -ffp-contract=off \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_symbol_draw_plan.c" \
+  "$ROOT/native/src/heman_symbol_mesh_geometry.c" \
+  "$ROOT/native/tests/test_symbol_mesh_geometry.c" \
+  -lm -o "$TMP/test_symbol_mesh_geometry"
+"$TMP/test_symbol_mesh_geometry"
