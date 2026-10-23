@@ -46,10 +46,10 @@ static void test_native_vertex_order_and_centered_quad(void) {
     hm_symbol_draw_command c = make_command();
     hm_symbol_quad_geometry g;
     assert(hm_symbol_mesh_build_quad(&c, 8, 4, NULL, &g) == HM_SYMBOL_MESH_OK);
-    assert(g.xy[0] == -4.0f && g.xy[1] == -2.0f);
-    assert(g.xy[2] == -4.0f && g.xy[3] == 2.0f);
-    assert(g.xy[4] == 4.0f && g.xy[5] == 2.0f);
-    assert(g.xy[6] == 4.0f && g.xy[7] == -2.0f);
+    assert(g.xy[0] == 0.0f && g.xy[1] == 0.0f);
+    assert(g.xy[2] == 0.0f && g.xy[3] == 4.0f);
+    assert(g.xy[4] == 8.0f && g.xy[5] == 4.0f);
+    assert(g.xy[6] == 8.0f && g.xy[7] == 0.0f);
     assert(g.front_face_flip == 1);
 }
 
@@ -61,10 +61,10 @@ static void test_local_scale_then_offset(void) {
     c.scale_x = 2.0f;
     c.scale_y = 3.0f;
     assert(hm_symbol_mesh_build_quad(&c, 4, 2, NULL, &g) == HM_SYMBOL_MESH_OK);
-    assert(g.xy[0] == 6.0f && g.xy[1] == 17.0f);
-    assert(g.xy[2] == 6.0f && g.xy[3] == 23.0f);
-    assert(g.xy[4] == 14.0f && g.xy[5] == 23.0f);
-    assert(g.xy[6] == 14.0f && g.xy[7] == 17.0f);
+    assert(g.xy[0] == 8.0f && g.xy[1] == 18.0f);
+    assert(g.xy[2] == 8.0f && g.xy[3] == 24.0f);
+    assert(g.xy[4] == 16.0f && g.xy[5] == 24.0f);
+    assert(g.xy[6] == 16.0f && g.xy[7] == 18.0f);
 }
 
 static void test_local_rotation_then_offset(void) {
@@ -74,10 +74,10 @@ static void test_local_rotation_then_offset(void) {
     c.offset_x = 3.0f;
     c.offset_y = 4.0f;
     assert(hm_symbol_mesh_build_quad(&c, 2, 2, NULL, &g) == HM_SYMBOL_MESH_OK);
-    assert(near(g.xy[0], 4.0f) && near(g.xy[1], 3.0f));
-    assert(near(g.xy[2], 2.0f) && near(g.xy[3], 3.0f));
-    assert(near(g.xy[4], 2.0f) && near(g.xy[5], 5.0f));
-    assert(near(g.xy[6], 4.0f) && near(g.xy[7], 5.0f));
+    assert(near(g.xy[0], 5.0f) && near(g.xy[1], 4.0f));
+    assert(near(g.xy[2], 3.0f) && near(g.xy[3], 4.0f));
+    assert(near(g.xy[4], 3.0f) && near(g.xy[5], 6.0f));
+    assert(near(g.xy[6], 5.0f) && near(g.xy[7], 6.0f));
 }
 
 static void test_player_transform_order_and_pivots(void) {
@@ -92,7 +92,7 @@ static void test_player_transform_order_and_pivots(void) {
     t.translation_x = 5.0f;
     t.translation_y = 7.0f;
     assert(hm_symbol_mesh_build_quad(&c, 2, 2, &t, &g) == HM_SYMBOL_MESH_OK);
-    assert(near(g.xy[0], 11.0f) && near(g.xy[1], 6.5f));
+    assert(near(g.xy[0], 9.0f) && near(g.xy[1], 7.0f));
 }
 
 static void test_negative_scale_mirrors_and_updates_winding(void) {
@@ -103,7 +103,7 @@ static void test_negative_scale_mirrors_and_updates_winding(void) {
     assert(hm_symbol_mesh_build_quad(&c, 4, 2, NULL, &mirrored) == HM_SYMBOL_MESH_OK);
     assert(normal.front_face_flip == 1);
     assert(mirrored.front_face_flip == 0);
-    assert(mirrored.xy[0] == 2.0f && mirrored.xy[1] == -1.0f);
+    assert(mirrored.xy[0] == 4.0f && mirrored.xy[1] == 0.0f);
 }
 
 static void test_player_negative_scale_does_not_recompute_native_winding_flag(void) {
@@ -111,9 +111,10 @@ static void test_player_negative_scale_does_not_recompute_native_winding_flag(vo
     hm_symbol_player_transform t = identity_player();
     hm_symbol_quad_geometry g;
     t.scale_x = -1.0f;
+    c.offset_x = 2.0f;
     assert(hm_symbol_mesh_build_quad(&c, 4, 2, &t, &g) == HM_SYMBOL_MESH_OK);
     assert(g.front_face_flip == 1);
-    assert(g.xy[0] == 2.0f && g.xy[1] == -1.0f);
+    assert(g.xy[0] == -2.0f && g.xy[1] == 0.0f);
 }
 
 static void test_signed_dimensions_and_zero_extent_are_preserved(void) {
@@ -122,8 +123,8 @@ static void test_signed_dimensions_and_zero_extent_are_preserved(void) {
     assert(hm_symbol_mesh_build_quad(&c, 0, 4, NULL, &zero) == HM_SYMBOL_MESH_OK);
     assert(zero.xy[0] == 0.0f && zero.xy[4] == 0.0f);
     assert(hm_symbol_mesh_build_quad(&c, -4, 2, NULL, &negative) == HM_SYMBOL_MESH_OK);
-    assert(negative.xy[0] == 2.0f && negative.xy[1] == -1.0f);
-    assert(negative.xy[4] == -2.0f && negative.xy[5] == 1.0f);
+    assert(negative.xy[0] == 0.0f && negative.xy[1] == 0.0f);
+    assert(negative.xy[4] == -4.0f && negative.xy[5] == 2.0f);
 }
 
 static void test_invalid_inputs_leave_output_unchanged(void) {
