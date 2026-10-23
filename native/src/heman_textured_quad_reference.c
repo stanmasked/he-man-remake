@@ -102,8 +102,10 @@ static hm_texture_reference_status hm_prepare(
     minx=maxx=q->xy[0]; miny=maxy=q->xy[1];
     for(i=0u;i<4u;++i) {
         const double x=q->xy[i*2u],y=q->xy[i*2u+1u];
-        if(x<minx)minx=x; if(x>maxx)maxx=x;
-        if(y<miny)miny=y; if(y>maxy)maxy=y;
+        if (x < minx) minx = x;
+        if (x > maxx) maxx = x;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
         if(fabs(x)>magnitude)magnitude=fabs(x);
         if(fabs(y)>magnitude)magnitude=fabs(y);
     }
@@ -126,7 +128,8 @@ static int64_t hm_nearest_index(double coord,uint32_t size,int32_t wrap) {
         if((uint64_t)idx>=(uint64_t)size)return (int64_t)size-1;
         return idx;
     }
-    idx%=(int64_t)size; if(idx<0)idx+=(int64_t)size;
+    idx %= (int64_t)size;
+    if (idx < 0) idx += (int64_t)size;
     return idx;
 }
 static double hm_factor(uint32_t f,const double src[4],const double dst[4],size_t c) {
@@ -142,8 +145,11 @@ static double hm_factor(uint32_t f,const double src[4],const double dst[4],size_
 }
 static uint8_t hm_to_byte(double v) {
     double n;
-    if(v<=0.0)return 0u; if(v>=1.0)return 255u;
-    n=floor(v*255.0+0.5); if(n<=0.0)return 0u; if(n>=255.0)return 255u;
+    if (v <= 0.0) return 0u;
+    if (v >= 1.0) return 255u;
+    n = floor(v * 255.0 + 0.5);
+    if (n <= 0.0) return 0u;
+    if (n >= 255.0) return 255u;
     return (uint8_t)n;
 }
 static void hm_sample(const hm_texture_reference_binding *t,double u,double v,uint8_t out[4]) {
@@ -157,7 +163,8 @@ static void hm_blend(uint8_t *dst_bytes,const uint8_t texel[4],const float rgba[
     double src[4],dst[4]; size_t c;
     for(c=0u;c<4u;++c) {
         src[c]=((double)texel[c]/255.0)*(double)rgba[c];
-        if(src[c]<0.0)src[c]=0.0; if(src[c]>1.0)src[c]=1.0;
+        if (src[c] < 0.0) src[c] = 0.0;
+        if (src[c] > 1.0) src[c] = 1.0;
         dst[c]=(double)dst_bytes[c]/255.0;
     }
     for(c=0u;c<4u;++c)
