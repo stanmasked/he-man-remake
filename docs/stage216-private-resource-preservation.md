@@ -18,7 +18,7 @@ PYTHONPATH=src python -m heman_tools.private_asset_backup \
   --out-dir local_reports/stage216-backup
 ```
 
-If a trusted baseline SHA-256 of the canonical IPA is available, add `--expected-source-sha256` with its 64-character lowercase hex digest. The tool always calculates and records the actual IPA SHA-256, requires the exact 137,274,848-byte length, checks source ZIP CRC for **all** members, and refuses incomplete/corrupt/unsafe or missing resolution packs. A truncated download of 109,707,264 bytes fails before extraction.
+If a trusted baseline SHA-256 of the canonical IPA is available, add `--expected-source-sha256` with its 64-character lowercase hex digest. The tool always calculates and records the actual IPA SHA-256, requires the exact 137,274,848-byte length, checks source ZIP CRC for **all** members, and refuses incomplete/corrupt/unsafe or missing resolution packs. It also recalculates the source SHA-256 **after extracting all three archives** and before publishing them, rejecting any IPA that changed while the backup was assembled. A truncated download of 109,707,264 bytes fails before extraction.
 
 The tool emits **four private files**, retaining original paths relative to each selected app subtree:
 - `heman-stage216-screen-med.zip`: complete `Payload/MOTU.app/screen-med/` subtree;
