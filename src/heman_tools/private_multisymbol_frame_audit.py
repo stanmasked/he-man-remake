@@ -280,18 +280,20 @@ def audit_private_multisymbol_frame(
                     or stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK):
                 raise PrivateFrameDecodeError("Resolved PNG member is unsafe or oversized")
 
-            png_bytes = png_bytes_by_member.get(actual_name)
-            if png_bytes is None:
+            dimensions = dimensions_by_member.get(actual_name)
+            png_bytes = png_bytes_by_member.get(actual_name) if _include_texture_pixels else None
+            if dimensions is None or (_include_texture_pixels and png_bytes is None):
                 with archive.open(info, "r") as stream:
                     png_bytes = stream.read(MAX_PNG_BYTES + 1)
                 if len(png_bytes) > MAX_PNG_BYTES or len(png_bytes) != info.file_size:
                     raise PrivateFrameDecodeError("Resolved PNG member is oversized or incomplete")
-                png_bytes_by_member[actual_name] = png_bytes
-
-            dimensions = dimensions_by_member.get(actual_name)
-            if dimensions is None:
-                dimensions = _checked_png_dimensions(png_bytes, rectangle)
-                dimensions_by_member[actual_name] = dimensions
+                if _include_texture_pixels:
+                    png_bytes_by_member[actual_name] = png_bytes
+                if dimensions is None:
+                    dimensions = _checked_png_dimensions(png_bytes, rectangle)
+                    dimensions_by_member[actual_name] = dimensions
+                else:
+                    _require_rectangle_in_bounds(rectangle, dimensions)
             else:
                 _require_rectangle_in_bounds(rectangle, dimensions)
 
