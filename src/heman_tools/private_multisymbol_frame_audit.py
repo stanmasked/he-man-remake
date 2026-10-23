@@ -128,6 +128,8 @@ def audit_private_multisymbol_frame(
             )
         if source_go[SCREENS[0]] != source_go[SCREENS[1]]:
             raise PrivateFrameDecodeError("Paired GO default data differ")
+        if any(end > len(source_go[SCREENS[0]]) for _, end in regions):
+            raise PrivateFrameDecodeError("Component region exceeds the source GO data")
         if source_sequence_repo[SCREENS[0]] != source_sequence_repo[SCREENS[1]]:
             raise PrivateFrameDecodeError("Paired SpriteSequence indexes differ")
 
