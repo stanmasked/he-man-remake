@@ -10,6 +10,7 @@ from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
 import unittest
 import warnings
+from unittest.mock import patch
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED, ZipInfo
 
 from heman_tools.physics_shape_census import PREFIX, SCREENS
@@ -170,6 +171,29 @@ class PrivateAssetBackupTests(unittest.TestCase):
         make_synthetic_ipa(self.ipa)
         with self.assertRaisesRegex(PrivateBackupError, "canonical source"):
             self._backup(expected_source_sha256="0" * 64)
+
+    def test_source_mutation_during_archiving_fails_closed(self):
+        """A valid source replacement after initial SHA must not be published."""
+        make_synthetic_ipa(self.ipa)
+        from heman_tools.private_asset_backup import _sha256_file as real_sha256
+        source_hash_reads = 0
+
+        def observed_sha256(path):
+            nonlocal source_hash_reads
+            computed = real_sha256(path)
+            if Path(path) == self.ipa:
+                source_hash_reads += 1
+                if source_hash_reads == 2:
+                    return "0" * 64
+            return computed
+
+        with patch("heman_tools.private_asset_backup._sha256_file",
+                   side_effect=observed_sha256):
+            with self.assertRaisesRegex(PrivateBackupError, "changed while"):
+                self._backup()
+        self.assertEqual(source_hash_reads, 2)
+        self.assertFalse((self.output / MANIFEST_NAME).exists())
+        self.assertFalse(any(self.output.glob("*.zip")))
 
     def test_missing_resolution_pack_refused(self):
         make_synthetic_ipa(self.ipa, omit_xlarge=True)
