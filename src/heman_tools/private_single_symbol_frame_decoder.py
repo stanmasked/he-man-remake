@@ -200,6 +200,17 @@ def audit_private_single_symbol_crop(
         raise PrivateFrameDecodeError("Variant must select one of the two audited regions")
     if direction not in ("east", "west"):
         raise PrivateFrameDecodeError("Direction must be east or west")
+    if not isinstance(regions, tuple) or len(regions) != 2:
+        raise PrivateFrameDecodeError("Exactly two component regions are required")
+    normalized = []
+    for region in regions:
+        if (not isinstance(region, tuple) or len(region) != 2
+                or type(region[0]) is not int or type(region[1]) is not int
+                or not 0 <= region[0] < region[1]):
+            raise PrivateFrameDecodeError("Component region bounds are invalid")
+        normalized.append(region)
+    if normalized[0][1] > normalized[1][0]:
+        raise PrivateFrameDecodeError("Component regions overlap or are out of order")
     png_output = _private_png_output_path(png_output)
 
     with ZipFile(ipa, "r") as archive:
@@ -375,11 +386,11 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if len(args.region) != 2:
         parser.error("exactly two --region values are required")
+    destination = private_output_path(args.report_out)
     report = audit_private_single_symbol_crop(
         args.ipa, tuple(args.region), args.alias, args.variant, args.direction,
         args.frame, args.png_out,
     )
-    destination = private_output_path(args.report_out)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print("Private single-symbol frame crop validated and saved locally.")
