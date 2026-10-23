@@ -43,6 +43,53 @@ static int pixel_is(uint32_t x, uint32_t y, const uint8_t expected[4]) {
     return memcmp(frame_rgba + at, expected, 4u) == 0;
 }
 
+#if defined(HM_NATIVE_PADDING_PROBE)
+/* Stage224: asset-free padded upload -> same C99 renderer -> framebuffer.
+ * This does not issue real GPU texture uploads. */
+static int verify_native_padding_probe(void) {
+    const uint8_t src[24]={
+        255,0,0,255, 0,255,0,255, 0,0,255,255,
+        255,128,0,255, 128,0,255,255, 0,255,255,255
+    };
+    const uint8_t clear[4]={0,0,0,0};
+    uint8_t allocated[64], rendered[64];
+    hm_texture_reference_binding binding;
+    hm_symbol_frame_packet packet;
+    hm_texture_reference_draw draw;
+    hm_texture_reference_projection proj={1,0,0,0,1,0};
+    hm_texture_reference_blend blend={HM_GL_ONE,HM_GL_ONE_MINUS_SRC_ALPHA};
+    hm_texture_reference_stats stats={0u,0u};
+    uint32_t x,y;
+    if(hm_native_png_prepare_rgba(src,sizeof src,3u,2u,0,0,0,0,42,
+          allocated,sizeof allocated,&binding)!=HM_NATIVE_PNG_UPLOAD_OK) return 0;
+    if(binding.width!=4u || binding.height!=4u || allocated[15]!=255u ||
+       allocated[63]!=255u) return 0;
+    memset(&packet,0,sizeof packet);
+    packet.source_order=0u;packet.cut_handle=7;packet.blend_source=-1;
+    packet.blend_destination=-1;
+    packet.xy[0]=0;packet.xy[1]=0;packet.xy[2]=0;packet.xy[3]=4;
+    packet.xy[4]=4;packet.xy[5]=4;packet.xy[6]=4;packet.xy[7]=0;
+    packet.uv[0]=0;packet.uv[1]=0;packet.uv[2]=0;packet.uv[3]=1;
+    packet.uv[4]=1;packet.uv[5]=1;packet.uv[6]=1;packet.uv[7]=0;
+    packet.rgba[0]=1;packet.rgba[1]=1;packet.rgba[2]=1;packet.rgba[3]=1;
+    draw.packet=&packet;draw.texture_slot=42;
+    if(hm_textured_quad_reference_render(&draw,1u,&binding,1u,4u,4u,16u,
+        &proj,&blend,clear,rendered,sizeof rendered,&stats)!=HM_TEXTURE_REFERENCE_OK)
+        return 0;
+    if(memcmp(rendered,allocated,sizeof allocated)!=0 ||
+       stats.pixel_samples!=16u || stats.packets_with_coverage!=1u) return 0;
+    /* Draw an easily visible 64x64 synthetic texture panel at x16,y16. */
+    for(y=0u;y<64u;++y) for(x=0u;x<64u;++x) {
+        const size_t dst=(((size_t)y+16u)*FRAME_WIDTH+(size_t)x+16u)*4u;
+        const size_t from=(((size_t)y/16u)*4u+(size_t)x/16u)*4u;
+        memcpy(frame_rgba+dst,rendered+from,4u);
+    }
+    return pixel_is(24u,24u,src) &&
+           pixel_is(72u,24u,(const uint8_t[4]){0u,0u,0u,255u}) &&
+           pixel_is(72u,72u,(const uint8_t[4]){0u,0u,0u,255u});
+}
+#endif
+
 static int render_and_selfcheck(void) {
     hm_symbol_frame_packet packet;
     hm_texture_reference_draw draw;
