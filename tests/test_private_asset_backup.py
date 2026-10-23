@@ -13,6 +13,7 @@ from heman_tools.physics_shape_census import PREFIX, SCREENS
 from heman_tools.private_asset_backup import (
     MANIFEST_NAME,
     OUTPUT_FILENAMES,
+    SHARED,
     PrivateBackupError,
     build_private_backup,
     verify_private_backup,
@@ -63,6 +64,11 @@ class PrivateAssetBackupTests(unittest.TestCase):
         self.assertFalse(manifest["drive_readback_verified"])
         self.assertFalse(manifest["original_runtime_pixel_parity_verified"])
         self.assertEqual(set(manifest["screen_packs"]), set(SCREENS))
+        self.assertEqual(manifest["shared_resources"]["file_count"], 1)
+        self.assertEqual(manifest["application_file_count"], 5)
+        self.assertEqual(manifest["shared_resources"]["files"][0]["path"], "Info.plist")
+        with ZipFile(self.output / OUTPUT_FILENAMES[SHARED], "r") as shared_zip:
+            self.assertEqual(shared_zip.read("Info.plist"), b"synthetic-non-screen-member")
         for screen in SCREENS:
             pack = manifest["screen_packs"][screen]
             self.assertEqual(pack["file_count"], 2)
@@ -73,6 +79,16 @@ class PrivateAssetBackupTests(unittest.TestCase):
                     zf.read("textures/synthetic.png"),
                     b"PNG-fixture-only:" + screen.encode(),
                 )
+        expected_manifest_sha = hashlib.sha256(
+            (self.output / MANIFEST_NAME).read_bytes()
+        ).hexdigest()
+        self.assertEqual(
+            set(verify_private_backup(
+                self.output / MANIFEST_NAME, self.output,
+                expected_manifest_sha256=expected_manifest_sha,
+            )),
+            set(SCREENS) | {SHARED},
+        )
         self.assertEqual(
             {v["verified"] for v in verify_private_backup(self.output / MANIFEST_NAME, self.output).values()},
             {True},
@@ -89,6 +105,10 @@ class PrivateAssetBackupTests(unittest.TestCase):
                 again["screen_packs"][screen]["archive_sha256"],
                 manifest["screen_packs"][screen]["archive_sha256"],
             )
+        self.assertEqual(
+            again["shared_resources"]["archive_sha256"],
+            manifest["shared_resources"]["archive_sha256"],
+        )
 
     def test_wrong_byte_size_blocks_backup_before_output(self):
         make_synthetic_ipa(self.ipa)
@@ -128,6 +148,33 @@ class PrivateAssetBackupTests(unittest.TestCase):
         self._backup()
         with (self.output / OUTPUT_FILENAMES[SCREENS[0]]).open("ab") as f:
             f.write(b"unexpected-extra-data")
+        with self.assertRaisesRegex(PrivateBackupError, "SHA-256 mismatch"):
+            verify_private_backup(self.output / MANIFEST_NAME, self.output)
+
+    def test_wrong_trusted_manifest_checksum_refused(self):
+        make_synthetic_ipa(self.ipa)
+        self._backup()
+        with self.assertRaisesRegex(PrivateBackupError, "trusted checkpoint"):
+            verify_private_backup(
+                self.output / MANIFEST_NAME,
+                self.output,
+                expected_manifest_sha256="0" * 64,
+            )
+
+    def test_repacked_member_not_counted_as_shared_twice(self):
+        make_synthetic_ipa(self.ipa)
+        result = self._backup()
+        self.assertEqual(
+            sum(result["screen_packs"][screen]["file_count"] for screen in SCREENS)
+            + result["shared_resources"]["file_count"],
+            result["application_file_count"],
+        )
+
+    def test_corrupt_shared_archive_is_detected(self):
+        make_synthetic_ipa(self.ipa)
+        self._backup()
+        with (self.output / OUTPUT_FILENAMES[SHARED]).open("ab") as f:
+            f.write(b"tamper shared bundle")
         with self.assertRaisesRegex(PrivateBackupError, "SHA-256 mismatch"):
             verify_private_backup(self.output / MANIFEST_NAME, self.output)
 
