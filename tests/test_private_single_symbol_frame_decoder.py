@@ -83,8 +83,8 @@ class PrivateSingleSymbolFrameDecoderTests(unittest.TestCase):
 
     def test_cut_handle_selects_exact_rectangle(self):
         raw = cut_record("SyntheticCut", "SyntheticTexture",
-                         ((0, 1, 2, 3, 4), (7, 2, 1, 4, 5)))
-        texture, rect = select_cut_rectangle(raw, "SyntheticCut", "SyntheticCut", 7)
+                         ((0, 1, 2, 3, 4), (1, 2, 1, 4, 5)))
+        texture, rect = select_cut_rectangle(raw, "SyntheticCut", "SyntheticCut", 1)
         self.assertEqual(texture, "SyntheticTexture")
         self.assertEqual(rect, (2, 1, 4, 5))
 
