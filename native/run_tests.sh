@@ -559,3 +559,13 @@ mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
   "$ROOT/raster/tests/test_third_room_marker.c" \
   -lm -o "$TMP/test_third_room_marker"
 "$TMP/test_third_room_marker"
+
+# Stage 198: portable Symbol draw-plan ABI. The complete command list is
+# validated before any visitor callback; UVs remain unclipped and mask skips
+# preserve the source order of drawable layers.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_symbol_draw_plan.c" \
+  "$ROOT/native/tests/test_symbol_draw_plan.c" \
+  -lm -o "$TMP/test_symbol_draw_plan"
+"$TMP/test_symbol_draw_plan"
