@@ -8,6 +8,7 @@ it does not submit GPU work or claim original-runtime pixel parity.
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import stat
 from pathlib import Path
@@ -33,7 +34,12 @@ from .sprite_cut_texture_image_graph import (
     parse_texture_data_record,
 )
 from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
-from .native_render_state_contract import decode_texture_filter_mode
+from .native_render_state_contract import (
+    decode_texture_alpha_transform_flag,
+    decode_texture_filter_mode,
+    decode_texture_payload_selector,
+)
+from .native_png_alpha import transform_native_png_alpha
 from .sprite_repo_wad_index import MAX_REPO_BYTES, MAX_WAD_BYTES, parse_sprite_repository
 from .sprite_wad_record_intervals import _intervals
 from .symbol_frame_assembler import MAX_SYMBOL_FRAME_COMMANDS
@@ -89,6 +95,7 @@ def audit_private_multisymbol_frame(
     active_mask: int = 0,
     source_screen_group: str = SCREENS[0],
     _private_details: list | None = None,
+    _include_texture_pixels: bool = False,
 ) -> dict:
     """Resolve one original frame and assemble aggregate CPU evidence.
 
@@ -107,6 +114,8 @@ def audit_private_multisymbol_frame(
         raise PrivateFrameDecodeError("Unsupported source screen group")
     if _private_details is not None and type(_private_details) is not list:
         raise PrivateFrameDecodeError("Private detail collector must be a list")
+    if type(_include_texture_pixels) is not bool:
+        raise PrivateFrameDecodeError("Texture pixel collection flag must be boolean")
     if not isinstance(regions, tuple) or len(regions) != 2:
         raise PrivateFrameDecodeError("Exactly two component regions are required")
     for region in regions:
@@ -232,8 +241,15 @@ def audit_private_multisymbol_frame(
         png_dimensions = []
         wrap_codes = []
         filter_modes = []
+        alpha_flags = []
+        payload_selectors = []
+        scalar_blocks = []
+        texture_keys = []
+        texture_rgba = []
         resolved_links = []
         dimensions_by_member = {}
+        png_bytes_by_member = {}
+        rgba_by_member = {}
         resolved_symbol_count = 0
         for symbol in symbols:
             cut_record = cut_by_key.get(symbol["name"])
@@ -265,20 +281,58 @@ def audit_private_multisymbol_frame(
                 raise PrivateFrameDecodeError("Resolved PNG member is unsafe or oversized")
 
             dimensions = dimensions_by_member.get(actual_name)
-            if dimensions is None:
+            png_bytes = png_bytes_by_member.get(actual_name) if _include_texture_pixels else None
+            if dimensions is None or (_include_texture_pixels and png_bytes is None):
                 with archive.open(info, "r") as stream:
                     png_bytes = stream.read(MAX_PNG_BYTES + 1)
                 if len(png_bytes) > MAX_PNG_BYTES or len(png_bytes) != info.file_size:
                     raise PrivateFrameDecodeError("Resolved PNG member is oversized or incomplete")
-                dimensions = _checked_png_dimensions(png_bytes, rectangle)
-                dimensions_by_member[actual_name] = dimensions
+                if _include_texture_pixels:
+                    png_bytes_by_member[actual_name] = png_bytes
+                if dimensions is None:
+                    dimensions = _checked_png_dimensions(png_bytes, rectangle)
+                    dimensions_by_member[actual_name] = dimensions
+                else:
+                    _require_rectangle_in_bounds(rectangle, dimensions)
             else:
                 _require_rectangle_in_bounds(rectangle, dimensions)
 
+            wrap_pair = decode_texture_wrap_codes(scalar_block)
+            filter_mode = decode_texture_filter_mode(scalar_block)
+            alpha_flag = decode_texture_alpha_transform_flag(scalar_block)
+            payload_selector = decode_texture_payload_selector(scalar_block)
+            if _include_texture_pixels:
+                if payload_selector != 0:
+                    raise PrivateFrameDecodeError("CPU preview supports only the confirmed PNG payload path")
+                if dimensions[0] * dimensions[1] * 4 > 64 * 1024 * 1024:
+                    raise PrivateFrameDecodeError("Decoded RGBA texture exceeds the CPU preview byte limit")
+                if actual_name not in rgba_by_member:
+                    try:
+                        from PIL import Image
+                        with Image.open(io.BytesIO(png_bytes)) as image:
+                            if image.format != "PNG":
+                                raise PrivateFrameDecodeError("Resolved source image is not PNG")
+                            image.load()
+                            has_alpha = "A" in image.getbands() or "transparency" in image.info
+                            rgba = image.convert("RGBA").tobytes()
+                        rgba_by_member[actual_name] = transform_native_png_alpha(
+                            rgba, dimensions[0], dimensions[1],
+                            has_alpha=has_alpha, premultiply_alpha=(alpha_flag == 1),
+                        )
+                    except PrivateFrameDecodeError:
+                        raise
+                    except Exception as exc:
+                        raise PrivateFrameDecodeError("Resolved PNG pixels could not be decoded safely") from exc
+                texture_rgba.append(rgba_by_member[actual_name])
+
             rectangles.append(rectangle)
             png_dimensions.append(dimensions)
-            wrap_codes.append(decode_texture_wrap_codes(scalar_block))
-            filter_modes.append(decode_texture_filter_mode(scalar_block))
+            wrap_codes.append(wrap_pair)
+            filter_modes.append(filter_mode)
+            alpha_flags.append(alpha_flag)
+            payload_selectors.append(payload_selector)
+            scalar_blocks.append(scalar_block)
+            texture_keys.append(texture_key)
             resolved_links.append((symbol["name"], texture_key, image_key, image_path))
             resolved_symbol_count += 1
 
@@ -289,14 +343,21 @@ def audit_private_multisymbol_frame(
     if _private_details is not None:
         # Retain private values only in caller memory for paired-pack comparison.
         # They are deliberately absent from the public aggregate report.
-        _private_details.append({
+        private_details = {
             "symbols": tuple(symbols),
             "rectangles": tuple(rectangles),
             "png_dimensions": tuple(png_dimensions),
             "wrap_codes": tuple(wrap_codes),
             "filter_modes": tuple(filter_modes),
+            "alpha_transform_flags": tuple(alpha_flags),
+            "payload_selectors": tuple(payload_selectors),
+            "scalar_blocks": tuple(scalar_blocks),
+            "texture_keys": tuple(texture_keys),
             "resolved_links": tuple(resolved_links),
-        })
+        }
+        if _include_texture_pixels:
+            private_details["texture_rgba"] = tuple(texture_rgba)
+        _private_details.append(private_details)
     return {
         "classification": "private_multisymbol_frame_packet_audit",
         "source_screen_group": screen,

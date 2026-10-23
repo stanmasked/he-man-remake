@@ -58,13 +58,13 @@ def _validate_factor(value: object, field: str, *, source: bool) -> int:
 class TexturePixels:
     """RGBA texels in native-upload row order; row zero is addressed by v=0.
 
-    Wrap codes are 0=clamp-to-edge and 1=repeat. This Stage207 reference
-    supports filter mode 0 (nearest) only; the original IPA also contains
-    mode-1 linear textures, which must fail closed until the linear sampler is
-    implemented. Bytes must already match native upload representation; this
-    class does not decode PNGs, flip rows, pad dimensions or transform alpha.
-    The PNGData RGB-by-alpha transform is controlled by scalar-block byte 5;
-    the 32-bit filter mode is stored separately at bytes 6..9.
+    Wrap codes are 0=clamp-to-edge and 1=repeat. This reference supports
+    filter mode 0 (nearest) and mode 1 (linear); mode 2 requires mipmap
+    construction and remains fail-closed. Bytes must already match native
+    upload representation; this class does not decode PNGs, flip rows, pad
+    dimensions or transform alpha. The PNGData RGB-by-alpha transform is
+    controlled by scalar-block byte 5; the signed 32-bit filter mode is stored
+    separately at bytes 6..9.
     """
     width: int
     height: int
