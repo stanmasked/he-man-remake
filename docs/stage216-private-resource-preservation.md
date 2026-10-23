@@ -48,6 +48,34 @@ PYTHONPATH=src python -m heman_tools.private_asset_backup \
 6. Only **after** successful Drive readback should the project record a dated verification receipt containing Drive IDs, independently pinned manifest SHA-256, ZIP SHA-256 digests and sizes. The receipt remains private; it must not alter the original manifest values.
 7. If Drive upload or readback fails, leave backup status at **pending** and keep the verified local copy. On a new session, start from the Drive archive + manifest and verify against the separately recorded SHA-256 before any extraction.
 
+## Interrupted transfers: bounded parts and authenticated restoration
+
+Because earlier transport returned a truncated 109,707,264-byte IPA against the canonical 137,274,848-byte Drive size, large derived ZIPs can optionally be **split into small checksummed parts** *after* the complete IPA has passed the source CRC gate. This does not repair or certify an incomplete IPA.
+
+From the repository root, with the four locally verified backup files already under `local_reports/stage216-backup/`:
+
+```sh
+PYTHONPATH=src python -m heman_tools.private_archive_transfer stage \
+  --backup-dir local_reports/stage216-backup \
+  --transfer-dir local_reports/stage216-transfer-parts \
+  --part-bytes 8388608
+```
+
+This creates 8 MiB-or-smaller numbered parts for each of the three ZIPs and the private manifest, plus a separate `heman-stage216-transfer-index.json`. The index records part sizes/SHA-256, complete file digests, and the original private manifest digest. **Store the transfer-index SHA-256 outside the transfer folder in a separate trusted private stage receipt before uploading.** The index is not public-safe; it reveals private backup metadata.
+
+Upload parts and the private transfer index to the relevant owner-only Drive archives. It is acceptable to place the transfer index in `00_Manifest_and_SHA256`; the numbered parts may be stored in the appropriate resolution/shared-asset folders, with the manifest parts stored beside the index. For a partial failed upload, keep previously verified parts and transfer the missing parts individually. Do not mix parts from separate checkpoints.
+
+After downloading all parts and index into one private `local_reports/stage216-downloaded-parts/` folder, restore with the **independently pinned** transfer-index hash:
+
+```sh
+PYTHONPATH=src python -m heman_tools.private_archive_transfer restore \
+  --transfer-dir local_reports/stage216-downloaded-parts \
+  --out-dir local_reports/stage216-restored-from-drive \
+  --expected-index-sha256 SHA256_FROM_SEPARATELY_TRUSTED_RECEIPT
+```
+
+The tool validates the trusted index, each numbered chunk, every reassembled ZIP and the complete per-file backup manifest. It refuses overwrites and incomplete downloads. A self-consistent transfer is still not evidence of successful **Drive** backup unless its authenticated upload and independent re-download were observed.
+
 ## Stage216 evidence boundary
 
 Source-controlled code and synthetic fixtures may run under GitHub Actions, but a public CI success does **not** mean the user's extracted game resources were uploaded, preserved, or reconstructed. Stage216 is complete only after the owner-private original has passed the source integrity gate and the backup archives and manifest have been uploaded to Drive and independently read back and verified.
