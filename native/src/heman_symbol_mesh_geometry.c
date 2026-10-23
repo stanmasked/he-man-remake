@@ -76,6 +76,7 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
     float theta;
     float cosine;
     float sine;
+    float local_xy[8];
     float area;
     size_t i;
     static const float x_sign[4] = {-1.0f, -1.0f, 1.0f, 1.0f};
@@ -118,6 +119,32 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
         }
         x = hm_add(x, (float)command->offset_x);
         y = hm_add(y, (float)command->offset_y);
+        if (!hm_finite(x) || !hm_finite(y)) {
+            return HM_SYMBOL_MESH_NONFINITE_GEOMETRY;
+        }
+        local_xy[i * 2u] = x;
+        local_xy[i * 2u + 1u] = y;
+    }
+
+    /*
+     * The original updateMesh computes winding after the Symbol-local
+     * transform. SpritePlayer-wide transforms run afterward and do not
+     * recompute the stored flag, so preserve that native timing.
+     */
+    area = hm_sub(
+        hm_mul(hm_sub(local_xy[2], local_xy[0]),
+               hm_sub(local_xy[5], local_xy[1])),
+        hm_mul(hm_sub(local_xy[3], local_xy[1]),
+               hm_sub(local_xy[4], local_xy[0]))
+    );
+    if (!hm_finite(area)) {
+        return HM_SYMBOL_MESH_NONFINITE_GEOMETRY;
+    }
+    result.front_face_flip = area <= 0.0f ? 1 : 0;
+
+    for (i = 0u; i < 4u; ++i) {
+        float x = local_xy[i * 2u];
+        float y = local_xy[i * 2u + 1u];
         hm_apply_player_transform(&x, &y, player);
         if (!hm_finite(x) || !hm_finite(y)) {
             return HM_SYMBOL_MESH_NONFINITE_GEOMETRY;
@@ -125,18 +152,6 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
         result.xy[i * 2u] = x;
         result.xy[i * 2u + 1u] = y;
     }
-
-    /* Match the native signed-area winding test; do not reorder vertices. */
-    area = hm_sub(
-        hm_mul(hm_sub(result.xy[2], result.xy[0]),
-               hm_sub(result.xy[5], result.xy[1])),
-        hm_mul(hm_sub(result.xy[3], result.xy[1]),
-               hm_sub(result.xy[4], result.xy[0]))
-    );
-    if (!hm_finite(area)) {
-        return HM_SYMBOL_MESH_NONFINITE_GEOMETRY;
-    }
-    result.front_face_flip = area <= 0.0f ? 1 : 0;
     *out_geometry = result;
     return HM_SYMBOL_MESH_OK;
 }
