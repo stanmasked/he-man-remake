@@ -42,7 +42,9 @@ typedef enum hm_symbol_mesh_status {
 
 /*
  * Build a centered quad from the original signed SpriteCut width/height.
- * Local Symbol transform order: independent scale -> rotation -> offset.
+ * Serialized Symbol offsets denote the unscaled top-left corner. Native local
+ * points are scaled and rotated around the origin, then translated by
+ * (offset_x + cut_width/2, offset_y + cut_height/2).
  * SpritePlayer transform order: rotate about pivot -> scale about pivot ->
  * translation. The player transform may be NULL to request identity.
  *
