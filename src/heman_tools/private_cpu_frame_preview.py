@@ -51,10 +51,18 @@ def render_private_cpu_frame_preview(
     *,
     screen: str = SCREENS[0],
     active_mask: int = 0,
+    player_transform: PlayerTransform | None = None,
 ) -> tuple[dict, SoftwareFrameResult]:
-    """Decode, assemble, and rasterize one private source frame in CPU memory."""
+    """Decode and rasterize a frame; a nonidentity player transform is synthetic only."""
     if screen not in SCREENS:
         raise PrivateCPUFramePreviewError("Unsupported source resolution pack")
+    if player_transform is not None and not isinstance(player_transform, PlayerTransform):
+        raise PrivateCPUFramePreviewError("Explicit player transform must be a validated PlayerTransform")
+    # A SpritePlayer-wide runtime transform was not serialized in the selected
+    # original Symbol frame; do not invent one. An explicit value can only
+    # exercise geometric diagnostics and cannot establish runtime parity.
+    selected_player_transform = player_transform if player_transform is not None else PlayerTransform()
+    synthetic_player_transform = selected_player_transform != PlayerTransform()
 
     details: list = []
     source_report = audit_private_multisymbol_frame(
@@ -125,7 +133,7 @@ def render_private_cpu_frame_preview(
             plan,
             extents,
             active_mask=active_mask,
-            player_transform=PlayerTransform(),
+            player_transform=selected_player_transform,
         )
         packets = assembly.packets
         if not packets:
@@ -214,7 +222,14 @@ def render_private_cpu_frame_preview(
         "all_source_rectangles_in_bounds": source_report["all_sprite_rectangles_in_bounds"],
         "all_source_pngs_validated": source_report["all_source_pngs_validated"],
         "active_mask_source": "CLI-supplied; runtime active mask not recovered",
-        "player_transform": "identity assumption",
+        "player_transform": (
+            "synthetic nonidentity geometry diagnostic; not from original runtime"
+            if synthetic_player_transform else "identity assumption"
+        ),
+        "synthetic_player_transform_applied": synthetic_player_transform,
+        "runtime_player_transform_grounded": False,
+        "player_transform_values_exported": False,
+        "source_translation_canceled_by_bounds_projection": True,
         "symbol_local_transform_summary": source_report["symbol_local_transform_summary"],
         "projection": "translate native XY bounds to a transparent canvas and trim only fully transparent padding; no scale or camera inferred",
         "render_canvas_width": render_canvas_width,
