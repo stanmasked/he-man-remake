@@ -11,7 +11,7 @@ Read-only tracing of `SpritePlayer::updateMesh` and `SpritePlayer::paint` establ
 - Four XY vertices occupy slot +20 bytes (8 binary32 values).
 - The UV pointer field begins at slot +52 bytes in the original 32-bit iOS object.
 - `paint` passes the XY pointer to `glVertexPointer(2, GL_FLOAT, 0, ...)`, passes the separately built SpriteCut UV array to `glTexCoordPointer`, then calls `glDrawArrays(GL_TRIANGLE_FAN, 0, 4)`.
-- The four vertex pairs are stored in source order as left/lower, left/upper, right/upper, right/lower. The winding flag is determined from the resulting signed area; the painter adjusts front-face state without sorting vertices.
+- The four vertex pairs are stored in source order as left/lower, left/upper, right/upper, right/lower. The winding flag is determined from the signed area **after Symbol-local transforms but before SpritePlayer-wide transforms**; later player transforms mutate the vertices without recomputing this stored flag. The painter adjusts front-face state without sorting vertices.
 
 This layout describes the original **32-bit iOS object**. The portable C99 result struct in this repository is deliberately not declared to be byte-for-byte ABI-compatible with that 32-bit pointer-bearing object on 64-bit host/Switch targets.
 
@@ -40,7 +40,7 @@ Added:
 
 The C99 helper accepts a Stage198 draw command, signed cut width/height, an optional player transform and an output structure. It validates the command and transform, computes the four XY points and winding flag, and writes output only on success. UV endpoints remain in the draw command. No GPU calls, original resources, or texture lookup are connected.
 
-The Python reference mirrors binary32 intermediate rounding and transform order. Synthetic coverage checks native vertex order, local scale/rotation/offset, player pivots/order, mirrored winding, zero/negative dimensions, overflow rejection, UV immutability and input immutability. The native tests are wired into the strict GCC/Clang `native/run_tests.sh` matrix with floating-point contraction disabled for this executable.
+The Python reference mirrors binary32 intermediate rounding and transform order. Synthetic coverage checks native vertex order, local scale/rotation/offset, player pivots/order, local and player-level mirroring, the pre-player winding-flag timing, zero/negative dimensions, overflow rejection, UV immutability and input immutability. The native tests are wired into the strict GCC/Clang `native/run_tests.sh` matrix with floating-point contraction disabled for this executable (10 C99 cases and 12 Python cases).
 
 ## Evidence boundary / next step
 
