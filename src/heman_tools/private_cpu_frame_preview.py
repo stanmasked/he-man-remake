@@ -27,6 +27,7 @@ from .symbol_frame_render_plan import (
     build_symbol_frame_render_plan,
 )
 from .symbol_render_contract import SymbolRenderContract
+from .native_png_zero_padding import reconstruct_native_zero_padded_texture
 from .native_texture_upload_gate import (
     NativeTextureUploadError, plan_native_texture_upload, prepare_native_cpu_texture,
 )
@@ -89,13 +90,14 @@ def render_private_cpu_frame_preview(
     wraps = private["wrap_codes"]
     filters = private["filter_modes"]
     texture_rgba = private["texture_rgba"]
+    texture_native_alpha = private["texture_native_alpha"]
     texture_keys = private["texture_keys"]
     alpha_flags = private["alpha_transform_flags"]
     payload_selectors = private["payload_selectors"]
     count = len(symbols)
     if not (count == len(rectangles) == len(dimensions) == len(wraps)
-            == len(filters) == len(texture_rgba) == len(texture_keys)
-            == len(alpha_flags) == len(payload_selectors)):
+            == len(filters) == len(texture_rgba) == len(texture_native_alpha)
+            == len(texture_keys) == len(alpha_flags) == len(payload_selectors)):
         raise PrivateCPUFramePreviewError("Decoded per-Symbol texture metadata lengths differ")
     if any(selector != 0 for selector in payload_selectors):
         raise PrivateCPUFramePreviewError("Only the confirmed PNG payload path is supported")
