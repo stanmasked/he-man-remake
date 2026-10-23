@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import math
 import struct
 
+from .native_sprite_cut_uv import NativeSpriteCutUV
 from .symbol_frame_render_plan import PlayerTransform, SymbolDrawCommand
 
 
@@ -71,7 +72,7 @@ def build_symbol_quad_geometry(
         raise SymbolMeshGeometryError("source_order must be an unsigned 32-bit integer")
     if type(command.cut_handle) is not int or not -(1 << 31) <= command.cut_handle <= (1 << 31) - 1:
         raise SymbolMeshGeometryError("cut_handle must be a signed 32-bit integer")
-    if not isinstance(command.uv, object):
+    if not isinstance(command.uv, NativeSpriteCutUV):
         raise SymbolMeshGeometryError("uv metadata is missing")
     for field in ("u0", "v0", "u1", "v1"):
         _f32(getattr(command.uv, field), "uv " + field)
