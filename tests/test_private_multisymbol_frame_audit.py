@@ -35,6 +35,7 @@ from heman_tools.private_cpu_frame_preview import (
     PrivateCPUFramePreviewError,
     render_private_cpu_frame_preview,
 )
+from heman_tools.symbol_frame_render_plan import PlayerTransform
 
 
 def png_bytes(size=(8, 8), *, transparent_border=False):
@@ -376,6 +377,57 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertFalse(report["gpu_submission_verified"])
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
             self.assertFalse(report["private_resource_details_exported"])
+
+    def test_synthetic_player_scale_changes_preview_geometry_not_source_status(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "synthetic-player-scale.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa)
+            baseline, first = render_private_cpu_frame_preview(
+                ipa, regions, "syntheticIdle", 0, "east", 0,
+            )
+            scaled, second = render_private_cpu_frame_preview(
+                ipa, regions, "syntheticIdle", 0, "east", 0,
+                player_transform=PlayerTransform(scale_x=1.5),
+            )
+            self.assertEqual(baseline["player_transform"], "identity assumption")
+            self.assertFalse(baseline["synthetic_player_transform_applied"])
+            self.assertTrue(scaled["synthetic_player_transform_applied"])
+            self.assertFalse(scaled["runtime_player_transform_grounded"])
+            self.assertFalse(scaled["player_transform_values_exported"])
+            self.assertFalse(scaled["original_runtime_pixel_parity_verified"])
+            self.assertNotEqual(first.width, second.width)
+            self.assertGreater(second.width, first.width)
+            self.assertEqual(baseline["texture_binding_count"], scaled["texture_binding_count"])
+            self.assertEqual(baseline["source_symbol_count"], scaled["source_symbol_count"])
+            self.assertIn("synthetic nonidentity", scaled["player_transform"])
+            self.assertNotIn("1.5", json.dumps(scaled))
+
+    def test_translation_is_recentered_and_cannot_prove_scene_position(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "translation-only.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa)
+            ordinary, first = render_private_cpu_frame_preview(
+                ipa, regions, "syntheticIdle", 0, "west", 0,
+            )
+            shifted, second = render_private_cpu_frame_preview(
+                ipa, regions, "syntheticIdle", 0, "west", 0,
+                player_transform=PlayerTransform(translation_x=64, translation_y=32),
+            )
+            self.assertEqual((first.width, first.height), (second.width, second.height))
+            self.assertEqual(first.rgba, second.rgba)
+            self.assertTrue(shifted["source_translation_canceled_by_bounds_projection"])
+            self.assertTrue(shifted["synthetic_player_transform_applied"])
+            self.assertFalse(shifted["full_scene_placement_verified"])
+            self.assertFalse(shifted["original_runtime_pixel_parity_verified"])
+            self.assertEqual(ordinary["source_symbol_count"], shifted["source_symbol_count"])
+
+    def test_player_transform_type_is_validated_before_private_ipa_read(self):
+        with self.assertRaisesRegex(PrivateCPUFramePreviewError, "validated PlayerTransform"):
+            render_private_cpu_frame_preview(
+                Path("/unavailable/source.ipa"), ((0, 1), (1, 2)),
+                "syntheticIdle", 0, "east", 0,
+                player_transform={"translation_x": 2},
+            )
 
     def test_private_cpu_preview_rejects_unimplemented_mipmap_sampling(self):
         with TemporaryDirectory() as directory:
