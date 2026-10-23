@@ -30,7 +30,6 @@ from .sprite_cut_texture_image_graph import (
     MAX_IMAGE_REPO_BYTES,
     _valid_image_path,
     parse_image_repository,
-    parse_sprite_cut_record,
     parse_texture_data_record,
 )
 from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
@@ -278,7 +277,7 @@ def audit_private_multisymbol_frame(
         "all_sprite_rectangles_in_bounds": True,
         "all_resource_links_resolved_uniquely": True,
         "all_source_pngs_validated": True,
-        "active_mask_supplied_by_auditor": True,
+        "active_mask_source": "CLI argument or default zero; not recovered from runtime",
         "runtime_active_mask_verified": False,
         "sprite_player_transform_used_identity_for_isolated_test": True,
         "full_frame_composition_verified": False,
