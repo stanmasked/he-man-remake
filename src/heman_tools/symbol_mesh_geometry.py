@@ -117,28 +117,37 @@ def build_symbol_quad_geometry(
             (half_width, half_height),
             (half_width, -half_height),
         )
-        transformed = []
+        local_vertices = []
         for base_x, base_y in corners:
-            x = _mul(_mul(base_x, scale_x), 1.0)
-            y = _mul(_mul(base_y, scale_y), 1.0)
+            x = _mul(base_x, scale_x)
+            y = _mul(base_y, scale_y)
             if command.rotation_degrees != 0:
                 rotated_x = _sub(_mul(cosine, x), _mul(sine, y))
                 rotated_y = _add(_mul(sine, x), _mul(cosine, y))
                 x, y = rotated_x, rotated_y
             x = _add(x, offset_x)
             y = _add(y, offset_y)
-            x, y = player_transform.apply((x, y))
-            transformed.append((_f32(x, "vertex x"), _f32(y, "vertex y")))
+            local_vertices.append((_f32(x, "local vertex x"), _f32(y, "local vertex y")))
     except (OverflowError, TypeError, ValueError) as exc:
         if isinstance(exc, SymbolMeshGeometryError):
             raise
         raise SymbolMeshGeometryError("Quad could not be transformed without guessing") from exc
 
-    x0, y0 = transformed[0]
-    x1, y1 = transformed[1]
-    x2, y2 = transformed[2]
+    # Native updateMesh stores winding before the later player-wide passes.
+    x0, y0 = local_vertices[0]
+    x1, y1 = local_vertices[1]
+    x2, y2 = local_vertices[2]
     area = _sub(
         _mul(_sub(x1, x0), _sub(y2, y0)),
         _mul(_sub(y1, y0), _sub(x2, x0)),
     )
+    transformed = []
+    try:
+        for point in local_vertices:
+            x, y = player_transform.apply(point)
+            transformed.append((_f32(x, "vertex x"), _f32(y, "vertex y")))
+    except (OverflowError, TypeError, ValueError) as exc:
+        if isinstance(exc, SymbolMeshGeometryError):
+            raise
+        raise SymbolMeshGeometryError("Player transform could not be applied safely") from exc
     return SymbolQuadGeometry(tuple(transformed), area <= 0.0)  # type: ignore[arg-type]
