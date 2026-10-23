@@ -1,5 +1,4 @@
 """Stage221 synthetic native UV/power-of-two allocation regression tests."""
-from copy import deepcopy
 import unittest
 
 from heman_tools.paired_native_cut_uv_contract import (
@@ -100,7 +99,7 @@ class NativeCutUVResolutionPairTests(unittest.TestCase):
         report = summarize_native_uv_resolution_pairs([pair])
         self.assertNotIn("private serial", str(report))
         self.assertNotIn("12345", str(report))
-        self.assertNotIn("key", str(report))
+        self.assertNotIn("original_byte_offset", str(report))
 
     def test_bools_or_bad_shapes_rejected_before_native_uv(self):
         cases = (
