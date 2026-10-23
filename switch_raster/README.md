@@ -184,3 +184,14 @@ Use these for qualitative visual/level/ability references, not for
 fabricated original iOS input traces, proven collision hitboxes,
 original game timing or a video-copyright asset export. Our owned
 source IPA remains private and can differ from early published footage.
+
+
+## Stage209 — isolated textured-quad reference NRO
+
+Build the standalone synthetic checkerboard probe with devkitPro:
+
+```sh
+make -C switch_raster clean all TEXTURE_PROBE=1
+```
+
+This creates `switch_raster/heman_texture_probe.nro` without replacing the ordinary `heman_raster_probe.nro` source or gameplay. The probe runs the portable Stage208 C99 CPU reference against a newly authored 8×4 RGBA texture, writes the result to the 640×360 libnx software framebuffer, and checks its own expected sample points before startup. The patched NeXium workflow captures guest frames 30, 120 and 300 and validates checker colors plus clear-background pixels. This verifies the CPU reference and framebuffer path only; it is not a GPU texture-upload path, original-game rendering or hardware proof. No original IPA or extracted resources are used.

@@ -5,6 +5,8 @@ on:
       - '.github/workflows/nexium-patched-headless.yml'
       - 'tools/instrument_nexium_frames.py'
       - 'tools/verify_nexium_guest_pngs.py'
+      - 'tools/verify_nexium_texture_quad_pngs.py'
+      - 'docs/stage209-textured-quad-probe.md'
       - 'patches/nexium-nro-segment-file-origin.patch'
       - 'switch_minimal/**'
       - 'switch_raster/**'
@@ -39,9 +41,11 @@ jobs:
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
           make -C switch_minimal clean all
           make -C switch_raster clean all
+          make -C switch_raster clean all TEXTURE_PROBE=1
           mkdir -p nros
           cp switch_minimal/heman_minimal_guest_probe.nro nros/
           cp switch_raster/heman_raster_probe.nro nros/
+          cp switch_raster/heman_texture_probe.nro nros/
           sha256sum nros/*.nro
       - uses: actions/upload-artifact@v4
         with:
@@ -188,6 +192,50 @@ jobs:
           set -euo pipefail
           python3 tools/verify_nexium_guest_pngs.py boot-evidence | tee boot-evidence/guest-frame-report.json
           sha256sum nros/heman_raster_probe.nro boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frame-sha256.txt
+      - name: Run Stage209 textured-quad NRO and verify genuine guest pixels
+        env:
+          NEXIUM_DEBUG_RUNNER_SECONDS: "40"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p boot-evidence/texture
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/texture-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence/texture"
+          export RUST_LOG="info,wgpu_core=warn"
+          NRO="$PWD/nros/heman_texture_probe.nro"
+          sha256sum "$NRO" | tee boot-evidence/texture-nro-sha256.txt
+          set +e
+          timeout --kill-after=6s 95s boot-evidence/debug_boot "$NRO" rustarmic runner \
+            >boot-evidence/texture-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/texture-exit-status.txt
+          tail -n 100 boot-evidence/texture-runner.log || true
+          if [ "$code" -ne 0 ]; then
+            echo "Patched NeXium textured-quad guest failed with status $code" >&2
+            exit 1
+          fi
+          python3 tools/verify_nexium_texture_quad_pngs.py boot-evidence/texture | tee boot-evidence/texture/texture-report.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/texture-runner.log").read_text()
+          if "Production runner complete" not in log:
+              raise SystemExit("Texture guest runner did not complete")
+          matches = re.findall(r"cycles=(\d+) svcs=(\d+) frames=(\d+)", log)
+          if not matches:
+              raise SystemExit("Texture guest has no CPU/SVC progress report")
+          cycles = max(int(row[0]) for row in matches)
+          svcs = max(int(row[1]) for row in matches)
+          frames = re.search(r"Production runner complete: frames=(\d+)", log)
+          if cycles <= 0 or svcs <= 0:
+              raise SystemExit("Texture guest did not retire CPU instructions/SVCs")
+          if frames is None or int(frames.group(1)) < 300:
+              raise SystemExit("Texture guest did not reach the frame-300 capture")
+          print(f"PASS: textured-quad guest CPU cycles={cycles}, SVCs={svcs}, frames={frames.group(1)}")
+          PY
+          sha256sum nros/heman_texture_probe.nro boot-evidence/texture/raster-frame-*.png | tee boot-evidence/texture/texture-sha256.txt
       - name: Upload logs and guest PNGs even on failure
         if: always()
         uses: actions/upload-artifact@v4
@@ -197,6 +245,9 @@ jobs:
             boot-evidence/*.log
             boot-evidence/*status.txt
             boot-evidence/*.png
+            boot-evidence/texture/*.png
+            boot-evidence/texture/*.json
+            boot-evidence/texture/*.txt
             boot-evidence/guest-frame*.txt
             boot-evidence/guest-frame*.json
           if-no-files-found: warn

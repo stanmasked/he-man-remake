@@ -70,6 +70,12 @@ endif
 ifeq ($(CHECKPOINT_DEFEAT_PROBE),1)
 CFLAGS += -DHM_CHECKPOINT_PROBE=1 -DHM_CHECKPOINT_DEFEAT_PROBE=1
 endif
+# Stage209: standalone synthetic textured-quad CPU-reference guest.
+# The ordinary raster NRO and all existing probe configurations stay unchanged.
+ifeq ($(TEXTURE_PROBE),1)
+TARGET := heman_texture_probe
+SOURCES := source/texture_probe.c $(ROOT)/native/src/heman_textured_quad_reference.c
+endif
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 .PHONY: all clean
