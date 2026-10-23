@@ -67,10 +67,14 @@ def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
             name = reader.utf16(allow_empty=True)
             fields = tuple(reader.s32() for _ in range(4))
             transforms = tuple(_F32.unpack(reader.take(4))[0] for _ in range(6))
-            for __ in range(7):
-                reader.s32()
-            symbols.append({"name": name, "cut_handle": fields[0],
-                            "transform_values": transforms})
+            serialized_tail = tuple(reader.s32() for _ in range(7))
+            symbols.append({
+                "name": name,
+                "cut_handle": fields[0],
+                "serialized_fields": fields,
+                "transform_values": transforms,
+                "serialized_tail": serialized_tail,
+            })
         if index == frame_index:
             selected = {"sequence_key": sequence_key, "frame_index": index,
                         "frame_time_field": header[1], "symbol_count": symbol_count,
