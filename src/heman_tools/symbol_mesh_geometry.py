@@ -108,6 +108,10 @@ def build_symbol_quad_geometry(
         scale_y = _f32(command.scale_y, "scale_y")
         half_width = _mul(_f32(cut_width, "cut_width"), 0.5)
         half_height = _mul(_f32(cut_height, "cut_height"), 0.5)
+        # Serialized offsets locate the unscaled top-left corner. Native mesh
+        # points are centered, then translated by offset + half-size.
+        center_x = _add(offset_x, half_width)
+        center_y = _add(offset_y, half_height)
         theta = _mul(rotation, _f32(0.0174532924, "degrees_to_radians"))
         cosine = _f32(math.cos(theta), "local cosine")
         sine = _f32(math.sin(theta), "local sine")
@@ -125,8 +129,8 @@ def build_symbol_quad_geometry(
                 rotated_x = _sub(_mul(cosine, x), _mul(sine, y))
                 rotated_y = _add(_mul(sine, x), _mul(cosine, y))
                 x, y = rotated_x, rotated_y
-            x = _add(x, offset_x)
-            y = _add(y, offset_y)
+            x = _add(x, center_x)
+            y = _add(y, center_y)
             local_vertices.append((_f32(x, "local vertex x"), _f32(y, "local vertex y")))
     except (OverflowError, TypeError, ValueError) as exc:
         if isinstance(exc, SymbolMeshGeometryError):
