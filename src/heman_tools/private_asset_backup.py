@@ -245,8 +245,20 @@ def build_private_backup(
         raise PrivateBackupError("IPA or private archive failed structural validation") from exc
 
 
-def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
-    """Verify all output archive digests and per-member content against a manifest."""
+def verify_private_backup(
+    manifest_path: Path,
+    directory: Path,
+    *,
+    expected_manifest_sha256: str | None = None,
+) -> dict:
+    """Verify full archives; independently pin the manifest for Drive provenance."""
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise PrivateBackupError("Missing or linked private manifest")
+    if manifest_path.stat().st_size > 32 * 1024 * 1024:
+        raise PrivateBackupError("Private manifest exceeds bounded size limit")
+    if expected_manifest_sha256 is not None:
+        if _sha256_file(manifest_path) != _require_valid_digest(expected_manifest_sha256):
+            raise PrivateBackupError("Private manifest SHA-256 differs from trusted checkpoint")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("schema") != "heman_private_asset_backup_v1":
         raise PrivateBackupError("Unrecognized backup manifest schema")
@@ -260,6 +272,8 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
     summary = {}
     for screen in PACK_KEYS:
         record = records[screen]
+        if not isinstance(record, dict):
+            raise PrivateBackupError("Malformed per-pack record")
         filename = OUTPUT_FILENAMES[screen]
         if record.get("filename") != filename:
             raise PrivateBackupError("Unexpected ZIP name in backup manifest")
@@ -273,17 +287,28 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
         if not isinstance(files, list) or (not files and screen != SHARED) or len(files) > MAX_MEMBERS:
             raise PrivateBackupError("Manifest must have a bounded per-file inventory")
         expected = {}
+        declared_bytes = 0
         for entry in files:
+            if not isinstance(entry, dict):
+                raise PrivateBackupError("Malformed manifest member")
             name = entry.get("path")
-            if not _safe_entry_name(name) or name in expected:
-                raise PrivateBackupError("Unsafe or duplicate manifest member path")
+            size = entry.get("bytes")
+            if not _safe_entry_name(name) or name in expected or type(size) is not int or not 0 <= size <= MEMBER_MAX:
+                raise PrivateBackupError("Unsafe, oversized or duplicate manifest member")
+            declared_bytes += size
+            if declared_bytes > EXTRACTED_TOTAL_MAX:
+                raise PrivateBackupError("Manifest declares excessive decompressed resource bytes")
+            _require_valid_digest(entry.get("sha256"))
             expected[name] = entry
         with ZipFile(zip_path, "r") as archive:
             infos = archive.infolist()
             if len(infos) != len(files) or {x.filename for x in infos} != set(expected):
                 raise PrivateBackupError("Archive content differs from manifest inventory")
             for info in infos:
-                if info.is_dir() or info.flag_bits & 1 or info.file_size != expected[info.filename].get("bytes"):
+                if (info.is_dir() or info.flag_bits & 1
+                        or stat.S_IFMT(info.external_attr >> 16) == stat.S_IFLNK
+                        or info.file_size != expected[info.filename].get("bytes")
+                        or info.file_size > MEMBER_MAX):
                     raise PrivateBackupError("Archive member size or type mismatch")
                 digest = hashlib.sha256()
                 with archive.open(info, "r") as stream:
@@ -308,16 +333,25 @@ def main(argv=None) -> int:
     parser.add_argument("--expected-source-bytes", type=int)
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--canonical-source-url", default="")
+    parser.add_argument("--expected-manifest-sha256",
+                        help="Trusted manifest SHA-256 pinned before downloading ZIPs from Drive")
     parser.add_argument("--verify-only", action="store_true",
                         help="Verify archives downloaded from Drive against the private manifest")
     args = parser.parse_args(argv)
     if args.verify_only:
         if args.ipa is not None or args.expected_source_bytes is not None:
             parser.error("--verify-only must not be combined with source extraction options")
-        checked = verify_private_backup(args.out_dir / MANIFEST_NAME, args.out_dir)
+        checked = verify_private_backup(
+            args.out_dir / MANIFEST_NAME, args.out_dir,
+            expected_manifest_sha256=args.expected_manifest_sha256,
+        )
         print("Stage216 three-pack private archive SHA-256 and contents verified: "
               + ", ".join(f"{screen}={checked[screen]['files']} files" for screen in PACK_KEYS))
+        if args.expected_manifest_sha256 is None:
+            print("WARNING: no independently pinned manifest SHA-256; provenance remains unverified")
         return 0
+    if args.expected_manifest_sha256 is not None:
+        parser.error("--expected-manifest-sha256 requires --verify-only")
     if args.ipa is None or args.expected_source_bytes is None:
         parser.error("backup requires --ipa and --expected-source-bytes")
     manifest = build_private_backup(
