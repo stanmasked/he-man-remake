@@ -129,7 +129,7 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
         "all_source_textures_use_nearest_filtering_without_mipmaps": all_nearest,
         "paired_sampling_metadata_match": all(
             (repo_indexes_match, wad_bytes_match, records_match, counts_match,
-             wraps_match, all_wraps_recognized, all_nearest)
+             wraps_match, all_wraps_recognized)
         ),
         "original_runtime_pixel_parity_verified": False,
         "private_resource_details_exported": False,

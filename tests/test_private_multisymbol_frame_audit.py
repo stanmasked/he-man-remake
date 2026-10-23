@@ -82,6 +82,7 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                rectangles=((0, 0, 8, 8), (8, 0, 8, 8)),
                                scale_xs=None,
                                resolution_scale=2,
+                               filter_mode=0,
                                xlarge_filter_mode=None):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
     east_record = _sequence_record(east_key, symbols, scale_xs)
@@ -124,6 +125,7 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
     scalar_med = bytearray(13)
     scalar_med[10] = 0
     scalar_med[11] = 0
+    scalar_med[12] = filter_mode
     scalar_xlarge = bytearray(scalar_med)
     if xlarge_filter_mode is not None:
         scalar_xlarge[12] = xlarge_filter_mode
@@ -296,6 +298,16 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertEqual(report["per_pack"]["screen-med"]["filter_mode_counts"],
                              {"nearest": 1, "linear": 0})
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
+
+    def test_census_accepts_matching_linear_selector_without_claiming_all_nearest(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "linear-sampling-census.ipa"
+            _synthetic_multisymbol_ipa(ipa, filter_mode=1)
+            report = audit_private_texture_sampling_modes(ipa)
+            self.assertTrue(report["paired_sampling_metadata_match"])
+            self.assertFalse(report["all_source_textures_use_nearest_filtering_without_mipmaps"])
+            self.assertEqual(report["per_pack"]["screen-med"]["filter_mode_counts"],
+                             {"nearest": 0, "linear": 1})
 
     def test_paired_resolution_audit_rejects_filter_mode_mismatch(self):
         with TemporaryDirectory() as directory:
