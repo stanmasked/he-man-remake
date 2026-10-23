@@ -1,4 +1,4 @@
-"""Stage206: private aggregate census of native TextureData sampling state."""
+"""Stage212: private aggregate census of native TextureData sampling metadata."""
 from __future__ import annotations
 
 import argparse
@@ -9,7 +9,9 @@ from zipfile import ZipFile
 
 from .collision_inventory import private_output_path
 from .native_render_state_contract import (
+    decode_texture_alpha_transform_flag,
     decode_texture_filter_mode,
+    decode_texture_payload_selector,
     resolve_texture_sampling_state,
 )
 from .physics_shape_census import MAX_MEMBERS, PREFIX, SCREENS, _safe_read
@@ -63,6 +65,8 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
             )
             records = _intervals(rows, wad)
             filters = Counter()
+            alpha_flags = Counter()
+            payload_selectors = Counter()
             wraps_s = Counter()
             wraps_t = Counter()
             signatures = []
@@ -74,10 +78,13 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
                         "TextureData indexed record identity is invalid"
                     )
                 code = decode_texture_filter_mode(scalar_block)
+                alpha_flag = decode_texture_alpha_transform_flag(scalar_block)
+                payload_selector = decode_texture_payload_selector(scalar_block)
                 state = resolve_texture_sampling_state(code)
                 wrap_s, wrap_t = decode_texture_wrap_codes(scalar_block)
-                name = state.filter_mode_name
-                filters[name] += 1
+                filters[state.filter_mode_name] += 1
+                alpha_flags[alpha_flag] += 1
+                payload_selectors[payload_selector] += 1
                 wraps_s[texture_wrap_mode(wrap_s)] += 1
                 wraps_t[texture_wrap_mode(wrap_t)] += 1
                 mipmap_count += int(state.generate_mipmaps)
@@ -91,11 +98,22 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
                 "filter_mode_counts": {
                     "nearest": filters["nearest"],
                     "linear": filters["linear"],
+                    "linear_mipmap_nearest": filters["linear_mipmap_nearest"],
+                },
+                "alpha_transform_flag_counts": {
+                    "disabled": alpha_flags[0],
+                    "enabled": alpha_flags[1],
+                },
+                "image_payload_selector_counts": {
+                    "png_path": payload_selectors[0],
+                    "alternate_path": payload_selectors[1],
                 },
                 "wrap_s_mode_counts": _wrap_counts(wraps_s),
                 "wrap_t_mode_counts": _wrap_counts(wraps_t),
                 "textures_requiring_mipmaps": mipmap_count,
-                "all_filter_selectors_supported": True,
+                "all_filter_modes_supported": True,
+                "all_alpha_transform_flags_boolean": True,
+                "all_payload_selectors_supported": True,
                 "all_wrap_modes_recognized": (
                     wraps_s["unrecognized"] == 0 and wraps_t["unrecognized"] == 0
                 ),
@@ -105,6 +123,8 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
     wad_bytes_match = wad_bytes[SCREENS[0]] == wad_bytes[SCREENS[1]]
     records_match = private_signatures[SCREENS[0]] == private_signatures[SCREENS[1]]
     counts_match = per_pack[SCREENS[0]]["filter_mode_counts"] == per_pack[SCREENS[1]]["filter_mode_counts"]
+    alpha_flags_match = per_pack[SCREENS[0]]["alpha_transform_flag_counts"] == per_pack[SCREENS[1]]["alpha_transform_flag_counts"]
+    payload_selectors_match = per_pack[SCREENS[0]]["image_payload_selector_counts"] == per_pack[SCREENS[1]]["image_payload_selector_counts"]
     wraps_match = (
         per_pack[SCREENS[0]]["wrap_s_mode_counts"] == per_pack[SCREENS[1]]["wrap_s_mode_counts"]
         and per_pack[SCREENS[0]]["wrap_t_mode_counts"] == per_pack[SCREENS[1]]["wrap_t_mode_counts"]
@@ -112,7 +132,18 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
     all_nearest = all(
         row["filter_mode_counts"]["nearest"] == row["texture_record_count"]
         and row["filter_mode_counts"]["linear"] == 0
+        and row["filter_mode_counts"]["linear_mipmap_nearest"] == 0
         and row["textures_requiring_mipmaps"] == 0
+        for row in per_pack.values()
+    )
+    all_alpha_disabled = all(
+        row["alpha_transform_flag_counts"]["disabled"] == row["texture_record_count"]
+        and row["alpha_transform_flag_counts"]["enabled"] == 0
+        for row in per_pack.values()
+    )
+    all_payloads_png = all(
+        row["image_payload_selector_counts"]["png_path"] == row["texture_record_count"]
+        and row["image_payload_selector_counts"]["alternate_path"] == 0
         for row in per_pack.values()
     )
     all_wraps_recognized = all(row["all_wrap_modes_recognized"] for row in per_pack.values())
@@ -124,12 +155,18 @@ def audit_private_texture_sampling_modes(ipa: Path) -> dict:
         "texture_wad_bytes_match": wad_bytes_match,
         "texture_record_identity_and_sampling_metadata_match": records_match,
         "filter_mode_counts_match": counts_match,
+        "alpha_transform_flag_counts_match": alpha_flags_match,
+        "image_payload_selector_counts_match": payload_selectors_match,
         "wrap_mode_counts_match": wraps_match,
         "all_wrap_modes_recognized": all_wraps_recognized,
         "all_source_textures_use_nearest_filtering_without_mipmaps": all_nearest,
+        "all_source_textures_alpha_transform_disabled": all_alpha_disabled,
+        "all_source_textures_use_png_payload_path": all_payloads_png,
+        "all_source_textures_use_supported_filter_modes": True,
         "paired_sampling_metadata_match": all(
             (repo_indexes_match, wad_bytes_match, records_match, counts_match,
-             wraps_match, all_wraps_recognized)
+             alpha_flags_match, payload_selectors_match, wraps_match,
+             all_wraps_recognized)
         ),
         "original_runtime_pixel_parity_verified": False,
         "private_resource_details_exported": False,

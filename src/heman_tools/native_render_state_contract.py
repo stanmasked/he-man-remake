@@ -1,14 +1,15 @@
-"""Stage206: source-confirmed native texture sampling and default blend state.
+"""Stage212: corrected native TextureData sampling and alpha-transform field map.
 
-The serialized TextureData filter selector is a boolean byte. Loader modes 0
-and 1 map to nearest and linear min/mag filtering respectively; the loader's
-mipmap mode 2 exists but is not representable by this TextureData field.
-The default SpritePlayer blend factors are GL_ONE / GL_ONE_MINUS_SRC_ALPHA,
-but runtime custom factors and per-Symbol overrides must remain supported.
+The 13-byte scalar block stores the alpha-transform flag at byte 5, the
+signed little-endian filter mode at bytes 6..9, S/T wrap codes at 10/11,
+and the image-payload path selector at byte 12. The owner's current IPA has
+1353 nearest and 292 linear textures per screen pack; every alpha-transform
+flag and payload selector is zero.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
+import struct
 
 GL_ZERO = 0
 GL_ONE = 1
@@ -31,7 +32,7 @@ NATIVE_DEFAULT_PLAYER_BLEND = (GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
 
 
 class NativeRenderStateError(ValueError):
-    """Invalid serialized texture filter selector or unsupported loader mode."""
+    """Invalid TextureData scalar field or unsupported native loader mode."""
 
 
 @dataclass(frozen=True)
@@ -43,18 +44,40 @@ class NativeTextureSamplingState:
     generate_mipmaps: bool
 
 
-def decode_texture_filter_mode(scalar_block: bytes) -> int:
-    """Decode the final boolean byte of the 13-byte native TextureData scalar block."""
+def _validate_scalar_block(scalar_block: bytes) -> None:
     if type(scalar_block) is not bytes or len(scalar_block) != 13:
         raise NativeRenderStateError("TextureData scalar block must contain exactly 13 bytes")
+
+
+def decode_texture_filter_mode(scalar_block: bytes) -> int:
+    """Read the signed 32-bit loader filter mode from scalar bytes 6..9."""
+    _validate_scalar_block(scalar_block)
+    code = struct.unpack_from("<i", scalar_block, 6)[0]
+    if code not in (0, 1, 2):
+        raise NativeRenderStateError("Serialized TextureData filter mode must be 0, 1, or 2")
+    return code
+
+
+def decode_texture_alpha_transform_flag(scalar_block: bytes) -> int:
+    """Read the PNGData RGB-by-alpha callback flag from scalar byte 5."""
+    _validate_scalar_block(scalar_block)
+    code = scalar_block[5]
+    if code not in (0, 1):
+        raise NativeRenderStateError("TextureData alpha-transform flag must be boolean 0 or 1")
+    return code
+
+
+def decode_texture_payload_selector(scalar_block: bytes) -> int:
+    """Read the loader's PNG-versus-alternate payload selector at scalar byte 12."""
+    _validate_scalar_block(scalar_block)
     code = scalar_block[12]
     if code not in (0, 1):
-        raise NativeRenderStateError("Serialized TextureData filter selector must be boolean 0 or 1")
+        raise NativeRenderStateError("TextureData payload selector must be boolean 0 or 1")
     return code
 
 
 def resolve_texture_sampling_state(filter_mode_code: int, *, force_nearest: bool = False) -> NativeTextureSamplingState:
-    """Resolve the observed loader state; force_nearest models its global override gate."""
+    """Resolve supported loader modes; force_nearest models its global override gate."""
     if type(force_nearest) is not bool:
         raise NativeRenderStateError("force_nearest must be boolean")
     if type(filter_mode_code) is not int or filter_mode_code not in (0, 1, 2):
