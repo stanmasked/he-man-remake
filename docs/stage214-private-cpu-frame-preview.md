@@ -33,7 +33,7 @@ Run separately for the paired resolution pack and the opposite direction. The PN
 - The full PNG is decoded to RGBA; source rows are not flipped or padded by this tool.
 - Each Symbol receives a private texture binding, preserving original source order and per-texture wrap/filter state.
 - The Stage201 packet assembler produces geometry with an explicit identity SpritePlayer transform.
-- The output projection translates the selected frame's native XY bounds into a transparent content-bounds canvas. It does not infer a camera, viewport placement, scene transform, animation interpolation, or player-wide transform.
+- The output projection translates the selected frame's native XY bounds into a transparent canvas, then trims only fully transparent padding without resampling any pixels. It does not infer a camera, viewport placement, scene transform, animation interpolation, or player-wide transform.
 - Rendering uses the existing bounded Python reference sampler and blend model. Mipmap mode, alternate payloads, unknown wrap modes, invalid PNGs and out-of-bounds SpriteCut rectangles fail closed.
 
 ## Evidence boundary
