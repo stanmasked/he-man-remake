@@ -23,7 +23,13 @@ Stage183 adds a second NRO dedicated to measuring a real libnx monotonic counter
 
 The dedicated NRO cross-compiled successfully and ran in the pinned NeXium guest. The runner reported 5.8 billion CPU cycles, 4,184 SVC calls and 370 captured frames, including checkpoints 120 and 300. The self-check text was visible, but the first OCR gate failed because Tesseract read the word RESUME as `SRASUNE`.
 
-The verifier now requires the ordered pause/resume/self-check PASS phrase within a bounded token window, rejects any FAIL token, and accepts that observed OCR spelling only in context. Seven synthetic regressions cover the exact phrase, the observed misread, misleading trailing RESUMES text, missing phrase elements, order, and FAIL rejection. A fresh guest run is required to confirm the correction.
+The verifier now requires the ordered pause/resume/self-check PASS phrase within a bounded token window, rejects any FAIL token, and accepts that observed OCR spelling only in context. Seven synthetic regressions cover the exact phrase, the observed misread, misleading trailing RESUMES text, missing phrase elements, order, and FAIL rejection.
+
+## Verified follow-up guest run
+
+The final head `0d019f3b` passed both the host matrix and the complete [pinned NeXium guest workflow](https://github.com/stanmasked/he-man-remake/actions/runs/39878326621). The emulator runner reported **5,470,981,516 CPU cycles**, **3,896 SVC calls** and **344 frames** at the final periodic progress checkpoint, then completed with **353 frames**. PNG checkpoints 30, 120 and 300 were captured at 1280×720. The guest-progress gate and the corrected visual OCR self-check both printed PASS.
+
+This verifies the synthetic real-time clock NRO on the pinned emulator. It does not validate a finished He-Man level or original iOS timing parity.
 
 ## Evidence boundary
 
