@@ -40,8 +40,11 @@ def _publish_temp_files(source_dir: Path, destination: Path, filenames: list[str
     try:
         for name in filenames:
             src, dst = source_dir / name, destination / name
-            os.rename(src, dst)
+            # Same-filesystem hard link is atomic and fails if dst already
+            # exists, unlike POSIX rename which would silently overwrite.
+            os.link(src, dst, follow_symlinks=False)
             moved.append(dst)
+            src.unlink()
     except Exception:
         for item in moved:
             item.unlink(missing_ok=True)
