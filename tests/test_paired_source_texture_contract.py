@@ -22,7 +22,7 @@ def _pair(*, low=(2, 1), high=(4, 2), same=True, visible=5):
             "compared_pixels": pixels,
             "exact_pixels": exact,
             "visible_union_pixels": min(visible, pixels),
-            "visible_exact_pixels": min(visible, exact),
+            "visible_exact_pixels": max(0, min(visible, exact) - (0 if same else 1)),
             "alpha_equal_pixels": pixels - (0 if same else 1),
         })
     return record
