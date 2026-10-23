@@ -61,9 +61,11 @@ class TexturePixels:
     Wrap codes are 0=clamp-to-edge and 1=repeat. Only filter selector 0 is
     accepted because every TextureData record in the inspected IPA uses nearest
     sampling. Bytes must already match native upload representation; this class
-    does not decode PNGs, flip rows, pad dimensions or premultiply RGB. When
-    source alpha is present, rgba must already use the native premultiplied
-    representation produced by PNGData before texture upload.
+    does not decode PNGs, flip rows, pad dimensions or transform alpha. The
+    original PNGData path applies its RGB-by-alpha row transform only when the
+    per-texture premultiply flag is enabled and the decoded image has alpha;
+    Stage211 models that transform exactly. Callers must not premultiply every
+    texture indiscriminately.
     """
     width: int
     height: int
