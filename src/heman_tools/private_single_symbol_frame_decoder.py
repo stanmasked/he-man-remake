@@ -32,6 +32,14 @@ from .sprite_sequence_native_loader_structure import (
     MAX_SEQUENCE_BYTES, _RecordReader, _parse_native_sequence,
 )
 from .sprite_wad_record_intervals import _intervals
+from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
+from .symbol_frame_assembler import (
+    SymbolFrameAssemblyError, assemble_symbol_frame,
+)
+from .symbol_frame_render_plan import (
+    PlayerTransform, SymbolLayerInput, build_symbol_frame_render_plan,
+)
+from .symbol_render_contract import SymbolRenderContract
 
 MAX_GO_BYTES = 8_000_000
 MAX_PNG_BYTES = 32_000_000
@@ -67,10 +75,14 @@ def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
             name = reader.utf16(allow_empty=True)
             fields = tuple(reader.s32() for _ in range(4))
             transforms = tuple(_F32.unpack(reader.take(4))[0] for _ in range(6))
-            for __ in range(7):
-                reader.s32()
-            symbols.append({"name": name, "cut_handle": fields[0],
-                            "transform_values": transforms})
+            serialized_tail = tuple(reader.s32() for _ in range(7))
+            symbols.append({
+                "name": name,
+                "cut_handle": fields[0],
+                "serialized_fields": fields,
+                "transform_values": transforms,
+                "serialized_tail": serialized_tail,
+            })
         if index == frame_index:
             selected = {"sequence_key": sequence_key, "frame_index": index,
                         "frame_time_field": header[1], "symbol_count": symbol_count,
@@ -190,10 +202,71 @@ def _read_source_member(archive: ZipFile, index: dict, path: str, max_size: int)
     return _safe_read(archive, index.get(path), max_size)
 
 
+def _assemble_private_symbol_packet_summary(
+    symbol: dict,
+    rectangle: tuple[int, int, int, int],
+    png_dimensions: tuple[int, int],
+    wrap_codes: tuple[int, int],
+) -> dict:
+    """Assemble one isolated CPU packet and return aggregate-only evidence."""
+    try:
+        contract = SymbolRenderContract.from_serialized_fields(
+            symbol["serialized_fields"],
+            symbol["transform_values"],
+            symbol["serialized_tail"],
+        )
+        layer = SymbolLayerInput(
+            source_order=0,
+            contract=contract,
+            cut_rectangle=rectangle,
+            png_dimensions=png_dimensions,
+            wrap_codes=wrap_codes,
+        )
+        plan = build_symbol_frame_render_plan(
+            (layer,), active_mask=0, user_rgba=(1.0, 1.0, 1.0, 1.0)
+        )
+        assembly = assemble_symbol_frame(
+            plan,
+            ((rectangle[2], rectangle[3]),),
+            active_mask=0,
+            player_transform=PlayerTransform(),
+        )
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise PrivateFrameDecodeError(
+            "Resolved source Symbol could not be assembled without guessing"
+        ) from exc
+
+    if assembly.packet_count != 1 or assembly.source_order != (0,):
+        raise PrivateFrameDecodeError("Isolated frame did not produce exactly one ordered packet")
+    packet = assembly.packets[0]
+    if (len(packet.xy) != 8 or len(packet.uv) != 8
+            or len(packet.rgba) != 4
+            or not all(math.isfinite(value) for value in packet.xy + packet.uv + packet.rgba)):
+        raise PrivateFrameDecodeError("Isolated frame packet is incomplete or non-finite")
+    return {
+        "cpu_frame_packet_assembled": True,
+        "cpu_frame_packet_count": assembly.packet_count,
+        "cpu_frame_packet_vertex_count": len(packet.xy) // 2,
+        "cpu_frame_packet_uv_pair_count": len(packet.uv) // 2,
+        "cpu_frame_packet_source_order_preserved": packet.source_order == 0,
+        "cpu_frame_packet_finite": True,
+        "native_winding_flag_computed": True,
+        "native_uv_out_of_unit_interval_preserved": any(
+            value < 0.0 or value > 1.0 for value in packet.uv
+        ),
+        "sprite_player_transform_used_identity_for_isolated_test": True,
+        "full_frame_composition_verified": False,
+        "original_runtime_pixel_parity_verified": False,
+    }
+
+
 def audit_private_single_symbol_crop(
     ipa: Path, regions: tuple[tuple[int, int], tuple[int, int]], alias: str,
     variant: int, direction: str, frame_index: int, png_output: Path,
+    *, assemble_packet: bool = False,
 ) -> dict:
+    if type(assemble_packet) is not bool:
+        raise PrivateFrameDecodeError("assemble_packet must be boolean")
     if not ipa.is_file():
         raise ValueError("Owner-private original IPA missing")
     if type(variant) is not int or variant not in (0, 1):
@@ -297,7 +370,8 @@ def audit_private_single_symbol_crop(
         texture_record = texture_record_by_key.get(texture_key)
         if texture_record is None:
             raise PrivateFrameDecodeError("SpriteCut texture key is absent from TextureData index")
-        texture_record_key, image_key, _ = parse_texture_data_record(texture_record)
+        texture_record_key, image_key, scalar_block = parse_texture_data_record(texture_record)
+        wrap_codes = decode_texture_wrap_codes(scalar_block)
         if texture_record_key != texture_key:
             raise PrivateFrameDecodeError("TextureData record key mismatch")
 
@@ -337,10 +411,15 @@ def audit_private_single_symbol_crop(
             raise PrivateFrameDecodeError("Resolved PNG member exceeds size limit")
 
     crop_bytes, source_size = crop_png_bytes(png_bytes, rectangle)
+    packet_summary = None
+    if assemble_packet:
+        packet_summary = _assemble_private_symbol_packet_summary(
+            symbol, rectangle, source_size, wrap_codes
+        )
     png_output.parent.mkdir(parents=True, exist_ok=True)
     png_output.write_bytes(crop_bytes)
     crop_width, crop_height = rectangle[2], rectangle[3]
-    return {
+    report = {
         "classification": "private_single_symbol_sprite_crop",
         "source_screen_group": screen,
         "component_variant_index": variant,
@@ -356,11 +435,14 @@ def audit_private_single_symbol_crop(
         "image_member_resolved": True,
         "casefold_path_fallback_used": casefold_fallback,
         "symbol_transform_fields_finite": True,
-        "symbol_transform_semantics_applied": False,
+        "symbol_transform_semantics_applied": bool(assemble_packet),
         "full_frame_composition_verified": False,
         "private_crop_written_locally": True,
         "original_resource_keys_paths_offsets_or_bytes_exported": False,
     }
+    if packet_summary is not None:
+        report.update(packet_summary)
+    return report
 
 
 def _parse_region(value: str) -> tuple[int, int]:
@@ -381,6 +463,10 @@ def main(argv=None) -> int:
     parser.add_argument("--variant", required=True, type=int, choices=(0, 1))
     parser.add_argument("--direction", required=True, choices=("east", "west"))
     parser.add_argument("--frame", type=int, default=0)
+    parser.add_argument(
+        "--assemble-packet", action="store_true",
+        help="also assemble one bounded CPU packet; report aggregate evidence only",
+    )
     parser.add_argument("--png-out", required=True, type=Path)
     parser.add_argument("--report-out", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -389,11 +475,14 @@ def main(argv=None) -> int:
     destination = private_output_path(args.report_out)
     report = audit_private_single_symbol_crop(
         args.ipa, tuple(args.region), args.alias, args.variant, args.direction,
-        args.frame, args.png_out,
+        args.frame, args.png_out, assemble_packet=args.assemble_packet,
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print("Private single-symbol frame crop validated and saved locally.")
+    if args.assemble_packet:
+        print("Private single-symbol crop and CPU packet validated; aggregate report saved locally.")
+    else:
+        print("Private single-symbol frame crop validated and saved locally.")
     return 0
 
 
