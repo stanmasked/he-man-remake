@@ -73,6 +73,8 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
     hm_symbol_quad_geometry result;
     float half_width;
     float half_height;
+    float center_x;
+    float center_y;
     float theta;
     float cosine;
     float sine;
@@ -103,6 +105,10 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
 
     half_width = hm_mul((float)cut_width, 0.5f);
     half_height = hm_mul((float)cut_height, 0.5f);
+    /* Serialized offsets locate the unscaled top-left corner. Native mesh
+       vertices are centered locally, then translated by offset + half-size. */
+    center_x = hm_add((float)command->offset_x, half_width);
+    center_y = hm_add((float)command->offset_y, half_height);
     theta = hm_mul((float)command->rotation_degrees, HM_DEGREES_TO_RADIANS);
     cosine = cosf(theta);
     sine = sinf(theta);
@@ -117,8 +123,8 @@ hm_symbol_mesh_status hm_symbol_mesh_build_quad(
             x = rotated_x;
             y = rotated_y;
         }
-        x = hm_add(x, (float)command->offset_x);
-        y = hm_add(y, (float)command->offset_y);
+        x = hm_add(x, center_x);
+        y = hm_add(y, center_y);
         if (!hm_finite(x) || !hm_finite(y)) {
             return HM_SYMBOL_MESH_NONFINITE_GEOMETRY;
         }
