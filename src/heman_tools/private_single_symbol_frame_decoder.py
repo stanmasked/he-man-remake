@@ -32,6 +32,14 @@ from .sprite_sequence_native_loader_structure import (
     MAX_SEQUENCE_BYTES, _RecordReader, _parse_native_sequence,
 )
 from .sprite_wad_record_intervals import _intervals
+from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
+from .symbol_frame_assembler import (
+    SymbolFrameAssemblyError, assemble_symbol_frame,
+)
+from .symbol_frame_render_plan import (
+    PlayerTransform, SymbolLayerInput, build_symbol_frame_render_plan,
+)
+from .symbol_render_contract import SymbolRenderContract
 
 MAX_GO_BYTES = 8_000_000
 MAX_PNG_BYTES = 32_000_000
@@ -192,6 +200,64 @@ def _private_png_output_path(path: Path) -> Path:
 
 def _read_source_member(archive: ZipFile, index: dict, path: str, max_size: int) -> bytes:
     return _safe_read(archive, index.get(path), max_size)
+
+
+def _assemble_private_symbol_packet_summary(
+    symbol: dict,
+    rectangle: tuple[int, int, int, int],
+    png_dimensions: tuple[int, int],
+    wrap_codes: tuple[int, int],
+) -> dict:
+    """Assemble one isolated CPU packet and return aggregate-only evidence."""
+    try:
+        contract = SymbolRenderContract.from_serialized_fields(
+            symbol["serialized_fields"],
+            symbol["transform_values"],
+            symbol["serialized_tail"],
+        )
+        layer = SymbolLayerInput(
+            source_order=0,
+            contract=contract,
+            cut_rectangle=rectangle,
+            png_dimensions=png_dimensions,
+            wrap_codes=wrap_codes,
+        )
+        plan = build_symbol_frame_render_plan(
+            (layer,), active_mask=0, user_rgba=(1.0, 1.0, 1.0, 1.0)
+        )
+        assembly = assemble_symbol_frame(
+            plan,
+            ((rectangle[2], rectangle[3]),),
+            active_mask=0,
+            player_transform=PlayerTransform(),
+        )
+    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+        raise PrivateFrameDecodeError(
+            "Resolved source Symbol could not be assembled without guessing"
+        ) from exc
+
+    if assembly.packet_count != 1 or assembly.source_order != (0,):
+        raise PrivateFrameDecodeError("Isolated frame did not produce exactly one ordered packet")
+    packet = assembly.packets[0]
+    if (len(packet.xy) != 8 or len(packet.uv) != 8
+            or len(packet.rgba) != 4
+            or not all(math.isfinite(value) for value in packet.xy + packet.uv + packet.rgba)):
+        raise PrivateFrameDecodeError("Isolated frame packet is incomplete or non-finite")
+    return {
+        "cpu_frame_packet_assembled": True,
+        "cpu_frame_packet_count": assembly.packet_count,
+        "cpu_frame_packet_vertex_count": len(packet.xy) // 2,
+        "cpu_frame_packet_uv_pair_count": len(packet.uv) // 2,
+        "cpu_frame_packet_source_order_preserved": packet.source_order == 0,
+        "cpu_frame_packet_finite": True,
+        "native_winding_flag_computed": True,
+        "native_uv_out_of_unit_interval_preserved": any(
+            value < 0.0 or value > 1.0 for value in packet.uv
+        ),
+        "sprite_player_transform_used_identity_for_isolated_test": True,
+        "full_frame_composition_verified": False,
+        "original_runtime_pixel_parity_verified": False,
+    }
 
 
 def audit_private_single_symbol_crop(
