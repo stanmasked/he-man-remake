@@ -10,8 +10,18 @@ sampler's coordinate denominator inconsistent with the source UV geometry.
 Consequently, earlier Stage218/219 source-derived cropped CPU previews
 cannot be treated as evidence of native texture sampling parity whenever
 their sampled texture needed padding. Their archival source-data provenance
-is intact, but full CPU pixel parity must be **re-evaluated** after texture
-upload evidence is recovered. Stage220's comparison of standalone original
+is intact, but full CPU pixel parity must be **re-evaluated** for any frame
+whose texture bindings used padded allocations.
+
+**Independent original-source check:** the four Stage218 selected east/west
+views from both packs were re-decoded from the pinned owner-only IPA.
+All **8 of 8 actual source frame texture bindings** (two per frame)
+had raw PNG dimensions exactly equal to the native allocated dimensions,
+with nearest sampling and clamp-to-edge in both axes. Therefore the specific
+Stage218/219 selected CPU frames are **not affected by this missing-padding
+error**. This does not establish camera placement or original iOS runtime
+screen parity. A private aggregate report records the four preflights
+without exporting the source sequence selector or texture identities. Stage220's comparison of standalone original
 PNG source files is not affected by the CPU sampler denominator.
 
 In the owner-private Stage221 original-source inventory, 1,296 medium
