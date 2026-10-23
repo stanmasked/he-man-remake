@@ -215,6 +215,7 @@ def render_private_cpu_frame_preview(
         "all_source_pngs_validated": source_report["all_source_pngs_validated"],
         "active_mask_source": "CLI-supplied; runtime active mask not recovered",
         "player_transform": "identity assumption",
+        "symbol_local_transform_summary": source_report["symbol_local_transform_summary"],
         "projection": "translate native XY bounds to a transparent canvas and trim only fully transparent padding; no scale or camera inferred",
         "render_canvas_width": render_canvas_width,
         "render_canvas_height": render_canvas_height,

@@ -14,6 +14,7 @@ from PIL import Image
 
 from heman_tools.physics_shape_census import PREFIX, SCREENS
 from heman_tools.private_multisymbol_frame_audit import (
+    _aggregate_symbol_transform_summary,
     _checked_png_dimensions,
     _parse_active_mask,
     _parse_region,
@@ -355,6 +356,12 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             )
             self.assertEqual(report["source_symbol_count"], 2)
             self.assertEqual(report["cpu_frame_packet_count"], 2)
+            self.assertEqual(
+                report["symbol_local_transform_summary"]["symbol_count"], 2
+            )
+            self.assertFalse(
+                report["symbol_local_transform_summary"]["raw_transform_values_exported"]
+            )
             self.assertEqual(report["native_texture_filter_mode_counts_by_unique_texture"],
                              {"nearest": 0, "linear": 1, "unsupported_mipmap": 0})
             self.assertEqual(report["unique_textures_with_alpha_transform_enabled"], 1)
@@ -429,6 +436,51 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
                     ipa, regions, "syntheticIdle", 0, "east", 0
                 )
 
+
+
+class SymbolTransformSummaryTests(unittest.TestCase):
+    def test_summary_counts_local_transforms_without_exporting_raw_values(self):
+        symbols = [
+            {
+                "serialized_fields": (0, 90, 5, -2),
+                "transform_values": (0.5, 1.0, 1.0, 1.0, 2.0, -1.0),
+                "serialized_tail": (1, 2, 3, 4, 1, 1, 0),
+            },
+            {
+                "serialized_fields": (1, 0, 0, 0),
+                "transform_values": (1.0, 1.0, 1.0, 1.0, 1.0, 1.0),
+                "serialized_tail": (1, 2, 1, 5, -1, -1, 2),
+            },
+        ]
+        summary = _aggregate_symbol_transform_summary(symbols)
+        self.assertEqual(summary["symbol_count"], 2)
+        self.assertEqual(summary["nonzero_rotation_count"], 1)
+        self.assertEqual(summary["nonzero_offset_x_count"], 1)
+        self.assertEqual(summary["nonzero_offset_y_count"], 1)
+        self.assertEqual(summary["non_unit_scale_x_count"], 1)
+        self.assertEqual(summary["non_unit_scale_y_count"], 1)
+        self.assertEqual(summary["negative_scale_x_count"], 0)
+        self.assertEqual(summary["negative_scale_y_count"], 1)
+        self.assertEqual(summary["zero_scale_x_count"], 0)
+        self.assertEqual(summary["zero_scale_y_count"], 0)
+        self.assertEqual(summary["non_default_color_multiplier_count"], 1)
+        self.assertEqual(summary["nonzero_symbol_mask_count"], 1)
+        self.assertEqual(summary["resolved_blend_override_count"], 1)
+        self.assertEqual(summary["tween_selector_counts"]["rotation"], {"2": 2})
+        self.assertEqual(summary["tween_selector_counts"]["scale_x_y"], {"1": 1, "3": 1})
+        self.assertEqual(summary["player_wide_transform_used"],
+                         "identity assumption for isolated CPU preview")
+        self.assertFalse(summary["raw_transform_values_exported"])
+        self.assertNotIn("serialized_fields", summary)
+        self.assertNotIn("transform_values", summary)
+
+    def test_summary_rejects_incomplete_transform_record(self):
+        with self.assertRaises(PrivateFrameDecodeError):
+            _aggregate_symbol_transform_summary([{
+                "serialized_fields": (0, 0, 0, 0),
+                "transform_values": (1.0, 1.0),
+                "serialized_tail": (1, 2, 3, 4, -1, -1, 0),
+            }])
 
 
 if __name__ == "__main__":
