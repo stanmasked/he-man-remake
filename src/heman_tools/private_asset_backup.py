@@ -234,8 +234,11 @@ def build_private_backup(
                         src, dst = working / file_name, out / file_name
                         if dst.exists():
                             raise PrivateBackupError("Another backup populated the output directory")
-                        os.rename(src, dst)
+                        # A same-filesystem hard link refuses an existing
+                        # destination atomically (POSIX rename overwrites).
+                        os.link(src, dst, follow_symlinks=False)
                         published.append(dst)
+                        src.unlink()
                 except Exception:
                     for item in published:
                         item.unlink(missing_ok=True)
