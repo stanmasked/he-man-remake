@@ -285,12 +285,23 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--ipa", required=True, type=Path)
+    parser.add_argument("--ipa", type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
-    parser.add_argument("--expected-source-bytes", required=True, type=int)
+    parser.add_argument("--expected-source-bytes", type=int)
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--canonical-source-url", default="")
+    parser.add_argument("--verify-only", action="store_true",
+                        help="Verify archives downloaded from Drive against the private manifest")
     args = parser.parse_args(argv)
+    if args.verify_only:
+        if args.ipa is not None or args.expected_source_bytes is not None:
+            parser.error("--verify-only must not be combined with source extraction options")
+        checked = verify_private_backup(args.out_dir / MANIFEST_NAME, args.out_dir)
+        print("Stage216 two-pack private archive SHA-256 and contents verified: "
+              + ", ".join(f"{screen}={checked[screen]['files']} files" for screen in SCREENS))
+        return 0
+    if args.ipa is None or args.expected_source_bytes is None:
+        parser.error("backup requires --ipa and --expected-source-bytes")
     manifest = build_private_backup(
         args.ipa, args.out_dir,
         expected_source_bytes=args.expected_source_bytes,
