@@ -44,7 +44,7 @@ def _indexed_repo(label, rows, target):
 
 def _sequence_record(key, symbols):
     out = bytearray(_string(key) + struct.pack("<iii", 0, 1, 0))
-    out += struct.pack("<4i", 0, 100, 0, 0) + b"\\x00" + struct.pack("<i", len(symbols))
+    out += struct.pack("<4i", 0, 100, 0, 0) + b"\x00" + struct.pack("<i", len(symbols))
     for name, offset_x, mask in symbols:
         out += struct.pack("<ii", 0, 0) + _string(name)
         out += struct.pack("<4i", 0, 0, offset_x, 12)
