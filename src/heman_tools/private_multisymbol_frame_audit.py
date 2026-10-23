@@ -230,6 +230,7 @@ def audit_private_multisymbol_frame(
         rectangles = []
         png_dimensions = []
         wrap_codes = []
+        resolved_links = []
         dimensions_by_member = {}
         resolved_symbol_count = 0
         for symbol in symbols:
@@ -275,6 +276,7 @@ def audit_private_multisymbol_frame(
             rectangles.append(rectangle)
             png_dimensions.append(dimensions)
             wrap_codes.append(decode_texture_wrap_codes(scalar_block))
+            resolved_links.append((symbol["name"], texture_key, image_key, image_path))
             resolved_symbol_count += 1
 
     summary = _assemble_private_symbol_frame_packet_summary(
@@ -289,6 +291,7 @@ def audit_private_multisymbol_frame(
             "rectangles": tuple(rectangles),
             "png_dimensions": tuple(png_dimensions),
             "wrap_codes": tuple(wrap_codes),
+            "resolved_links": tuple(resolved_links),
         })
     return {
         "classification": "private_multisymbol_frame_packet_audit",

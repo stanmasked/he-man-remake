@@ -145,6 +145,10 @@ def summarize_resolution_parity(
         and all(_double_tuple(a, b) for a, b in zip(med_dims, xl_dims))
     )
     wraps_match = med_wraps == xl_wraps and len(med_wraps) == len(xl_wraps)
+    resource_chain_match = (
+        med_details.get("resolved_links") == xlarge_details.get("resolved_links")
+        and len(med_details.get("resolved_links", ())) == len(med_symbols)
+    )
 
     med_packets = _packets(med_details, active_mask)
     xl_packets = _packets(xlarge_details, active_mask)
@@ -176,6 +180,7 @@ def summarize_resolution_parity(
     )
     checks = {
         "source_symbol_count_matches": same_count,
+        "resource_identity_chain_matches": resource_chain_match,
         "symbol_identity_and_visual_fields_match": identity_visual_match,
         "serialized_symbol_offsets_scale_exactly_2x": offsets_double,
         "sprite_cut_rectangles_scale_exactly_2x": rectangles_double,
