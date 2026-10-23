@@ -45,7 +45,7 @@ The owner-held IPA was processed locally for the selected eight-Symbol frame in 
 - The selected frame uses five unique textures: four nearest-filtered and one linear-filtered; no selected texture requests mipmaps, and the alpha transform is disabled for all five.
 - Native-bound render canvases were 756×756 for `screen-med` and 1512×1512 for `screen-xlarge`. Trimming only fully transparent padding produced preview images of 199×182 and 398×363 respectively; the rendered RGBA pixels were not resampled.
 - The full TextureData census matched across both packs: 1,645 records each, 1,353 nearest and 292 linear, zero mipmap selectors, alpha transform disabled for all records, PNG payload path for all records, and no unrecognized S/T wrap selectors.
-- Local Python suite: 2,122 tests passed. Targeted Stage201 assembler and Stage208 textured-quad C99 tests passed under both GCC and Clang. GitHub Actions run 39988119030 also passed Python 3.10/3.12/3.13 and native GCC/Clang before temporary source-handoff cleanup; the post-cleanup run remains the final CI gate.
+- Local Python suite: 2,122 tests passed. Targeted Stage201 assembler and Stage208 textured-quad C99 tests passed under both GCC and Clang. GitHub Actions run [39988494115](https://github.com/stanmasked/he-man-remake/actions/runs/39988494115) passed Python 3.10/3.12/3.13 and native GCC/Clang after temporary source-handoff cleanup.
 
 No original IPA, extracted texture, preview PNG, private selector or detailed local report was committed or uploaded to GitHub.
 
