@@ -209,6 +209,16 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertEqual(report["masked_symbol_count"], 1)
             self.assertTrue(report["cpu_frame_packet_source_order_preserved"])
 
+    def test_both_source_regions_must_fit_the_go_record(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "bad-region.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa)
+            bad_regions = (regions[0], (regions[1][0], regions[1][1] + 1))
+            with self.assertRaisesRegex(PrivateFrameDecodeError, "exceeds the source GO data"):
+                audit_private_multisymbol_frame(
+                    ipa, bad_regions, "syntheticIdle", 0, "east", 0
+                )
+
     def test_multisymbol_cli_rejects_out_of_bounds_late_symbol(self):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "out-of-bounds.ipa"
