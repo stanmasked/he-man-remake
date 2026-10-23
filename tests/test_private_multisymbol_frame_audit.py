@@ -36,8 +36,18 @@ from heman_tools.private_cpu_frame_preview import (
 )
 
 
-def png_bytes(size=(8, 8)):
-    image = Image.new("RGBA", size, (12, 34, 56, 255))
+def png_bytes(size=(8, 8), *, transparent_border=False):
+    image = Image.new(
+        "RGBA", size, (0, 0, 0, 0) if transparent_border else (12, 34, 56, 255)
+    )
+    if transparent_border:
+        from PIL import ImageDraw
+        scale = size[0] // 16
+        draw = ImageDraw.Draw(image)
+        draw.rectangle((2 * scale, 2 * scale, 6 * scale - 1, 6 * scale - 1),
+                       fill=(12, 34, 56, 255))
+        draw.rectangle((10 * scale, 2 * scale, 14 * scale - 1, 6 * scale - 1),
+                       fill=(12, 34, 56, 255))
     out = io.BytesIO()
     image.save(out, format="PNG")
     return out.getvalue()
@@ -88,7 +98,8 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                resolution_scale=2,
                                filter_mode=0,
                                xlarge_filter_mode=None,
-                               alpha_transform_flag=0):
+                               alpha_transform_flag=0,
+                               transparent_border=False):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
     east_record = _sequence_record(east_key, symbols, scale_xs)
     west_record = _sequence_record(west_key, symbols, scale_xs)
@@ -154,7 +165,8 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
         for screen in SCREENS:
             root = PREFIX + screen + "/"
             scale = 1 if screen == SCREENS[0] else resolution_scale
-            image = png_bytes((16 * scale, 16 * scale))
+            image = png_bytes((16 * scale, 16 * scale),
+                              transparent_border=transparent_border)
             archive.writestr(root + "go/default", go)
             archive.writestr(root + "meta/SpriteSeqData.repo", sequence_repo)
             archive.writestr(root + "sprite/SpriteSeqData.wad", sequence_wad_by_screen[screen])
@@ -334,7 +346,8 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "cpu-preview.ipa"
             regions = _synthetic_multisymbol_ipa(
-                ipa, filter_mode=1, alpha_transform_flag=1
+                ipa, filter_mode=1, alpha_transform_flag=1,
+                transparent_border=True,
             )
             report, rendered = render_private_cpu_frame_preview(
                 ipa, regions, "syntheticIdle", 0, "east", 0,
