@@ -39,15 +39,15 @@ def pad_decoded_png_rows_zero_fill(
         raise SpritePaddingEdgeAuditError("Decoded PNG dimensions must be bounded positive integers")
     if type(bytes_per_pixel) is not int or bytes_per_pixel not in (3, 4):
         raise SpritePaddingEdgeAuditError("Native decoded rows must use 3 or 4 bytes per pixel")
+    allocated_width, allocated_height = allocated_texture_dimensions((width, height))
+    total = allocated_width * allocated_height * bytes_per_pixel
+    if total > MAX_PADDED_TEXTURE_BYTES:
+        raise SpritePaddingEdgeAuditError("Padded texture exceeds the reference-model memory limit")
     if not isinstance(rows, (tuple, list)) or len(rows) != height:
         raise SpritePaddingEdgeAuditError("Decoded row count must match PNG height")
     row_bytes = width * bytes_per_pixel
     if any(type(row) is not bytes or len(row) != row_bytes for row in rows):
         raise SpritePaddingEdgeAuditError("Every decoded row must contain exactly width × BPP bytes")
-    allocated_width, allocated_height = allocated_texture_dimensions((width, height))
-    total = allocated_width * allocated_height * bytes_per_pixel
-    if total > MAX_PADDED_TEXTURE_BYTES:
-        raise SpritePaddingEdgeAuditError("Padded texture exceeds the reference-model memory limit")
     output = bytearray(total)
     stride = allocated_width * bytes_per_pixel
     for y, row in enumerate(rows):
