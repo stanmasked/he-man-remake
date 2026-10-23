@@ -86,8 +86,8 @@ class TexturePixels:
             raise TexturedQuadRenderError("S wrap code must be 0 (clamp) or 1 (repeat)")
         if type(self.wrap_t_code) is not int or self.wrap_t_code not in (0, 1):
             raise TexturedQuadRenderError("T wrap code must be 0 (clamp) or 1 (repeat)")
-        if type(self.filter_mode_code) is not int or self.filter_mode_code != 0:
-            raise TexturedQuadRenderError("Stage207 supports nearest filter selector 0 only")
+        if type(self.filter_mode_code) is not int or self.filter_mode_code not in (0, 1):
+            raise TexturedQuadRenderError("reference supports filter selector 0 (nearest) or 1 (linear)")
 
 
 @dataclass(frozen=True)
@@ -173,17 +173,52 @@ def _validate_packet(packet: object, previous_order: int) -> NativeFramePacket:
     return packet
 
 
-def _nearest_index(coord: float, size: int, wrap_code: int) -> int:
-    index = math.floor(coord * size)
+def _wrap_index(index: int, size: int, wrap_code: int) -> int:
     return min(size - 1, max(0, index)) if wrap_code == 0 else index % size
 
 
-def _sample_nearest(texture: TexturePixels, u: float, v: float) -> tuple[int, int, int, int]:
+def _nearest_index(coord: float, size: int, wrap_code: int) -> int:
+    return _wrap_index(math.floor(coord * size), size, wrap_code)
+
+
+def _normalized_texel(texture: TexturePixels, x: int, y: int) -> tuple[float, float, float, float]:
+    x = _wrap_index(x, texture.width, texture.wrap_s_code)
+    y = _wrap_index(y, texture.height, texture.wrap_t_code)
+    at = (y * texture.width + x) * 4
+    return tuple(texture.rgba[at+i] / 255.0 for i in range(4))  # type: ignore[return-value]
+
+
+def _sample_nearest(texture: TexturePixels, u: float, v: float) -> tuple[float, float, float, float]:
     x = _nearest_index(u, texture.width, texture.wrap_s_code)
     y = _nearest_index(v, texture.height, texture.wrap_t_code)
-    at = (y * texture.width + x) * 4
-    return (texture.rgba[at], texture.rgba[at+1],
-            texture.rgba[at+2], texture.rgba[at+3])
+    return _normalized_texel(texture, x, y)
+
+
+def _sample_linear(texture: TexturePixels, u: float, v: float) -> tuple[float, float, float, float]:
+    # GLES normalized linear sampling places texel centers at (i + 0.5) / size.
+    # Wrap each neighboring index independently so repeat interpolates across seams.
+    px = u * texture.width - 0.5
+    py = v * texture.height - 0.5
+    x0, y0 = math.floor(px), math.floor(py)
+    fx, fy = px - x0, py - y0
+    c00 = _normalized_texel(texture, x0, y0)
+    c10 = _normalized_texel(texture, x0 + 1, y0)
+    c01 = _normalized_texel(texture, x0, y0 + 1)
+    c11 = _normalized_texel(texture, x0 + 1, y0 + 1)
+    result = []
+    for channel in range(4):
+        top = c00[channel] * (1.0 - fx) + c10[channel] * fx
+        bottom = c01[channel] * (1.0 - fx) + c11[channel] * fx
+        result.append(top * (1.0 - fy) + bottom * fy)
+    return tuple(result)  # type: ignore[return-value]
+
+
+def _sample_texture(texture: TexturePixels, u: float, v: float) -> tuple[float, float, float, float]:
+    if texture.filter_mode_code == 0:
+        return _sample_nearest(texture, u, v)
+    if texture.filter_mode_code == 1:
+        return _sample_linear(texture, u, v)
+    raise TexturedQuadRenderError("unsupported filter selector reached raster stage")
 
 
 def _factor_value(factor: int, source: tuple[float, ...],
@@ -229,7 +264,7 @@ def render_textured_frame(
     frame_blend: FrameBlendState,
     clear_rgba: tuple[int, int, int, int] = (0, 0, 0, 0),
 ) -> SoftwareFrameResult:
-    """Rasterize ordered packets with nearest sampling and GLES blend factors.
+    """Rasterize ordered packets with nearest/linear sampling and GLES blend factors.
 
     Packet XY already includes Symbol-local and explicit SpritePlayer transforms
     from Stage201 assembly. Projection is a separate caller-supplied mapping to
@@ -313,9 +348,9 @@ def render_textured_frame(
                     continue
                 u = packet.uv[0] + s * (packet.uv[6] - packet.uv[0])
                 v = packet.uv[1] + t * (packet.uv[3] - packet.uv[1])
-                texel = _sample_nearest(texture, u, v)
+                texel = _sample_texture(texture, u, v)
                 source = tuple(min(1.0, max(0.0,
-                    (texel[i] / 255.0) * packet.rgba[i])) for i in range(4))
+                    texel[i] * packet.rgba[i])) for i in range(4))
                 at = (py * width + px) * 4
                 destination = (pixels[at], pixels[at+1], pixels[at+2], pixels[at+3])
                 pixels[at:at+4] = bytes(_blend_pixel(source, destination, blend))

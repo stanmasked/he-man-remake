@@ -104,9 +104,36 @@ class TexturedQuadReferenceTests(unittest.TestCase):
             render_textured_frame([_packet()], {}, width=2, height=2,
                 projection=RasterProjection(), frame_blend=FrameBlendState())
 
-    def test_linear_filter_is_not_silently_approximated(self):
-        with self.assertRaisesRegex(TexturedQuadRenderError, "nearest filter selector"):
-            TexturePixels(1,1,bytes(4),0,0,filter_mode_code=1)
+    def test_linear_filter_interpolates_between_texel_centers(self):
+        texture = TexturePixels(2,1,bytes((255,0,0,255, 0,0,255,255)),0,0,
+                                filter_mode_code=1)
+        packet = _packet(xy=(0,0,0,1,4,1,4,0))
+        result = _render(packet, texture, width=4, height=1)
+        self.assertEqual(result.rgba, bytes((
+            255,0,0,255, 191,0,64,255, 64,0,191,255, 0,0,255,255
+        )))
+
+    def test_linear_repeat_blends_across_s_seam(self):
+        texture = TexturePixels(2,1,bytes((255,0,0,255, 0,0,255,255)),1,0,
+                                filter_mode_code=1)
+        packet = _packet(xy=(0,0,0,1,4,1,4,0))
+        result = _render(packet, texture, width=4, height=1)
+        self.assertEqual(result.rgba, bytes((
+            191,0,64,255, 191,0,64,255, 64,0,191,255, 64,0,191,255
+        )))
+
+    def test_linear_t_repeat_is_independent_of_s_clamp(self):
+        texture = TexturePixels(1,2,bytes((255,0,0,255, 0,0,255,255)),0,1,
+                                filter_mode_code=1)
+        packet = _packet(xy=(0,0,0,4,1,4,1,0))
+        result = _render(packet, texture, width=1, height=4)
+        self.assertEqual(result.rgba, bytes((
+            191,0,64,255, 191,0,64,255, 64,0,191,255, 64,0,191,255
+        )))
+
+    def test_mipmap_filter_is_not_silently_approximated(self):
+        with self.assertRaisesRegex(TexturedQuadRenderError, "filter selector 0"):
+            TexturePixels(1,1,bytes(4),0,0,filter_mode_code=2)
 
     def test_invalid_wrap_code_fails_closed(self):
         with self.assertRaisesRegex(TexturedQuadRenderError, "S wrap code"):

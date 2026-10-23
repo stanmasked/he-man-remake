@@ -120,6 +120,49 @@ class C99TexturedQuadParityTests(unittest.TestCase):
     def tearDownClass(cls):
         cls._temporary.cleanup()
 
+    def test_linear_sampling_and_s_wrap_modes_match_byte_for_byte(self):
+        rgba = bytes((255, 0, 0, 255, 0, 0, 255, 255))
+        projection = RasterProjection()
+        blend = FrameBlendState()
+        clear = (0, 0, 0, 0)
+        packet = NativeFramePacket(
+            0, 29, False, (0., 0., 0., 1., 4., 1., 4., 0.),
+            (0., 0., 0., 1., 1., 1., 1., 0.),
+            (1., 1., 1., 1.), None, 8,
+        )
+        for wrap_s, expected_bytes in (
+            (0, bytes((255,0,0,255, 191,0,64,255, 64,0,191,255, 0,0,255,255))),
+            (1, bytes((191,0,64,255, 191,0,64,255, 64,0,191,255, 64,0,191,255))),
+        ):
+            with self.subTest(wrap_s=wrap_s):
+                texture = TexturePixels(2, 1, rgba, wrap_s, 0, filter_mode_code=1)
+                expected = render_textured_frame(
+                    [packet], {8: texture}, width=4, height=1,
+                    projection=projection, frame_blend=blend, clear_rgba=clear,
+                )
+                self.assertEqual(expected.rgba, expected_bytes)
+
+                c_packet = _c_packet(packet)
+                c_draw = CDraw(ctypes.pointer(c_packet), 8)
+                storage = (ctypes.c_uint8 * len(rgba)).from_buffer_copy(rgba)
+                c_binding = CBinding(
+                    8, 2, 1, ctypes.cast(storage, ctypes.POINTER(ctypes.c_uint8)),
+                    len(rgba), wrap_s, 0, 1,
+                )
+                c_projection = CProjection(1, 0, 0, 0, 1, 0)
+                c_blend = CBlend(blend.source_factor, blend.destination_factor)
+                c_clear = (ctypes.c_uint8 * 4)(*clear)
+                output = (ctypes.c_uint8 * 16)()
+                stats = CStats(0, 0)
+                status = self._library.hm_textured_quad_reference_render(
+                    ctypes.byref(c_draw), 1, ctypes.byref(c_binding), 1,
+                    4, 1, 16, ctypes.byref(c_projection), ctypes.byref(c_blend),
+                    c_clear, output, 16, ctypes.byref(stats),
+                )
+                self.assertEqual(status, 0)
+                self.assertEqual(bytes(output), expected.rgba)
+                self.assertEqual(stats.pixel_samples, expected.pixel_samples)
+
     def test_multitexture_clipping_and_blend_match_byte_for_byte(self):
         texture_a = TexturePixels(
             2, 2,

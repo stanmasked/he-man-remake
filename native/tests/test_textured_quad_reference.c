@@ -116,8 +116,46 @@ static void test_empty_frame_clears(void) {
         clear,out,sizeof out,&stats)==HM_TEXTURE_REFERENCE_OK);
     assert(memcmp(out,expected,8)==0 && stats.packets_with_coverage==0 && stats.pixel_samples==0);
 }
+static void test_linear_sampling_and_repeat_seam(void) {
+    const uint8_t tex[8]={255,0,0,255,0,0,255,255};
+    const uint8_t clear[4]={0,0,0,0};
+    const uint8_t clamp_expected[16]={
+        255,0,0,255, 191,0,64,255, 64,0,191,255, 0,0,255,255
+    };
+    const uint8_t repeat_expected[16]={
+        191,0,64,255, 191,0,64,255, 64,0,191,255, 64,0,191,255
+    };
+    hm_symbol_frame_packet p=packet(0,29);
+    hm_texture_reference_draw draw={&p,8};
+    hm_texture_reference_binding binding={8,2,1,tex,sizeof tex,0,0,1};
+    hm_texture_reference_projection proj=projection_identity();
+    hm_texture_reference_blend blend=blend_default();
+    hm_texture_reference_stats stats={0,0}; uint8_t out[16]={0};
+    p.xy[3]=1; p.xy[4]=4; p.xy[5]=1; p.xy[6]=4; p.xy[7]=0;
+    assert(hm_textured_quad_reference_render(&draw,1,&binding,1,4,1,16,&proj,&blend,
+        clear,out,sizeof out,&stats)==HM_TEXTURE_REFERENCE_OK);
+    assert(memcmp(out,clamp_expected,sizeof out)==0 && stats.pixel_samples==4);
+    binding.wrap_s_code=1;
+    memset(out,0,sizeof out);
+    assert(hm_textured_quad_reference_render(&draw,1,&binding,1,4,1,16,&proj,&blend,
+        clear,out,sizeof out,&stats)==HM_TEXTURE_REFERENCE_OK);
+    assert(memcmp(out,repeat_expected,sizeof out)==0 && stats.pixel_samples==4);
+}
+static void test_mipmap_filter_mode_fails_closed(void) {
+    const uint8_t tex[4]={255,255,255,255},clear[4]={0,0,0,0};
+    hm_symbol_frame_packet p=packet(0,2); hm_texture_reference_draw draw={&p,1};
+    hm_texture_reference_binding binding={1,1,1,tex,sizeof tex,0,0,2};
+    hm_texture_reference_projection proj=projection_identity();
+    hm_texture_reference_blend blend=blend_default();
+    hm_texture_reference_stats stats={0,0}; uint8_t out[4]={0};
+    unit_quad(&p);
+    assert(hm_textured_quad_reference_render(&draw,1,&binding,1,1,1,4,&proj,&blend,
+        clear,out,sizeof out,&stats)==HM_TEXTURE_REFERENCE_INVALID_TEXTURE);
+}
+
 int main(void) {
     test_nearest_and_row_padding(); test_negative_u_repeat_uses_explicit_slot();
+    test_linear_sampling_and_repeat_seam(); test_mipmap_filter_mode_fails_closed();
     test_blend_and_symbol_override(); test_projection_translation();
     test_failure_is_transactional(); test_missing_slot_fails_closed(); test_empty_frame_clears();
     puts("Stage208 textured quad C99 reference tests passed");

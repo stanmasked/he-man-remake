@@ -46,7 +46,8 @@ static hm_texture_reference_status hm_validate_bindings(
         bytes=(size_t)b->width*(size_t)b->height*4u;
         if(bytes>(size_t)HM_TEXTURE_REF_MAX_TEXTURE_BYTES || b->rgba_size!=bytes ||
            (b->wrap_s_code!=0 && b->wrap_s_code!=1) ||
-           (b->wrap_t_code!=0 && b->wrap_t_code!=1) || b->filter_mode_code!=0)
+           (b->wrap_t_code!=0 && b->wrap_t_code!=1) ||
+           (b->filter_mode_code!=0 && b->filter_mode_code!=1))
             return HM_TEXTURE_REFERENCE_INVALID_TEXTURE;
         for(j=0u;j<i;++j)
             if(items[j].texture_slot==b->texture_slot) return HM_TEXTURE_REFERENCE_INVALID_TEXTURE;
@@ -121,16 +122,18 @@ static hm_texture_reference_status hm_prepare(
     q->packet=p; q->texture=texture;
     return HM_TEXTURE_REFERENCE_OK;
 }
-static int64_t hm_nearest_index(double coord,uint32_t size,int32_t wrap) {
-    int64_t idx=(int64_t)floor(coord*(double)size);
+static int64_t hm_wrap_index(int64_t index,uint32_t size,int32_t wrap) {
     if(wrap==0) {
-        if(idx<0)return 0;
-        if((uint64_t)idx>=(uint64_t)size)return (int64_t)size-1;
-        return idx;
+        if(index<0)return 0;
+        if((uint64_t)index>=(uint64_t)size)return (int64_t)size-1;
+        return index;
     }
-    idx %= (int64_t)size;
-    if (idx < 0) idx += (int64_t)size;
-    return idx;
+    index %=(int64_t)size;
+    if(index<0)index+=(int64_t)size;
+    return index;
+}
+static int64_t hm_nearest_index(double coord,uint32_t size,int32_t wrap) {
+    return hm_wrap_index((int64_t)floor(coord*(double)size),size,wrap);
 }
 static double hm_factor(uint32_t f,const double src[4],const double dst[4],size_t c) {
     switch(f) {
@@ -152,17 +155,42 @@ static uint8_t hm_to_byte(double v) {
     if (n >= 255.0) return 255u;
     return (uint8_t)n;
 }
-static void hm_sample(const hm_texture_reference_binding *t,double u,double v,uint8_t out[4]) {
-    const int64_t x=hm_nearest_index(u,t->width,t->wrap_s_code);
-    const int64_t y=hm_nearest_index(v,t->height,t->wrap_t_code);
-    const size_t at=((size_t)y*(size_t)t->width+(size_t)x)*4u;
-    memcpy(out,t->rgba+at,4u);
+static double hm_texel_channel(const hm_texture_reference_binding *t,
+                                int64_t x,int64_t y,size_t channel) {
+    const size_t at=((size_t)y*(size_t)t->width+(size_t)x)*4u+channel;
+    return (double)t->rgba[at]/255.0;
 }
-static void hm_blend(uint8_t *dst_bytes,const uint8_t texel[4],const float rgba[4],
+static void hm_sample(const hm_texture_reference_binding *t,double u,double v,double out[4]) {
+    size_t c;
+    if(t->filter_mode_code==0) {
+        const int64_t x=hm_nearest_index(u,t->width,t->wrap_s_code);
+        const int64_t y=hm_nearest_index(v,t->height,t->wrap_t_code);
+        for(c=0u;c<4u;++c)out[c]=hm_texel_channel(t,x,y,c);
+    } else {
+        const double px=u*(double)t->width-0.5;
+        const double py=v*(double)t->height-0.5;
+        const int64_t x0=(int64_t)floor(px),y0=(int64_t)floor(py);
+        const double fx=px-(double)x0,fy=py-(double)y0;
+        const int64_t xa=hm_wrap_index(x0,t->width,t->wrap_s_code);
+        const int64_t xb=hm_wrap_index(x0+1,t->width,t->wrap_s_code);
+        const int64_t ya=hm_wrap_index(y0,t->height,t->wrap_t_code);
+        const int64_t yb=hm_wrap_index(y0+1,t->height,t->wrap_t_code);
+        for(c=0u;c<4u;++c) {
+            const double c00=hm_texel_channel(t,xa,ya,c);
+            const double c10=hm_texel_channel(t,xb,ya,c);
+            const double c01=hm_texel_channel(t,xa,yb,c);
+            const double c11=hm_texel_channel(t,xb,yb,c);
+            const double top=c00*(1.0-fx)+c10*fx;
+            const double bottom=c01*(1.0-fx)+c11*fx;
+            out[c]=top*(1.0-fy)+bottom*fy;
+        }
+    }
+}
+static void hm_blend(uint8_t *dst_bytes,const double texel[4],const float rgba[4],
                      uint32_t sfactor,uint32_t dfactor) {
     double src[4],dst[4]; size_t c;
     for(c=0u;c<4u;++c) {
-        src[c]=((double)texel[c]/255.0)*(double)rgba[c];
+        src[c]=texel[c]*(double)rgba[c];
         if (src[c] < 0.0) src[c] = 0.0;
         if (src[c] > 1.0) src[c] = 1.0;
         dst[c]=(double)dst_bytes[c]/255.0;
@@ -248,7 +276,7 @@ hm_texture_reference_status hm_textured_quad_reference_render(
                 const double dx=(double)px+0.5-p0x;
                 const double s=(dx*q->ey_y-dy*q->ey_x)/q->determinant;
                 const double t=(q->ex_x*dy-q->ex_y*dx)/q->determinant;
-                double u,v; uint8_t texel[4]; size_t at;
+                double u,v; double texel[4]; size_t at;
                 if(s<0.0||s>=1.0||t<0.0||t>=1.0)continue;
                 u=(double)q->packet->uv[0]+s*((double)q->packet->uv[6]-(double)q->packet->uv[0]);
                 v=(double)q->packet->uv[1]+t*((double)q->packet->uv[3]-(double)q->packet->uv[1]);
