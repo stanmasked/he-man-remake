@@ -13,7 +13,10 @@ from PIL import Image, ImageOps
 FRAME_INDICES = (30, 120, 300)
 LATE_FRAMES = (120, 300)
 SUPPORTED_SIZES = {(640, 360), (1280, 720)}
-REQUIRED_TOKENS = ("STARTUP", "COUNTER", "RESUME", "PASS")
+REQUIRED_TOKENS = ("STARTUP", "COUNTER", "PAUSE", "SELF", "CHECK", "PASS")
+# Tesseract misread observed on the real NeXium guest: RESUME -> SRASUNE.
+# This alias is accepted only inside the ordered pause/resume/self-check phrase.
+RESUME_TOKEN_ALIASES = frozenset(("RESUME", "RESUMES", "SRASUNE"))
 
 
 def normalize(text: str) -> str:
@@ -21,8 +24,33 @@ def normalize(text: str) -> str:
 
 
 def has_pass_marker(text: str) -> bool:
-    tokens = set(normalize(text).split())
-    return all(token in tokens for token in REQUIRED_TOKENS) and "FAIL" not in tokens
+    tokens = normalize(text).split()
+    if "FAIL" in tokens:
+        return False
+
+    # Require the self-check phrase in order, within a bounded token window.
+    # A trailing "GATE RESUMES" label alone must not satisfy the resume token.
+    for start, token in enumerate(tokens):
+        if token != "STARTUP":
+            continue
+        limit = min(len(tokens), start + 16)
+        cursor = start + 1
+        matched = True
+        for choices in (
+            {"COUNTER"}, {"PAUSE"}, RESUME_TOKEN_ALIASES,
+            {"SELF"}, {"CHECK"}, {"PASS"},
+        ):
+            found = next(
+                (index for index in range(cursor, limit) if tokens[index] in choices),
+                None,
+            )
+            if found is None:
+                matched = False
+                break
+            cursor = found + 1
+        if matched:
+            return True
+    return False
 
 
 def read_and_ocr(path: Path, scratch: Path, index: int) -> tuple[Image.Image, str]:
@@ -93,14 +121,16 @@ def verify(folder: Path) -> dict:
     if not successful_frames:
         rendered = {str(index): normalize(captures[index]) for index in LATE_FRAMES}
         raise ValueError(
-            "No late guest frame OCR contains STARTUP, COUNTER, RESUME and PASS "
-            f"without FAIL; normalized OCR={rendered}"
+            "No late guest frame OCR contains the ordered STARTUP/COUNTER/PAUSE/"
+            "RESUME/SELF/CHECK/PASS marker without FAIL; "
+            f"normalized OCR={rendered}"
         )
 
     return {
         "captured_frames": list(FRAME_INDICES),
         "supported_dimensions": [list(size) for size in sorted(SUPPORTED_SIZES)],
         "required_tokens": list(REQUIRED_TOKENS),
+        "resume_token_aliases": sorted(RESUME_TOKEN_ALIASES),
         "pass_marker_frames": successful_frames,
         "frame_results": details,
     }
