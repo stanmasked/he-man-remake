@@ -43,9 +43,70 @@ from .native_png_alpha import transform_native_png_alpha
 from .sprite_repo_wad_index import MAX_REPO_BYTES, MAX_WAD_BYTES, parse_sprite_repository
 from .sprite_wad_record_intervals import _intervals
 from .symbol_frame_assembler import MAX_SYMBOL_FRAME_COMMANDS
+from .symbol_render_contract import SymbolRenderContract
 
 _S32_MIN = -(1 << 31)
 _S32_MAX = (1 << 31) - 1
+
+
+def _aggregate_symbol_transform_summary(symbols: tuple[dict, ...] | list[dict]) -> dict:
+    """Return transform counts only; never expose source names or numeric transforms."""
+    if not isinstance(symbols, (tuple, list)):
+        raise PrivateFrameDecodeError("Frame Symbols must be a sequence")
+    if len(symbols) > MAX_SYMBOL_FRAME_COMMANDS:
+        raise PrivateFrameDecodeError("Frame exceeds the bounded command limit")
+    contracts = []
+    for symbol in symbols:
+        if not isinstance(symbol, dict):
+            raise PrivateFrameDecodeError("Every frame Symbol must be a mapping")
+        try:
+            contracts.append(SymbolRenderContract.from_serialized_fields(
+                symbol["serialized_fields"],
+                symbol["transform_values"],
+                symbol["serialized_tail"],
+            ))
+        except (KeyError, IndexError, TypeError, ValueError, OverflowError) as exc:
+            raise PrivateFrameDecodeError(
+                "Symbol transform fields could not be summarized without guessing"
+            ) from exc
+
+    selector_counts = {}
+    for group, attribute in (
+        ("x_y_offset", "offset_xy"),
+        ("rotation", "rotation"),
+        ("scale_x_y", "scale_xy"),
+        ("alpha_red_green_blue", "color_alpha_rgb"),
+    ):
+        histogram = {}
+        for contract in contracts:
+            selector = getattr(contract.tween, attribute)
+            histogram[selector] = histogram.get(selector, 0) + 1
+        selector_counts[group] = {
+            str(selector): histogram[selector] for selector in sorted(histogram)
+        }
+
+    return {
+        "symbol_count": len(contracts),
+        "nonzero_rotation_count": sum(c.rotation_degrees != 0 for c in contracts),
+        "nonzero_offset_x_count": sum(c.offset_x != 0 for c in contracts),
+        "nonzero_offset_y_count": sum(c.offset_y != 0 for c in contracts),
+        "non_unit_scale_x_count": sum(c.scale_x != 1.0 for c in contracts),
+        "non_unit_scale_y_count": sum(c.scale_y != 1.0 for c in contracts),
+        "negative_scale_x_count": sum(c.scale_x < 0.0 for c in contracts),
+        "negative_scale_y_count": sum(c.scale_y < 0.0 for c in contracts),
+        "zero_scale_x_count": sum(c.scale_x == 0.0 for c in contracts),
+        "zero_scale_y_count": sum(c.scale_y == 0.0 for c in contracts),
+        "non_default_color_multiplier_count": sum(
+            (c.color.alpha, c.color.red, c.color.green, c.color.blue)
+            != (1.0, 1.0, 1.0, 1.0) for c in contracts
+        ),
+        "nonzero_symbol_mask_count": sum(c.symbol_mask != 0 for c in contracts),
+        "resolved_blend_override_count": sum(c.blend.resolve() is not None for c in contracts),
+        "tween_selector_counts": selector_counts,
+        "player_wide_transform_source": "not serialized in selected Symbol frame record",
+        "player_wide_transform_used": "identity assumption for isolated CPU preview",
+        "raw_transform_values_exported": False,
+    }
 
 
 def _parse_region(value: str) -> tuple[int, int]:
@@ -377,6 +438,7 @@ def audit_private_multisymbol_frame(
         "active_mask_source": "CLI argument or default zero; not recovered from runtime",
         "runtime_active_mask_verified": False,
         "sprite_player_transform_used_identity_for_isolated_test": True,
+        "symbol_local_transform_summary": _aggregate_symbol_transform_summary(symbols),
         "full_frame_composition_verified": False,
         "original_runtime_pixel_parity_verified": False,
         "private_resource_details_exported": False,
