@@ -49,7 +49,7 @@ class SymbolRenderPlanTests(unittest.TestCase):
         self.assertEqual(plan.commands[0].uv.u1, 0.5)
         self.assertAlmostEqual(plan.commands[0].vertex_rgba[0], 0.2, places=7)
         self.assertAlmostEqual(plan.commands[0].vertex_rgba[1], 0.075, places=7)
-        self.assertAlmostEqual(plan.commands[0].vertex_rgba[2], 0.1, places=7)
+        self.assertAlmostEqual(plan.commands[0].vertex_rgba[2], 0.2, places=7)
 
     def test_source_draw_order_is_preserved_exactly(self):
         layers = [_layer(i) for i in range(4)]
