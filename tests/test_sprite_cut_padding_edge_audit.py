@@ -114,7 +114,7 @@ class ZeroPaddingModelTests(unittest.TestCase):
 
     def test_padded_buffer_memory_is_bounded(self):
         with self.assertRaisesRegex(SpritePaddingEdgeAuditError, "memory limit"):
-            pad_decoded_png_rows_zero_fill((bytes(32768 * 4),), 32768, 1, 4)
+            pad_decoded_png_rows_zero_fill((), 8192, 8192, 4)
 
 
 class NativeEdgeSamplingTests(unittest.TestCase):
