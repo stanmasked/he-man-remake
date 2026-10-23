@@ -590,3 +590,11 @@ mkdir -p "$TMP/sd-adapter-premounted-root/sdmc:"
   "$ROOT/native/tests/test_symbol_frame_assembler.c" \
   -lm -o "$TMP/test_symbol_frame_assembler"
 "$TMP/test_symbol_frame_assembler"
+
+# Stage208: portable C99 textured-quad reference; synthetic textures only.
+"$CC" -std=c99 -O2 -Wall -Wextra -Werror -pedantic \
+  -I"$ROOT/native/include" \
+  "$ROOT/native/src/heman_textured_quad_reference.c" \
+  "$ROOT/native/tests/test_textured_quad_reference.c" \
+  -lm -o "$TMP/test_textured_quad_reference"
+"$TMP/test_textured_quad_reference"
