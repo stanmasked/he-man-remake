@@ -61,7 +61,9 @@ class TexturePixels:
     Wrap codes are 0=clamp-to-edge and 1=repeat. Only filter selector 0 is
     accepted because every TextureData record in the inspected IPA uses nearest
     sampling. Bytes must already match native upload representation; this class
-    does not flip rows or premultiply RGB.
+    does not decode PNGs, flip rows, pad dimensions or premultiply RGB. When
+    source alpha is present, rgba must already use the native premultiplied
+    representation produced by PNGData before texture upload.
     """
     width: int
     height: int
@@ -142,6 +144,8 @@ def _validate_packet(packet: object, previous_order: int) -> NativeFramePacket:
         raise TexturedQuadRenderError("packet source_order values must be strictly increasing")
     if type(packet.cut_handle) is not int or not _S32_MIN <= packet.cut_handle <= _S32_MAX:
         raise TexturedQuadRenderError("cut_handle must be a signed 32-bit integer")
+    if type(packet.texture_slot) is not int or not 0 <= packet.texture_slot <= _S32_MAX:
+        raise TexturedQuadRenderError("texture_slot must be a non-negative signed 32-bit integer")
     if type(packet.front_face_flip) is not bool:
         raise TexturedQuadRenderError("front_face_flip must be boolean")
     if not isinstance(packet.xy, tuple) or len(packet.xy) != 8:
@@ -216,7 +220,7 @@ def _blend_pixel(source: tuple[float, float, float, float],
 
 def render_textured_frame(
     packets: Sequence[NativeFramePacket],
-    textures_by_cut_handle: Mapping[int, TexturePixels],
+    textures_by_slot: Mapping[int, TexturePixels],
     *,
     width: int,
     height: int,
@@ -249,7 +253,7 @@ def render_textured_frame(
         raise TexturedQuadRenderError("textures_by_cut_handle must be a mapping")
     for key, value in textures_by_cut_handle.items():
         if type(key) is not int or not _S32_MIN <= key <= _S32_MAX:
-            raise TexturedQuadRenderError("texture mapping keys must be signed 32-bit cut handles")
+            raise TexturedQuadRenderError("texture mapping keys must be non-negative signed 32-bit texture slots")
         if not isinstance(value, TexturePixels):
             raise TexturedQuadRenderError("every texture mapping value must be TexturePixels")
 
@@ -262,7 +266,7 @@ def render_textured_frame(
         try:
             texture = textures_by_cut_handle[packet.cut_handle]
         except KeyError as exc:
-            raise TexturedQuadRenderError("packet cut_handle has no resolved texture") from exc
+            raise TexturedQuadRenderError("packet texture_slot has no resolved texture") from exc
         points = tuple(projection.apply(
             (packet.xy[index*2], packet.xy[index*2+1])
         ) for index in range(4))
