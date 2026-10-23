@@ -154,7 +154,9 @@ def summarize_resolution_parity(
         == tuple(packet.source_order for packet in xl_packets)
     )
     uv_match = packet_count_match and all(
-        a.uv == b.uv for a, b in zip(med_packets, xl_packets)
+        (a.uv.u0, a.uv.v0, a.uv.u1, a.uv.v1)
+        == (b.uv.u0, b.uv.v0, b.uv.u1, b.uv.v1)
+        for a, b in zip(med_packets, xl_packets)
     )
     geometry_double = packet_count_match and all(
         _double_tuple(a.xy, b.xy) for a, b in zip(med_packets, xl_packets)
