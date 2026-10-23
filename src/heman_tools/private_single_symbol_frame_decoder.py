@@ -479,7 +479,10 @@ def main(argv=None) -> int:
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print("Private single-symbol frame crop validated and saved locally.")
+    if args.assemble_packet:
+        print("Private single-symbol crop and CPU packet validated; aggregate report saved locally.")
+    else:
+        print("Private single-symbol frame crop validated and saved locally.")
     return 0
 
 
