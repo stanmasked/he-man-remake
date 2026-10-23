@@ -17,7 +17,7 @@ This layout describes the original **32-bit iOS object**. The portable C99 resul
 
 ## Geometry and transforms
 
-The helper constructs a centered quad from the signed SpriteCut width and height. Native offset semantics were cross-checked against the two-part `MUCutscene.MainMenu_Heman` composition: at unit scale, `HemanTop` (142×268, offset −64/−166) and `HemanBot` (128×64, offset −58/101) align at the split when offsets denote the unscaled top-left corners. Accordingly, the native mesh's translation center is `(offset_x + width/2, offset_y + height/2)`; scaling occurs around that unscaled center.
+The helper constructs a centered quad from the signed SpriteCut width and height. Native offset semantics were cross-checked against a private two-part menu-character composition: the pieces align at the split when offsets denote the unscaled top-left corners. Individual resource names, dimensions, offsets and image data remain private. Accordingly, the native mesh's translation center is `(offset_x + width/2, offset_y + height/2)`; scaling occurs around that unscaled center.
 
 The helper then applies:
 
