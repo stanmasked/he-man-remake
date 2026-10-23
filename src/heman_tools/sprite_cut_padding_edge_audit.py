@@ -20,8 +20,40 @@ from .sprite_cut_wrap_bounds_audit import _load_private_cut_wrap_codes
 from .native_sprite_cut_uv import compute_native_sprite_cut_uv
 
 
+MAX_PADDED_TEXTURE_BYTES = 64_000_000
+
+
 class SpritePaddingEdgeAuditError(ValueError):
     """Paired geometry, wrap modes, or UV edge classification is unresolved."""
+
+
+def pad_decoded_png_rows_zero_fill(
+    rows: tuple[bytes, ...] | list[bytes],
+    width: int,
+    height: int,
+    bytes_per_pixel: int,
+) -> tuple[bytes, tuple[int, int]]:
+    """Model PNGData's post-transform row layout and zero-filled right/bottom padding."""
+    if (type(width) is not int or type(height) is not int
+            or not 0 < width <= 32768 or not 0 < height <= 32768):
+        raise SpritePaddingEdgeAuditError("Decoded PNG dimensions must be bounded positive integers")
+    if type(bytes_per_pixel) is not int or bytes_per_pixel not in (3, 4):
+        raise SpritePaddingEdgeAuditError("Native decoded rows must use 3 or 4 bytes per pixel")
+    if not isinstance(rows, (tuple, list)) or len(rows) != height:
+        raise SpritePaddingEdgeAuditError("Decoded row count must match PNG height")
+    row_bytes = width * bytes_per_pixel
+    if any(type(row) is not bytes or len(row) != row_bytes for row in rows):
+        raise SpritePaddingEdgeAuditError("Every decoded row must contain exactly width × BPP bytes")
+    allocated_width, allocated_height = allocated_texture_dimensions((width, height))
+    total = allocated_width * allocated_height * bytes_per_pixel
+    if total > MAX_PADDED_TEXTURE_BYTES:
+        raise SpritePaddingEdgeAuditError("Padded texture exceeds the reference-model memory limit")
+    output = bytearray(total)
+    stride = allocated_width * bytes_per_pixel
+    for y, row in enumerate(rows):
+        start = y * stride
+        output[start:start + row_bytes] = row
+    return bytes(output), (allocated_width, allocated_height)
 
 
 def _axis_edge_sample(
@@ -46,7 +78,6 @@ def classify_native_edge_sampling(
     status, _excess_x, _excess_y = classify_allocated_cut(rectangle, png_dimensions)
     uv = compute_native_sprite_cut_uv(rectangle, png_dimensions, wrap_codes)
     alloc_w, alloc_h = allocated_texture_dimensions(png_dimensions)
-    x, y, width, height = rectangle
     over_x = uv.u0 > 1.0 or uv.u1 > 1.0
     over_y = uv.v0 > 1.0 or uv.v1 > 1.0
     sample_x = _axis_edge_sample(over_x, uv.wrap_s_mode, png_dimensions[0], alloc_w)
