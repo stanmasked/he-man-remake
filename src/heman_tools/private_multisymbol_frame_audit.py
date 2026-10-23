@@ -307,10 +307,12 @@ def audit_private_multisymbol_frame(
         scalar_blocks = []
         texture_keys = []
         texture_rgba = []
+        texture_native_alpha = []
         resolved_links = []
         dimensions_by_member = {}
         png_bytes_by_member = {}
         rgba_by_member = {}
+        native_alpha_by_member = {}
         resolved_symbol_count = 0
         for symbol in symbols:
             cut_record = cut_by_key.get(symbol["name"])
@@ -380,11 +382,13 @@ def audit_private_multisymbol_frame(
                             rgba, dimensions[0], dimensions[1],
                             has_alpha=has_alpha, premultiply_alpha=(alpha_flag == 1),
                         )
+                        native_alpha_by_member[actual_name] = has_alpha
                     except PrivateFrameDecodeError:
                         raise
                     except Exception as exc:
                         raise PrivateFrameDecodeError("Resolved PNG pixels could not be decoded safely") from exc
                 texture_rgba.append(rgba_by_member[actual_name])
+                texture_native_alpha.append(native_alpha_by_member[actual_name])
 
             rectangles.append(rectangle)
             png_dimensions.append(dimensions)
@@ -418,6 +422,7 @@ def audit_private_multisymbol_frame(
         }
         if _include_texture_pixels:
             private_details["texture_rgba"] = tuple(texture_rgba)
+            private_details["texture_native_alpha"] = tuple(texture_native_alpha)
         _private_details.append(private_details)
     return {
         "classification": "private_multisymbol_frame_packet_audit",

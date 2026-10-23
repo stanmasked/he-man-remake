@@ -27,6 +27,7 @@ from .symbol_frame_render_plan import (
     build_symbol_frame_render_plan,
 )
 from .symbol_render_contract import SymbolRenderContract
+from .native_png_zero_padding import reconstruct_native_zero_padded_texture
 from .native_texture_upload_gate import (
     NativeTextureUploadError, plan_native_texture_upload, prepare_native_cpu_texture,
 )
@@ -89,13 +90,14 @@ def render_private_cpu_frame_preview(
     wraps = private["wrap_codes"]
     filters = private["filter_modes"]
     texture_rgba = private["texture_rgba"]
+    texture_native_alpha = private["texture_native_alpha"]
     texture_keys = private["texture_keys"]
     alpha_flags = private["alpha_transform_flags"]
     payload_selectors = private["payload_selectors"]
     count = len(symbols)
     if not (count == len(rectangles) == len(dimensions) == len(wraps)
-            == len(filters) == len(texture_rgba) == len(texture_keys)
-            == len(alpha_flags) == len(payload_selectors)):
+            == len(filters) == len(texture_rgba) == len(texture_native_alpha)
+            == len(texture_keys) == len(alpha_flags) == len(payload_selectors)):
         raise PrivateCPUFramePreviewError("Decoded per-Symbol texture metadata lengths differ")
     if any(selector != 0 for selector in payload_selectors):
         raise PrivateCPUFramePreviewError("Only the confirmed PNG payload path is supported")
@@ -117,18 +119,15 @@ def render_private_cpu_frame_preview(
                 wrap_codes=wraps[order],
                 texture_slot=order,
             ))
-            # Stage222: native UVs divide by allocated powers-of-two.
-            # Raw PNG rows cannot masquerade as the allocated surface.
-            # Until native padding pixels are independently recovered,
-            # any padded source texture fails closed instead of silently
-            # distorting the CPU preview's texture sampling.
+            # Stage223: the native PNG callback zeroes padded byte regions
+            # before progressive image rows are combined into allocated stride.
+            # RGB zero bytes sample as opaque black; RGBA zeros as transparent.
             layout = plan_native_texture_upload(
-                dimensions[order],
-                tuple(wraps[order]),
-                filters[order],
+                dimensions[order], tuple(wraps[order]), filters[order],
             )
-            textures_by_slot[order] = prepare_native_cpu_texture(
+            textures_by_slot[order] = reconstruct_native_zero_padded_texture(
                 layout, texture_rgba[order],
+                native_png_has_alpha=texture_native_alpha[order],
             )
         plan = build_symbol_frame_render_plan(
             tuple(layers),
@@ -253,6 +252,12 @@ def render_private_cpu_frame_preview(
         "output_height": rendered.height,
         "native_allocated_texture_dimensions_verified": True,
         "native_padding_texels_required_without_evidence": False,
+        "native_padding_source": "ARMv7 PNG info callback zeroed right/bottom bytes",
+        "native_zero_padded_texture_bindings": sum(
+            int(plan_native_texture_upload(dimensions[index], tuple(wraps[index]), filters[index]).needs_native_padding)
+            for index in range(count)
+        ),
+        "native_rgb_vs_rgba_padding_distinguished": True,
         "native_texture_sampling_uses_allocated_dimensions": True,
         "gpu_submission_verified": False,
         "original_runtime_pixel_parity_verified": False,

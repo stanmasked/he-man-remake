@@ -101,7 +101,8 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                filter_mode=0,
                                xlarge_filter_mode=None,
                                alpha_transform_flag=0,
-                               transparent_border=False):
+                               transparent_border=False,
+                               png_size=(16, 16)):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
     east_record = _sequence_record(east_key, symbols, scale_xs)
     west_record = _sequence_record(west_key, symbols, scale_xs)
@@ -167,7 +168,7 @@ def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
         for screen in SCREENS:
             root = PREFIX + screen + "/"
             scale = 1 if screen == SCREENS[0] else resolution_scale
-            image = png_bytes((16 * scale, 16 * scale),
+            image = png_bytes((png_size[0] * scale, png_size[1] * scale),
                               transparent_border=transparent_border)
             archive.writestr(root + "go/default", go)
             archive.writestr(root + "meta/SpriteSeqData.repo", sequence_repo)
