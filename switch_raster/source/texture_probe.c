@@ -161,6 +161,9 @@ static int render_and_selfcheck(void) {
         !pixel_is(FRAME_WIDTH - 1u, FRAME_HEIGHT - 1u, clear_rgba)) {
         return 0;
     }
+#if defined(HM_NATIVE_PADDING_PROBE)
+    if (!verify_native_padding_probe()) return 0;
+#endif
     return 1;
 }
 
