@@ -249,10 +249,10 @@ def render_textured_frame(
     if (not isinstance(clear_rgba, (tuple, list)) or len(clear_rgba) != 4
             or any(type(c) is not int or not 0 <= c <= 255 for c in clear_rgba)):
         raise TexturedQuadRenderError("clear_rgba must contain four byte channels")
-    if not isinstance(textures_by_cut_handle, Mapping):
-        raise TexturedQuadRenderError("textures_by_cut_handle must be a mapping")
-    for key, value in textures_by_cut_handle.items():
-        if type(key) is not int or not _S32_MIN <= key <= _S32_MAX:
+    if not isinstance(textures_by_slot, Mapping):
+        raise TexturedQuadRenderError("textures_by_slot must be a mapping")
+    for key, value in textures_by_slot.items():
+        if type(key) is not int or not 0 <= key <= _S32_MAX:
             raise TexturedQuadRenderError("texture mapping keys must be non-negative signed 32-bit texture slots")
         if not isinstance(value, TexturePixels):
             raise TexturedQuadRenderError("every texture mapping value must be TexturePixels")
@@ -264,7 +264,7 @@ def render_textured_frame(
         packet = _validate_packet(raw_packet, previous_order)
         previous_order = packet.source_order
         try:
-            texture = textures_by_cut_handle[packet.cut_handle]
+            texture = textures_by_slot[packet.texture_slot]
         except KeyError as exc:
             raise TexturedQuadRenderError("packet texture_slot has no resolved texture") from exc
         points = tuple(projection.apply(

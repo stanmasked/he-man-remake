@@ -10,17 +10,17 @@ from heman_tools.textured_quad_reference import (
 )
 
 
-def _packet(*, order=0, handle=7,
+def _packet(*, order=0, handle=7, slot=0,
             xy=(0., 0., 0., 2., 2., 2., 2., 0.),
             uv=(0., 0., 0., 1., 1., 1., 1., 0.),
             rgba=(1., 1., 1., 1.), blend=None):
-    return NativeFramePacket(order, handle, False, tuple(xy), tuple(uv), tuple(rgba), blend)
+    return NativeFramePacket(order, handle, False, tuple(xy), tuple(uv), tuple(rgba), blend, slot)
 
 
 def _render(packet, texture, *, width=2, height=2, projection=None, blend=None,
             clear=(0, 0, 0, 0)):
     return render_textured_frame(
-        [packet], {packet.cut_handle: texture}, width=width, height=height,
+        [packet], {packet.texture_slot: texture}, width=width, height=height,
         projection=projection or RasterProjection(),
         frame_blend=blend or FrameBlendState(), clear_rgba=clear,
     )
@@ -76,12 +76,12 @@ class TexturedQuadReferenceTests(unittest.TestCase):
     def test_source_order_controls_alpha_composition(self):
         red = TexturePixels(1,1,bytes((128,0,0,128)),0,0)
         green = TexturePixels(1,1,bytes((0,128,0,128)),0,0)
-        packets = [_packet(order=0, handle=7, xy=(0,0,0,1,1,1,1,0),
+        packets = [_packet(order=0, handle=7, slot=0, xy=(0,0,0,1,1,1,1,0),
                            uv=(0,0,0,1,1,1,1,0)),
-                   _packet(order=2, handle=8, xy=(0,0,0,1,1,1,1,0),
+                   _packet(order=2, handle=8, slot=1, xy=(0,0,0,1,1,1,1,0),
                            uv=(0,0,0,1,1,1,1,0))]
         result = render_textured_frame(
-            packets, {7:red,8:green}, width=1, height=1,
+            packets, {0:red,1:green}, width=1, height=1,
             projection=RasterProjection(), frame_blend=FrameBlendState())
         self.assertEqual(result.rgba, bytes((64,128,0,192)))
 
@@ -127,7 +127,7 @@ class TexturedQuadReferenceTests(unittest.TestCase):
     def test_unsorted_source_order_fails_closed(self):
         texture = TexturePixels(1,1,bytes((255,255,255,255)),0,0)
         with self.assertRaisesRegex(TexturedQuadRenderError, "strictly increasing"):
-            render_textured_frame([_packet(order=2),_packet(order=1)], {7:texture},
+            render_textured_frame([_packet(order=2),_packet(order=1)], {0:texture},
                 width=2,height=2,projection=RasterProjection(),frame_blend=FrameBlendState())
 
     def test_invalid_symbol_blend_factor_fails_closed(self):
@@ -151,10 +151,31 @@ class TexturedQuadReferenceTests(unittest.TestCase):
 
     def test_source_order_gap_from_masked_symbol_is_allowed(self):
         texture = TexturePixels(1,1,bytes((255,255,255,255)),0,0)
-        result = render_textured_frame([_packet(order=0),_packet(order=2,handle=8)],
-            {7:texture,8:texture},width=2,height=2,
+        result = render_textured_frame([_packet(order=0),_packet(order=2,handle=8,slot=1)],
+            {0:texture,1:texture},width=2,height=2,
             projection=RasterProjection(),frame_blend=FrameBlendState())
         self.assertEqual((result.packets_considered,result.packets_with_coverage),(2,2))
+
+    def test_two_cut_handles_can_share_one_texture_slot(self):
+        texture = TexturePixels(1,1,bytes((255,255,255,255)),0,0)
+        packets = [
+            _packet(order=0, handle=7, slot=4, xy=(0,0,0,1,1,1,1,0),
+                    uv=(0,0,0,1,1,1,1,0)),
+            _packet(order=2, handle=8, slot=4, xy=(0,0,0,1,1,1,1,0),
+                    uv=(0,0,0,1,1,1,1,0)),
+        ]
+        result = render_textured_frame(packets, {4:texture}, width=1, height=1,
+            projection=RasterProjection(), frame_blend=FrameBlendState())
+        self.assertEqual((result.packets_considered, result.pixel_samples), (2,2))
+
+    def test_missing_texture_slot_fails_closed(self):
+        packet = NativeFramePacket(0, 7, False, (0.,0.,0.,1.,1.,1.,1.,0.),
+                                   (0.,0.,0.,1.,1.,1.,1.,0.),
+                                   (1.,1.,1.,1.), None, None)
+        texture = TexturePixels(1,1,bytes((255,255,255,255)),0,0)
+        with self.assertRaisesRegex(TexturedQuadRenderError, "texture_slot"):
+            render_textured_frame([packet], {0:texture}, width=1, height=1,
+                projection=RasterProjection(), frame_blend=FrameBlendState())
 
     def test_unrepresentably_large_integer_fails_closed(self):
         packet = _packet(xy=(10**1000, 0, 0, 1, 1, 1, 1, 0))
