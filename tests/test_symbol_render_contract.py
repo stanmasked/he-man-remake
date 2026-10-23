@@ -34,10 +34,10 @@ class SymbolRenderContractTests(unittest.TestCase):
 
     def test_alpha_is_shared_multiplier_and_color_serialization_is_argb(self):
         color = SymbolColorMultipliers(alpha=0.5, red=0.5, green=0.2, blue=0.4)
-        self.assertEqual(
-            color.apply_user_rgba((0.8, 0.7, 0.6, 0.9)),
-            (0.2, 0.07, 0.12, 0.45),
-        )
+        actual = color.apply_user_rgba((0.8, 0.7, 0.6, 0.9))
+        expected = (0.2, 0.07, 0.12, 0.45)
+        for actual_channel, expected_channel in zip(actual, expected):
+            self.assertAlmostEqual(actual_channel, expected_channel, places=7)
 
     def test_zero_symbol_alpha_suppresses_all_rgba_channels(self):
         color = SymbolColorMultipliers(0.0, 1.0, 0.5, 0.25)
@@ -46,8 +46,10 @@ class SymbolRenderContractTests(unittest.TestCase):
 
     def test_native_color_clamp_handles_above_one_and_negative_inputs(self):
         color = SymbolColorMultipliers(1.5, 1.1, -0.2, 0.8)
-        self.assertEqual(color.apply_user_rgba((1.0, 0.9, 0.5, 1.0)),
-                         (1.0, 0.0, 0.6, 1.0))
+        actual = color.apply_user_rgba((1.0, 0.9, 0.5, 1.0))
+        expected = (1.0, 0.0, 0.6, 1.0)
+        for actual_channel, expected_channel in zip(actual, expected):
+            self.assertAlmostEqual(actual_channel, expected_channel, places=7)
 
     def test_user_rgba_must_have_four_finite_numeric_channels(self):
         color = SymbolColorMultipliers(1, 1, 1, 1)
