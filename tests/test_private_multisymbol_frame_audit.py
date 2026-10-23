@@ -350,6 +350,9 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertTrue(any(rendered.rgba[3::4]))
             self.assertEqual((rendered.width, rendered.height),
                              (report["output_width"], report["output_height"]))
+            self.assertTrue(report["output_crop_applied"])
+            self.assertLess(report["output_width"], report["render_canvas_width"])
+            self.assertLess(report["output_height"], report["render_canvas_height"])
             self.assertFalse(report["gpu_submission_verified"])
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
             self.assertFalse(report["private_resource_details_exported"])
