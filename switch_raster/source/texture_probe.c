@@ -4,6 +4,9 @@
 #include <stdint.h>
 #include <string.h>
 #include "heman_textured_quad_reference.h"
+#if defined(HM_NATIVE_PADDING_PROBE)
+#include "heman_native_png_upload.h"
+#endif
 
 #define FRAME_WIDTH 640u
 #define FRAME_HEIGHT 360u
