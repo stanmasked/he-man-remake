@@ -34,7 +34,7 @@ from .sprite_sequence_native_loader_structure import (
 from .sprite_wad_record_intervals import _intervals
 from .sprite_cut_wrap_bounds_audit import decode_texture_wrap_codes
 from .symbol_frame_assembler import (
-    SymbolFrameAssemblyError, assemble_symbol_frame,
+    MAX_SYMBOL_FRAME_COMMANDS, SymbolFrameAssemblyError, assemble_symbol_frame,
 )
 from .symbol_frame_render_plan import (
     PlayerTransform, SymbolLayerInput, build_symbol_frame_render_plan,
@@ -53,8 +53,8 @@ class PrivateFrameDecodeError(ValueError):
     """A single-symbol crop cannot be resolved without guessing."""
 
 
-def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
-    """Strictly parse a sequence record and return one frame's sole symbol."""
+def parse_symbol_frame(record: bytes, frame_index: int) -> dict:
+    """Strictly parse a sequence record and return all Symbols in one frame."""
     sequence = _parse_native_sequence(record)
     if type(frame_index) is not int or not 0 <= frame_index < len(sequence.frames):
         raise PrivateFrameDecodeError("Frame index is outside the sequence")
@@ -89,15 +89,22 @@ def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
                         "symbols": symbols}
     if reader.pos != len(record):
         raise PrivateFrameDecodeError("Sequence parser did not reach exact EOF")
-    if selected is None or selected["symbol_count"] != 1:
-        raise PrivateFrameDecodeError("Only a single-symbol frame is supported")
-    symbol = selected["symbols"][0]
-    if not symbol["name"]:
-        raise PrivateFrameDecodeError("Frame symbol has an empty resource name")
-    if not all(math.isfinite(value) for value in symbol["transform_values"]):
-        raise PrivateFrameDecodeError("Frame symbol has non-finite transform fields")
+    if selected is None:
+        raise PrivateFrameDecodeError("Selected frame is absent from the sequence")
+    for symbol in selected["symbols"]:
+        if not symbol["name"]:
+            raise PrivateFrameDecodeError("Frame symbol has an empty resource name")
+        if not all(math.isfinite(value) for value in symbol["transform_values"]):
+            raise PrivateFrameDecodeError("Frame symbol has non-finite transform fields")
     return selected
 
+
+def parse_single_symbol_frame(record: bytes, frame_index: int) -> dict:
+    """Strictly parse a sequence record and require exactly one Symbol."""
+    selected = parse_symbol_frame(record, frame_index)
+    if selected["symbol_count"] != 1:
+        raise PrivateFrameDecodeError("Only a single-symbol frame is supported")
+    return selected
 
 def resolve_alias_pair(
     go_data: bytes, sequence_keys: set[str] | frozenset[str],
@@ -202,63 +209,102 @@ def _read_source_member(archive: ZipFile, index: dict, path: str, max_size: int)
     return _safe_read(archive, index.get(path), max_size)
 
 
+def _assemble_private_symbol_frame_packet_summary(
+    symbols: tuple[dict, ...] | list[dict],
+    rectangles: tuple[tuple[int, int, int, int], ...] | list[tuple[int, int, int, int]],
+    png_dimensions: tuple[tuple[int, int], ...] | list[tuple[int, int]],
+    wrap_codes: tuple[tuple[int, int], ...] | list[tuple[int, int]],
+    *,
+    active_mask: int = 0,
+) -> dict:
+    """Assemble a bounded multi-Symbol frame and return aggregate-only evidence."""
+    if not isinstance(symbols, (tuple, list)):
+        raise PrivateFrameDecodeError("Frame Symbols must be a sequence")
+    count = len(symbols)
+    if count > MAX_SYMBOL_FRAME_COMMANDS:
+        raise PrivateFrameDecodeError("Frame exceeds the bounded command limit")
+    if any(not isinstance(values, (tuple, list)) or len(values) != count
+           for values in (rectangles, png_dimensions, wrap_codes)):
+        raise PrivateFrameDecodeError("Resolved frame metadata must parallel every Symbol")
+
+    try:
+        layers = []
+        for source_order, symbol in enumerate(symbols):
+            contract = SymbolRenderContract.from_serialized_fields(
+                symbol["serialized_fields"],
+                symbol["transform_values"],
+                symbol["serialized_tail"],
+            )
+            layers.append(SymbolLayerInput(
+                source_order=source_order,
+                contract=contract,
+                cut_rectangle=rectangles[source_order],
+                png_dimensions=png_dimensions[source_order],
+                wrap_codes=wrap_codes[source_order],
+            ))
+        plan = build_symbol_frame_render_plan(
+            tuple(layers), active_mask=active_mask, user_rgba=(1.0, 1.0, 1.0, 1.0)
+        )
+        extents = tuple((rectangle[2], rectangle[3]) for rectangle in rectangles)
+        assembly = assemble_symbol_frame(
+            plan, extents, active_mask=active_mask, player_transform=PlayerTransform()
+        )
+    except (KeyError, IndexError, TypeError, ValueError, OverflowError) as exc:
+        raise PrivateFrameDecodeError(
+            "Resolved source frame could not be assembled without guessing"
+        ) from exc
+
+    expected_order = tuple(
+        index for index, layer in enumerate(layers)
+        if not layer.contract.is_suppressed_by_mask(active_mask)
+    )
+    if assembly.source_order != expected_order:
+        raise PrivateFrameDecodeError("Assembled packet source order is inconsistent")
+
+    for packet in assembly.packets:
+        if (len(packet.xy) != 8 or len(packet.uv) != 8 or len(packet.rgba) != 4
+                or not all(math.isfinite(value)
+                           for value in packet.xy + packet.uv + packet.rgba)):
+            raise PrivateFrameDecodeError("Frame packet is incomplete or non-finite")
+
+    return {
+        "frame_symbol_count": count,
+        "cpu_frame_packet_assembled": True,
+        "cpu_frame_packet_count": assembly.packet_count,
+        "cpu_frame_packet_vertex_count": sum(len(packet.xy) // 2 for packet in assembly.packets),
+        "cpu_frame_packet_uv_pair_count": sum(len(packet.uv) // 2 for packet in assembly.packets),
+        "cpu_frame_packet_color_channel_count": sum(len(packet.rgba) for packet in assembly.packets),
+        "cpu_frame_packet_source_order_preserved": assembly.source_order == expected_order,
+        "cpu_frame_packet_finite": True,
+        "native_winding_flag_computed": all(
+            isinstance(packet.front_face_flip, bool) for packet in assembly.packets
+        ),
+        "native_uv_out_of_unit_interval_preserved": any(
+            value < 0.0 or value > 1.0
+            for packet in assembly.packets for value in packet.uv
+        ),
+        "masked_symbol_count": count - assembly.packet_count,
+        "sprite_player_transform_used_identity_for_isolated_test": True,
+        "full_frame_composition_verified": False,
+        "original_runtime_pixel_parity_verified": False,
+    }
+
+
 def _assemble_private_symbol_packet_summary(
     symbol: dict,
     rectangle: tuple[int, int, int, int],
     png_dimensions: tuple[int, int],
     wrap_codes: tuple[int, int],
 ) -> dict:
-    """Assemble one isolated CPU packet and return aggregate-only evidence."""
-    try:
-        contract = SymbolRenderContract.from_serialized_fields(
-            symbol["serialized_fields"],
-            symbol["transform_values"],
-            symbol["serialized_tail"],
-        )
-        layer = SymbolLayerInput(
-            source_order=0,
-            contract=contract,
-            cut_rectangle=rectangle,
-            png_dimensions=png_dimensions,
-            wrap_codes=wrap_codes,
-        )
-        plan = build_symbol_frame_render_plan(
-            (layer,), active_mask=0, user_rgba=(1.0, 1.0, 1.0, 1.0)
-        )
-        assembly = assemble_symbol_frame(
-            plan,
-            ((rectangle[2], rectangle[3]),),
-            active_mask=0,
-            player_transform=PlayerTransform(),
-        )
-    except (KeyError, TypeError, ValueError, OverflowError) as exc:
+    """Compatibility wrapper for the original single-Symbol audit."""
+    report = _assemble_private_symbol_frame_packet_summary(
+        (symbol,), (rectangle,), (png_dimensions,), (wrap_codes,), active_mask=0
+    )
+    if report["cpu_frame_packet_count"] != 1:
         raise PrivateFrameDecodeError(
-            "Resolved source Symbol could not be assembled without guessing"
-        ) from exc
-
-    if assembly.packet_count != 1 or assembly.source_order != (0,):
-        raise PrivateFrameDecodeError("Isolated frame did not produce exactly one ordered packet")
-    packet = assembly.packets[0]
-    if (len(packet.xy) != 8 or len(packet.uv) != 8
-            or len(packet.rgba) != 4
-            or not all(math.isfinite(value) for value in packet.xy + packet.uv + packet.rgba)):
-        raise PrivateFrameDecodeError("Isolated frame packet is incomplete or non-finite")
-    return {
-        "cpu_frame_packet_assembled": True,
-        "cpu_frame_packet_count": assembly.packet_count,
-        "cpu_frame_packet_vertex_count": len(packet.xy) // 2,
-        "cpu_frame_packet_uv_pair_count": len(packet.uv) // 2,
-        "cpu_frame_packet_source_order_preserved": packet.source_order == 0,
-        "cpu_frame_packet_finite": True,
-        "native_winding_flag_computed": True,
-        "native_uv_out_of_unit_interval_preserved": any(
-            value < 0.0 or value > 1.0 for value in packet.uv
-        ),
-        "sprite_player_transform_used_identity_for_isolated_test": True,
-        "full_frame_composition_verified": False,
-        "original_runtime_pixel_parity_verified": False,
-    }
-
+            "Isolated frame did not produce exactly one ordered packet"
+        )
+    return report
 
 def audit_private_single_symbol_crop(
     ipa: Path, regions: tuple[tuple[int, int], tuple[int, int]], alias: str,
