@@ -11,7 +11,6 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
-import shutil
 import stat
 import tempfile
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED, BadZipFile
@@ -22,9 +21,12 @@ SOURCE_FILE_MAX = 1024 * 1024 * 1024
 MEMBER_MAX = 256 * 1024 * 1024
 EXTRACTED_TOTAL_MAX = 4 * 1024 * 1024 * 1024
 CHUNK_SIZE = 1024 * 1024
+SHARED = "shared-assets"
+PACK_KEYS = (*SCREENS, SHARED)
 OUTPUT_FILENAMES = {
     SCREENS[0]: "heman-stage216-screen-med.zip",
     SCREENS[1]: "heman-stage216-screen-xlarge.zip",
+    SHARED: "heman-stage216-shared-assets.zip",
 }
 MANIFEST_NAME = "heman-stage216-private-manifest.json"
 
@@ -77,7 +79,7 @@ def _selected_paths(archive: ZipFile) -> dict[str, list[tuple[object, str]]]:
         raise PrivateBackupError("Original IPA has too many ZIP members")
     names = set()
     casefold = set()
-    selected: dict[str, list[tuple[object, str]]] = {screen: [] for screen in SCREENS}
+    selected: dict[str, list[tuple[object, str]]] = {key: [] for key in PACK_KEYS}
     total = 0
     for info in infos:
         name = info.filename
@@ -95,21 +97,26 @@ def _selected_paths(archive: ZipFile) -> dict[str, list[tuple[object, str]]]:
             raise PrivateBackupError("IPA member size exceeds per-member safety limit")
         if info.compress_size < 0:
             raise PrivateBackupError("IPA member has an invalid compressed size")
+        if not name.startswith(PREFIX):
+            continue
+        chosen = SHARED
+        relative = name[len(PREFIX):]
         for screen in SCREENS:
             prefix = PREFIX + screen + "/"
             if name.startswith(prefix):
+                chosen = screen
                 relative = name[len(prefix):]
-                if not _safe_entry_name(relative):
-                    raise PrivateBackupError("Selected source member has an unsafe relative path")
-                selected[screen].append((info, relative))
-                total += info.file_size
-                if total > EXTRACTED_TOTAL_MAX:
-                    raise PrivateBackupError("Uncompressed screen packs exceed safety limit")
                 break
+        if not _safe_entry_name(relative):
+            raise PrivateBackupError("Selected source member has an unsafe relative path")
+        selected[chosen].append((info, relative))
+        total += info.file_size
+        if total > EXTRACTED_TOTAL_MAX:
+            raise PrivateBackupError("Uncompressed application resources exceed safety limit")
     if any(not selected[screen] for screen in SCREENS):
         raise PrivateBackupError("Both original resolution packs must be present and nonempty")
-    for screen in SCREENS:
-        selected[screen].sort(key=lambda item: item[1])
+    for key in PACK_KEYS:
+        selected[key].sort(key=lambda item: item[1])
     return selected
 
 
@@ -181,7 +188,7 @@ def build_private_backup(
             with tempfile.TemporaryDirectory(prefix=".stage216-", dir=out) as temporary:
                 working = Path(temporary)
                 reports = {}
-                for screen in SCREENS:
+                for screen in PACK_KEYS:
                     archive_name = OUTPUT_FILENAMES[screen]
                     zip_path = working / archive_name
                     records = []
@@ -207,7 +214,10 @@ def build_private_backup(
                         "zip_crc_verified": True,
                     },
                     "tool": "heman_tools.private_asset_backup v1 (Python stdlib, ZIP_DEFLATED)",
-                    "screen_packs": reports,
+                    "screen_packs": {screen: reports[screen] for screen in SCREENS},
+                    "shared_resources": reports[SHARED],
+                    "application_file_count": sum(reports[key]["file_count"] for key in PACK_KEYS),
+                    "application_uncompressed_bytes": sum(reports[key]["uncompressed_bytes"] for key in PACK_KEYS),
                     "backed_up_to_drive": False,
                     "drive_readback_verified": False,
                     "original_runtime_pixel_parity_verified": False,
@@ -243,9 +253,13 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
     packs = manifest.get("screen_packs")
     if not isinstance(packs, dict) or set(packs) != set(SCREENS):
         raise PrivateBackupError("Manifest must describe both resolution packs")
+    shared = manifest.get("shared_resources")
+    if not isinstance(shared, dict):
+        raise PrivateBackupError("Manifest must describe application-level shared assets")
+    records = {**packs, SHARED: shared}
     summary = {}
-    for screen in SCREENS:
-        record = packs[screen]
+    for screen in PACK_KEYS:
+        record = records[screen]
         filename = OUTPUT_FILENAMES[screen]
         if record.get("filename") != filename:
             raise PrivateBackupError("Unexpected ZIP name in backup manifest")
@@ -256,8 +270,8 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
                 or _sha256_file(zip_path) != _require_valid_digest(record.get("archive_sha256"))):
             raise PrivateBackupError("Backup ZIP byte size or SHA-256 mismatch")
         files = record.get("files")
-        if not isinstance(files, list) or not files:
-            raise PrivateBackupError("Manifest must have nonempty per-file digests")
+        if not isinstance(files, list) or (not files and screen != SHARED) or len(files) > MAX_MEMBERS:
+            raise PrivateBackupError("Manifest must have a bounded per-file inventory")
         expected = {}
         for entry in files:
             name = entry.get("path")
@@ -280,6 +294,10 @@ def verify_private_backup(manifest_path: Path, directory: Path) -> dict:
         if len(files) != record.get("file_count") or sum(x["bytes"] for x in files) != record.get("uncompressed_bytes"):
             raise PrivateBackupError("Manifest aggregate counts do not match")
         summary[screen] = {"files": len(files), "zip_bytes": zip_path.stat().st_size, "verified": True}
+    if (sum(v["files"] for v in summary.values()) != manifest.get("application_file_count")
+            or sum(records[key]["uncompressed_bytes"] for key in PACK_KEYS)
+                != manifest.get("application_uncompressed_bytes")):
+        raise PrivateBackupError("Application-wide archive coverage counts do not match")
     return summary
 
 
@@ -297,8 +315,8 @@ def main(argv=None) -> int:
         if args.ipa is not None or args.expected_source_bytes is not None:
             parser.error("--verify-only must not be combined with source extraction options")
         checked = verify_private_backup(args.out_dir / MANIFEST_NAME, args.out_dir)
-        print("Stage216 two-pack private archive SHA-256 and contents verified: "
-              + ", ".join(f"{screen}={checked[screen]['files']} files" for screen in SCREENS))
+        print("Stage216 three-pack private archive SHA-256 and contents verified: "
+              + ", ".join(f"{screen}={checked[screen]['files']} files" for screen in PACK_KEYS))
         return 0
     if args.ipa is None or args.expected_source_bytes is None:
         parser.error("backup requires --ipa and --expected-source-bytes")
@@ -312,7 +330,7 @@ def main(argv=None) -> int:
         "Stage216 private archive verified locally: "
         + ", ".join(
             f"{screen}={manifest['screen_packs'][screen]['file_count']} members"
-            for screen in SCREENS
+            for screen in PACK_KEYS
         )
         + "; Google Drive upload and readback still pending."
     )
