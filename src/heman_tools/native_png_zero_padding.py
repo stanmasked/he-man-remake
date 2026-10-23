@@ -38,3 +38,13 @@ def reconstruct_native_zero_padded_texture(
     # In GLES, missing alpha in a three-channel RGB texture samples as 1.0.
     pixel = bytes((0, 0, 0, 0 if native_png_has_alpha else 255))
     complete = bytearray(pixel * (layout.allocated_width * layout.allocated_height))
+    for row in range(height):
+        start = row * width * 4
+        destination = row * layout.allocated_width * 4
+        complete[destination:destination + width * 4] = (
+            transformed_png_rgba[start:start + width * 4]
+        )
+    return prepare_native_cpu_texture(
+        layout, transformed_png_rgba,
+        complete_allocated_rgba=bytes(complete),
+    )
