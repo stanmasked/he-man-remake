@@ -50,7 +50,7 @@ PYTHONPATH=src python -m heman_tools.sprite_cut_png_bounds_census \
   --out local_reports/stage191_cut_png_bounds.json
 ```
 
-Added 12 asset-free synthetic unit tests for exact-edge rectangles, one-pixel and large overflows, malformed dimensions, booleans, cross-pack classification, redacted reports, mismatched keys, valid PNG IHDR, and CRC tampering.
+Added 15 asset-free synthetic tests for exact-edge rectangles, one-pixel and large overflows, malformed dimensions, booleans, cross-pack classification, redacted reports, mismatched keys, valid PNG IHDR and CRC tampering. Three of these construct a complete fabricated two-resolution IPA with repository/WAD/PNG members and exercise the entire audit, missing-image rejection and cross-pack index mismatch rejection.
 
 ## Next evidence gates
 
