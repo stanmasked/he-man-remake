@@ -263,7 +263,10 @@ def _assemble_private_symbol_packet_summary(
 def audit_private_single_symbol_crop(
     ipa: Path, regions: tuple[tuple[int, int], tuple[int, int]], alias: str,
     variant: int, direction: str, frame_index: int, png_output: Path,
+    *, assemble_packet: bool = False,
 ) -> dict:
+    if type(assemble_packet) is not bool:
+        raise PrivateFrameDecodeError("assemble_packet must be boolean")
     if not ipa.is_file():
         raise ValueError("Owner-private original IPA missing")
     if type(variant) is not int or variant not in (0, 1):
@@ -367,7 +370,8 @@ def audit_private_single_symbol_crop(
         texture_record = texture_record_by_key.get(texture_key)
         if texture_record is None:
             raise PrivateFrameDecodeError("SpriteCut texture key is absent from TextureData index")
-        texture_record_key, image_key, _ = parse_texture_data_record(texture_record)
+        texture_record_key, image_key, scalar_block = parse_texture_data_record(texture_record)
+        wrap_codes = decode_texture_wrap_codes(scalar_block)
         if texture_record_key != texture_key:
             raise PrivateFrameDecodeError("TextureData record key mismatch")
 
@@ -407,10 +411,15 @@ def audit_private_single_symbol_crop(
             raise PrivateFrameDecodeError("Resolved PNG member exceeds size limit")
 
     crop_bytes, source_size = crop_png_bytes(png_bytes, rectangle)
+    packet_summary = None
+    if assemble_packet:
+        packet_summary = _assemble_private_symbol_packet_summary(
+            symbol, rectangle, source_size, wrap_codes
+        )
     png_output.parent.mkdir(parents=True, exist_ok=True)
     png_output.write_bytes(crop_bytes)
     crop_width, crop_height = rectangle[2], rectangle[3]
-    return {
+    report = {
         "classification": "private_single_symbol_sprite_crop",
         "source_screen_group": screen,
         "component_variant_index": variant,
@@ -426,11 +435,14 @@ def audit_private_single_symbol_crop(
         "image_member_resolved": True,
         "casefold_path_fallback_used": casefold_fallback,
         "symbol_transform_fields_finite": True,
-        "symbol_transform_semantics_applied": False,
+        "symbol_transform_semantics_applied": bool(assemble_packet),
         "full_frame_composition_verified": False,
         "private_crop_written_locally": True,
         "original_resource_keys_paths_offsets_or_bytes_exported": False,
     }
+    if packet_summary is not None:
+        report.update(packet_summary)
+    return report
 
 
 def _parse_region(value: str) -> tuple[int, int]:
