@@ -33,4 +33,4 @@ No resource names, exact offsets, raw scale/rotation values, source byte offsets
 
 ## Status
 
-Code and synthetic tests are prepared in Draft PR #207. The CI run is the next validation gate. Original IPA, extracted PNGs, screenshots, and detailed local reports remain private and must not be uploaded to GitHub Actions or committed.
+Code and synthetic tests are prepared in Draft PR #207. GitHub Actions [run 39992081909](https://github.com/stanmasked/he-man-remake/actions/runs/39992081909) passed Python 3.10/3.12/3.13 and native GCC/Clang. A fresh private IPA run to generate this summary is still pending. Original IPA, extracted PNGs, screenshots, and detailed local reports remain private and must not be uploaded to GitHub Actions or committed.
