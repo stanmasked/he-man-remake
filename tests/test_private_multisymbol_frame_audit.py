@@ -37,6 +37,14 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
         with self.assertRaises(argparse.ArgumentTypeError):
             _parse_active_mask("0x100000000")
 
+    def test_region_and_mask_parsers_reject_malformed_text(self):
+        for value in ("", "10", "a:b", "10:20:30"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                _parse_region(value)
+        for value in ("", "mask", "0xzz"):
+            with self.subTest(value=value), self.assertRaises(argparse.ArgumentTypeError):
+                _parse_active_mask(value)
+
     def test_png_dimensions_helper_validates_full_png_and_rectangle(self):
         dims = _checked_png_dimensions(png_bytes((16, 8)), (2, 1, 3, 4))
         self.assertEqual(dims, (16, 8))
