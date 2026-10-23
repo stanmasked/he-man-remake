@@ -1,0 +1,181 @@
+"""Asset-free regressions for Stage191 paired PNG/SpriteCut bounds census."""
+from __future__ import annotations
+
+import io
+import json
+import struct
+import tempfile
+import unittest
+from pathlib import Path
+from zipfile import ZipFile
+
+from PIL import Image
+
+from heman_tools.sprite_cut_png_bounds_census import (
+    SpriteCutBoundsError, _png_ihdr_dimensions, audit_private_cut_bounds, classify_rectangle,
+    summarize_paired_cut_bounds,
+)
+
+
+def fixture_png() -> bytes:
+    img = Image.new("RGBA", (17, 19), (8, 20, 55, 255))
+    output = io.BytesIO()
+    img.save(output, format="PNG")
+    return output.getvalue()
+
+
+class SpriteCutPngBoundsTests(unittest.TestCase):
+    def test_cut_exactly_touching_bottom_right_edge_is_inside(self):
+        self.assertEqual(classify_rectangle((3, 4, 7, 6), (10, 10)), ("inside", 0, 0))
+
+    def test_one_pixel_horizontal_overrun_is_not_clipped(self):
+        self.assertEqual(classify_rectangle((3, 4, 8, 6), (10, 10)), ("outside", 1, 0))
+
+    def test_large_vertical_overrun_is_reported_not_repaired(self):
+        self.assertEqual(classify_rectangle((0, 2, 1, 513), (10, 3)), ("outside", 0, 512))
+
+    def test_negative_origin_fails_closed_as_invalid_geometry(self):
+        self.assertEqual(classify_rectangle((-1, 0, 2, 2), (8, 8)), ("invalid", 0, 0))
+
+    def test_zero_width_fails_closed_as_invalid_geometry(self):
+        self.assertEqual(classify_rectangle((0, 0, 0, 2), (8, 8)), ("invalid", 0, 0))
+
+    def test_boolean_rectangle_coordinate_rejected(self):
+        with self.assertRaisesRegex(SpriteCutBoundsError, "four integer fields"):
+            classify_rectangle((False, 0, 1, 1), (10, 10))
+
+    def test_invalid_png_dimensions_rejected(self):
+        with self.assertRaisesRegex(SpriteCutBoundsError, "positive integers"):
+            classify_rectangle((0, 0, 2, 2), (0, 10))
+
+    def test_pair_census_tracks_resolution_specific_exceptions_without_names(self):
+        cases = {
+            ("synthetic-key-A", 0): ((0, 0, 1, 1), (10, 10)),
+            ("synthetic-key-B", 0): ((9, 0, 1, 1), (10, 10)),
+            ("synthetic-key-C", 0): ((0, 9, 1, 2), (10, 10)),
+            ("synthetic-key-D", 0): ((9, 9, 18, 18), (10, 10)),
+            ("synthetic-key-E", 0): ((0, 0, -1, 1), (10, 10)),
+            ("synthetic-key-F", 0): ((0, 0, 1, 1), (10, 10)),
+        }
+        extra = dict(cases)
+        extra[("synthetic-key-B", 0)] = ((9, 0, 2, 1), (10, 10))
+        extra[("synthetic-key-C", 0)] = ((0, 9, 1, 3), (10, 10))
+        result = summarize_paired_cut_bounds(cases, extra)
+        med = result["per_pack"]["screen-med"]
+        large = result["per_pack"]["screen-xlarge"]
+        self.assertEqual((med["inside_png"], med["outside_png"],
+                          med["invalid_rectangle"]), (3, 2, 1))
+        self.assertEqual((large["inside_png"], large["outside_png"],
+                          large["invalid_rectangle"]), (2, 3, 1))
+        self.assertEqual(result["paired_category_counts"]["inside_med__outside_xlarge"], 1)
+        self.assertEqual(result["paired_category_counts"]["outside_med__outside_xlarge"], 2)
+        self.assertEqual(med["overrun_magnitude"]["one_pixel"], 1)
+        self.assertEqual(med["overrun_magnitude"]["above_sixteen"], 1)
+        self.assertFalse(result["padding_or_atlas_repair_inferred"])
+        self.assertFalse(result["outside_or_invalid_cuts_may_be_cropped_or_rendered"])
+        serialized = json.dumps(result)
+        self.assertNotIn("synthetic-key-A", serialized)
+        self.assertNotIn("synthetic-key-E", serialized)
+
+    def test_paired_cut_keys_must_match(self):
+        a = {("fake", 0): ((0, 0, 1, 1), (3, 3))}
+        b = {("other", 0): ((0, 0, 1, 1), (3, 3))}
+        with self.assertRaisesRegex(SpriteCutBoundsError, "inventories differ"):
+            summarize_paired_cut_bounds(a, b)
+
+    def test_valid_png_header_is_recognized_without_full_image_decode(self):
+        buf = io.BytesIO()
+        with ZipFile(buf, "w") as z:
+            z.writestr("synthetic.png", fixture_png())
+        buf.seek(0)
+        with ZipFile(buf, "r") as z:
+            self.assertEqual(
+                _png_ihdr_dimensions(z, z.getinfo("synthetic.png")), (17, 19)
+            )
+
+    def test_tampered_ihdr_fails_crc_gate(self):
+        image = bytearray(fixture_png())
+        struct.pack_into(">I", image, 16, 18)
+        buf = io.BytesIO()
+        with ZipFile(buf, "w") as z:
+            z.writestr("synthetic.png", image)
+        buf.seek(0)
+        with ZipFile(buf, "r") as z:
+            with self.assertRaisesRegex(SpriteCutBoundsError, "checksum"):
+                _png_ihdr_dimensions(z, z.getinfo("synthetic.png"))
+
+
+
+def _field(value):
+    return struct.pack("<H", len(value)) + value.encode("utf-16le")
+
+
+def _repo_index(label, key, target):
+    return (
+        _field(label) + struct.pack("<HI", 0, 1)
+        + _field(key) + struct.pack("<I", 0)
+        + _field(target) + struct.pack("<I", 0)
+    )
+
+
+def _synthetic_ipa(path, *, xlarge_overrun=False, omit_large_png=False,
+                   incompatible_indexes=False):
+    from zipfile import ZIP_DEFLATED
+    image_index = (
+        _field("ImageData") + struct.pack("<HI", 0, 1)
+        + _field("fakeImage") + struct.pack("<I", 1)
+        + _field("/textures/fake.png") + struct.pack("<I", 0)
+    )
+    texture_payload = (
+        _field("fakeTexture") + bytes([1]) + bytes(12)
+        + _field("") + _field("fakeImage")
+    )
+    with ZipFile(path, "w", ZIP_DEFLATED) as archive:
+        for screen in ("screen-med", "screen-xlarge"):
+            root = "Payload/MOTU.app/" + screen + "/"
+            cut_key = ("mismatchedCut" if screen == "screen-xlarge"
+                       and incompatible_indexes else "fakeCut")
+            cut_rect = ((0, 18, 0, 8, 9) if screen == "screen-xlarge"
+                        and xlarge_overrun else (0, 0, 0, 8, 9))
+            cut_record = (_field(cut_key) + _field("fakeTexture")
+                          + struct.pack("<I", 1) + struct.pack("<5i", *cut_rect))
+            archive.writestr(root + "meta/SpriteCutData.repo",
+                             _repo_index("SpriteCutData", cut_key, "sprite/SpriteResData.wad"))
+            archive.writestr(root + "sprite/SpriteResData.wad", cut_record)
+            archive.writestr(root + "meta/TextureData.repo",
+                             _repo_index("TextureData", "fakeTexture", "textureData/TextureData.wad"))
+            archive.writestr(root + "textureData/TextureData.wad", texture_payload)
+            archive.writestr(root + "meta/ImageData.repo", image_index)
+            if screen != "screen-xlarge" or not omit_large_png:
+                archive.writestr(root + "textures/fake.png", fixture_png())
+
+
+class PrivateIpaBoundsIntegrationTests(unittest.TestCase):
+    def test_synthetic_ipa_end_to_end_census(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "synthetic.ipa"
+            _synthetic_ipa(path, xlarge_overrun=True)
+            result = audit_private_cut_bounds(path)
+        self.assertEqual(result["indexed_cut_count_per_pack"], 1)
+        self.assertEqual(result["paired_category_counts"]["inside_med__outside_xlarge"], 1)
+        self.assertEqual(result["per_pack"]["screen-med"]["inside_png"], 1)
+        self.assertEqual(result["per_pack"]["screen-xlarge"]["outside_png"], 1)
+        self.assertNotIn("fakeCut", json.dumps(result))
+
+    def test_missing_synthetic_png_is_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "synthetic.ipa"
+            _synthetic_ipa(path, omit_large_png=True)
+            with self.assertRaisesRegex(SpriteCutBoundsError, "Unresolved image member"):
+                audit_private_cut_bounds(path)
+
+    def test_inconsistent_synthetic_indexes_are_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "synthetic.ipa"
+            _synthetic_ipa(path, incompatible_indexes=True)
+            with self.assertRaisesRegex(SpriteCutBoundsError, "indexes differ"):
+                audit_private_cut_bounds(path)
+
+
+if __name__ == "__main__":
+    unittest.main()
