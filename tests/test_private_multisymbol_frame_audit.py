@@ -42,13 +42,17 @@ def _indexed_repo(label, rows, target):
     return bytes(out)
 
 
-def _sequence_record(key, symbols):
+def _sequence_record(key, symbols, scale_xs=None):
+    if scale_xs is None:
+        scale_xs = (1.0,) * len(symbols)
+    if len(scale_xs) != len(symbols):
+        raise ValueError("scale_xs must parallel the source Symbols")
     out = bytearray(_string(key) + struct.pack("<iii", 0, 1, 0))
     out += struct.pack("<4i", 0, 100, 0, 0) + b"\x00" + struct.pack("<i", len(symbols))
-    for name, offset_x, mask in symbols:
+    for (name, offset_x, mask), scale_x in zip(symbols, scale_xs):
         out += struct.pack("<ii", 0, 0) + _string(name)
         out += struct.pack("<4i", 0, 0, offset_x, 12)
-        out += struct.pack("<6f", 1, 1, 1, 1, 1, 1)
+        out += struct.pack("<6f", 1, 1, 1, 1, scale_x, 1)
         out += struct.pack("<7i", 0, 0, 0, 0, -1, -1, mask)
     return bytes(out)
 
@@ -66,10 +70,11 @@ def _image_repo():
 
 def _synthetic_multisymbol_ipa(path, *, symbols=(("SyntheticCutA", 10, 0),
                                                   ("SyntheticCutB", 30, 0)),
-                               rectangles=((0, 0, 8, 8), (8, 0, 8, 8))):
+                               rectangles=((0, 0, 8, 8), (8, 0, 8, 8)),
+                               scale_xs=None):
     east_key, west_key = "syntheticIdle.e", "syntheticIdle.w"
-    east_record = _sequence_record(east_key, symbols)
-    west_record = _sequence_record(west_key, symbols)
+    east_record = _sequence_record(east_key, symbols, scale_xs)
+    west_record = _sequence_record(west_key, symbols, scale_xs)
     sequence_wad = east_record + west_record
     sequence_repo = _indexed_repo(
         "SpriteSeqData",
@@ -194,6 +199,20 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
                 self.assertNotIn("SyntheticCut", json.dumps(saved))
             finally:
                 report_path.unlink(missing_ok=True)
+
+    def test_negative_horizontal_scale_is_accepted_as_finite_mirrored_geometry(self):
+        with TemporaryDirectory() as directory:
+            ipa = Path(directory) / "mirrored.ipa"
+            regions = _synthetic_multisymbol_ipa(ipa, scale_xs=(1.0, -1.0))
+            report = audit_private_multisymbol_frame(
+                ipa, regions, "syntheticIdle", 0, "west", 0, active_mask=0
+            )
+            self.assertEqual(report["source_symbol_count"], 2)
+            self.assertEqual(report["cpu_frame_packet_count"], 2)
+            self.assertEqual(report["cpu_frame_packet_vertex_count"], 8)
+            self.assertTrue(report["cpu_frame_packet_finite"])
+            self.assertTrue(report["native_winding_flag_computed"])
+            self.assertTrue(report["cpu_frame_packet_source_order_preserved"])
 
     def test_multisymbol_cli_applies_explicit_mask_without_renumbering(self):
         with TemporaryDirectory() as directory:
