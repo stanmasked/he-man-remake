@@ -307,10 +307,12 @@ def audit_private_multisymbol_frame(
         scalar_blocks = []
         texture_keys = []
         texture_rgba = []
+        texture_native_alpha = []
         resolved_links = []
         dimensions_by_member = {}
         png_bytes_by_member = {}
         rgba_by_member = {}
+        native_alpha_by_member = {}
         resolved_symbol_count = 0
         for symbol in symbols:
             cut_record = cut_by_key.get(symbol["name"])
