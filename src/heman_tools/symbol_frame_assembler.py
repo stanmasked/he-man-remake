@@ -33,6 +33,7 @@ class NativeFramePacket:
     uv: tuple[float, ...]
     rgba: tuple[float, float, float, float]
     blend_override: tuple[int, int] | None
+    texture_slot: int | None = None
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,10 @@ def assemble_symbol_frame(
             _validate_command(command)
         except (ValueError, TypeError, OverflowError) as exc:
             raise SymbolFrameAssemblyError("draw command failed validation") from exc
+        if (command.texture_slot is not None
+                and (type(command.texture_slot) is not int
+                     or not 0 <= command.texture_slot <= _S32_MAX)):
+            raise SymbolFrameAssemblyError("texture_slot must be a non-negative signed 32-bit integer or None")
         expected_draw_enabled = (command.symbol_mask & active_mask) == 0
         if command.draw_enabled != expected_draw_enabled:
             raise SymbolFrameAssemblyError(
@@ -117,6 +122,7 @@ def assemble_symbol_frame(
             packets.append(NativeFramePacket(
                 source_order=command.source_order,
                 cut_handle=command.cut_handle,
+                texture_slot=command.texture_slot,
                 front_face_flip=geometry.front_face_flip,
                 xy=geometry.flat_xy,
                 uv=tuple(value for pair in uv_pairs for value in pair),

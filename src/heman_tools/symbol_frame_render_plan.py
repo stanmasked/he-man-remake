@@ -109,12 +109,16 @@ class SymbolLayerInput:
     cut_rectangle: tuple[int, int, int, int]
     png_dimensions: tuple[int, int]
     wrap_codes: tuple[int, int]
+    texture_slot: int | None = None
 
     def __post_init__(self) -> None:
         if type(self.source_order) is not int or self.source_order < 0:
             raise SymbolRenderPlanError("source_order must be a non-negative integer")
         if not isinstance(self.contract, SymbolRenderContract):
             raise SymbolRenderPlanError("contract must be a SymbolRenderContract")
+        if (self.texture_slot is not None
+                and (type(self.texture_slot) is not int or not 0 <= self.texture_slot <= _S32_MAX)):
+            raise SymbolRenderPlanError("texture_slot must be a non-negative signed 32-bit integer or None")
 
 
 @dataclass(frozen=True)
@@ -134,6 +138,7 @@ class SymbolDrawCommand:
     scale_y: float
     tween_selectors: SymbolTweenSelectors
     symbol_mask: int
+    texture_slot: int | None = None
 
 
 @dataclass(frozen=True)
@@ -197,6 +202,7 @@ def build_symbol_frame_render_plan(
         commands.append(SymbolDrawCommand(
             source_order=layer.source_order,
             cut_handle=layer.contract.cut_handle,
+            texture_slot=layer.texture_slot,
             uv=uv,
             vertex_rgba=color,
             draw_enabled=draw_enabled,
