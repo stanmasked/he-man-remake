@@ -305,7 +305,7 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertTrue(report["paired_sampling_metadata_match"])
             self.assertEqual(report["texture_record_count_per_pack"], 1)
             self.assertEqual(report["per_pack"]["screen-med"]["filter_mode_counts"],
-                             {"nearest": 1, "linear": 0})
+                             {"nearest": 1, "linear": 0, "linear_mipmap_nearest": 0})
             self.assertFalse(report["original_runtime_pixel_parity_verified"])
 
     def test_census_accepts_matching_linear_selector_without_claiming_all_nearest(self):
@@ -316,7 +316,7 @@ class PrivateMultiSymbolFrameAuditTests(unittest.TestCase):
             self.assertTrue(report["paired_sampling_metadata_match"])
             self.assertFalse(report["all_source_textures_use_nearest_filtering_without_mipmaps"])
             self.assertEqual(report["per_pack"]["screen-med"]["filter_mode_counts"],
-                             {"nearest": 0, "linear": 1})
+                             {"nearest": 0, "linear": 1, "linear_mipmap_nearest": 0})
 
     def test_paired_resolution_audit_rejects_filter_mode_mismatch(self):
         with TemporaryDirectory() as directory:
