@@ -24,3 +24,17 @@ def reconstruct_native_zero_padded_texture(
     )
     if verified != layout:
         raise NativeTextureUploadError("Allocated dimensions disagree")
+    width, height = layout.png_width, layout.png_height
+    if type(transformed_png_rgba) is not bytes or len(transformed_png_rgba) != width * height * 4:
+        raise NativeTextureUploadError("Source PNG RGBA byte count is invalid")
+    if not native_png_has_alpha and any(
+        transformed_png_rgba[i] != 255 for i in range(3, len(transformed_png_rgba), 4)
+    ):
+        raise NativeTextureUploadError("Native RGB PNG must decode as opaque RGBA")
+    if not layout.needs_native_padding:
+        return prepare_native_cpu_texture(layout, transformed_png_rgba)
+
+    # The verified ARMv7 reader memset(0) writes each missing native byte.
+    # In GLES, missing alpha in a three-channel RGB texture samples as 1.0.
+    pixel = bytes((0, 0, 0, 0 if native_png_has_alpha else 255))
+    complete = bytearray(pixel * (layout.allocated_width * layout.allocated_height))
