@@ -106,6 +106,16 @@ static void test_negative_scale_mirrors_and_updates_winding(void) {
     assert(mirrored.xy[0] == 2.0f && mirrored.xy[1] == -1.0f);
 }
 
+static void test_player_negative_scale_does_not_recompute_native_winding_flag(void) {
+    hm_symbol_draw_command c = make_command();
+    hm_symbol_player_transform t = identity_player();
+    hm_symbol_quad_geometry g;
+    t.scale_x = -1.0f;
+    assert(hm_symbol_mesh_build_quad(&c, 4, 2, &t, &g) == HM_SYMBOL_MESH_OK);
+    assert(g.front_face_flip == 1);
+    assert(g.xy[0] == 2.0f && g.xy[1] == -1.0f);
+}
+
 static void test_signed_dimensions_and_zero_extent_are_preserved(void) {
     hm_symbol_draw_command c = make_command();
     hm_symbol_quad_geometry zero, negative;
@@ -156,6 +166,7 @@ int main(void) {
     test_local_rotation_then_offset();
     test_player_transform_order_and_pivots();
     test_negative_scale_mirrors_and_updates_winding();
+    test_player_negative_scale_does_not_recompute_native_winding_flag();
     test_signed_dimensions_and_zero_extent_are_preserved();
     test_invalid_inputs_leave_output_unchanged();
     test_geometry_overflow_fails_closed();
