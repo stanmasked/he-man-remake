@@ -1,0 +1,162 @@
+name: He-Man Stage225 synthetic PNG padding in patched NeXium
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/nexium-png-padding-guest.yml'
+      - 'tools/verify_nexium_png_padding_guest.py'
+      - 'tools/verify_nexium_texture_quad_pngs.py'
+      - 'switch_raster/**'
+      - 'native/src/heman_native_png_upload.c'
+      - 'native/include/heman_native_png_upload.h'
+      - 'tools/instrument_nexium_frames.py'
+      - 'patches/nexium-nro-segment-file-origin.patch'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-guest:
+    name: Compile asset-free padded RGB Switch guest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original commercial materials
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo "Private source material is forbidden in GitHub Actions" >&2
+            exit 1
+          fi
+      - name: Build synthetic allocated-PNG software guest
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_raster clean all TEXTURE_PROBE=1 PNG_PADDING_PROBE=1
+          test -s switch_raster/heman_png_padding_probe.nro
+          test "$(dd if=switch_raster/heman_png_padding_probe.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_raster/heman_png_padding_probe.nro
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage225-padded-rgb-nro
+          path: switch_raster/heman_png_padding_probe.nro
+          if-no-files-found: error
+          retention-days: 7
+
+  nexium-guest:
+    name: Capture actual emulator RGB padding framebuffer
+    needs: build-guest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 65
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+      RUST_BACKTRACE: "1"
+      NEXIUM_CPU_BACKEND: rustarmic
+      NEXIUM_DEBUG_RUNNER_SECONDS: "40"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: heman-stage225-padded-rgb-nro
+          path: nros
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install pinned NeXium runner dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake ninja-build pkg-config \
+            libgtk-3-dev libasound2-dev libpulse-dev libudev-dev libdbus-1-dev \
+            libibus-1.0-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxfixes-dev libxss-dev libxtst-dev libxinerama-dev \
+            libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            wayland-protocols libdecor-0-dev libdrm-dev libgbm-dev \
+            libboost-dev libvulkan1 mesa-vulkan-drivers python3-pil
+      - name: Checkout instrumented pinned NeXium in temporary directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/nexium-upstream
+          git -C /tmp/nexium-upstream init -q
+          git -C /tmp/nexium-upstream remote add origin https://github.com/nexium-emu/nexium.git
+          git -C /tmp/nexium-upstream fetch --depth 1 origin b6149f647f1b0824e450555beb6cfc16b6f0e075
+          git -C /tmp/nexium-upstream checkout -q --detach FETCH_HEAD
+          git -C /tmp/nexium-upstream submodule update --init --depth 1
+          git -C /tmp/nexium-upstream apply --check "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          git -C /tmp/nexium-upstream apply "$GITHUB_WORKSPACE/patches/nexium-nro-segment-file-origin.patch"
+          python3 "$GITHUB_WORKSPACE/tools/instrument_nexium_frames.py" /tmp/nexium-upstream/nexium-gui/src/debug_boot.rs
+          mkdir -p "$GITHUB_WORKSPACE/boot-evidence"
+      - name: Compile patched genuine guest runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/nexium-upstream
+          cargo build -p nexium-gui --bin debug_boot --no-default-features --features backend-rustarmic
+          cp target/debug/debug_boot "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+          test -x "$GITHUB_WORKSPACE/boot-evidence/debug_boot"
+      - name: Execute guest, verify source-free frame pixels and CPU progress
+        shell: bash
+        run: |
+          set -euo pipefail
+          export NEXIUM_DATA_ROOT="$PWD/boot-evidence/nexium-data"
+          export NEXIUM_DEBUG_BOOT_LOG="$PWD/boot-evidence/padded-rgb-runner.log"
+          export HEMAN_FRAME_CAPTURE_DIR="$PWD/boot-evidence"
+          export RUST_LOG="info,wgpu_core=warn"
+          NRO="$PWD/nros/heman_png_padding_probe.nro"
+          sha256sum "$NRO" | tee boot-evidence/guest-nro-sha256.txt
+          set +e
+          timeout --kill-after=6s 95s boot-evidence/debug_boot "$NRO" rustarmic runner \
+            >boot-evidence/guest-stdout.log 2>&1
+          code=$?
+          set -e
+          echo "$code" > boot-evidence/guest-exit-status.txt
+          if [ "$code" -ne 0 ]; then
+            tail -n 120 boot-evidence/padded-rgb-runner.log || true
+            exit 1
+          fi
+          python3 tools/verify_nexium_png_padding_guest.py boot-evidence | tee boot-evidence/padded-rgb-report.json
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          log = Path("boot-evidence/padded-rgb-runner.log").read_text()
+          if "Production runner complete" not in log:
+              raise SystemExit("Guest runner not complete")
+          rows = re.findall(r"cycles=(\d+) svcs=(\d+) frames=(\d+)", log)
+          if not rows:
+              raise SystemExit("No actual guest CPU/SVC reports")
+          if max(int(x[0]) for x in rows) <= 0 or max(int(x[1]) for x in rows) <= 0:
+              raise SystemExit("No guest instruction/SVC progress")
+          frames = re.search(r"Production runner complete: frames=(\d+)", log)
+          if not frames or int(frames.group(1)) < 300:
+              raise SystemExit("Guest did not reach frame 300")
+          print("PASS: genuine NeXium captured verified padded-PNG software frames")
+          PY
+          sha256sum boot-evidence/raster-frame-*.png | tee boot-evidence/guest-frames-sha256.txt
+      - name: Preserve runtime evidence including failed attempts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage225-nexium-padded-png-evidence
+          path: |
+            boot-evidence/*.log
+            boot-evidence/*.txt
+            boot-evidence/*.json
+            boot-evidence/*.png
+          if-no-files-found: warn
+          retention-days: 7
