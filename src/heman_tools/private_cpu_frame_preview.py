@@ -154,6 +154,29 @@ def render_private_cpu_frame_preview(
             frame_blend=FrameBlendState(),
             clear_rgba=(0, 0, 0, 0),
         )
+        render_canvas_width, render_canvas_height = rendered.width, rendered.height
+        # Trim only fully transparent presentation padding. Pixel samples and
+        # their RGBA values remain unchanged; no scale or camera is inferred.
+        from PIL import Image
+        rendered_image = Image.frombytes(
+            "RGBA", (rendered.width, rendered.height), rendered.rgba
+        )
+        alpha_bounds = rendered_image.getchannel("A").getbbox()
+        if alpha_bounds is None:
+            raise PrivateCPUFramePreviewError("Rendered frame contains no visible pixels")
+        left = max(0, alpha_bounds[0] - margin)
+        top = max(0, alpha_bounds[1] - margin)
+        right = min(rendered.width, alpha_bounds[2] + margin)
+        bottom = min(rendered.height, alpha_bounds[3] + margin)
+        cropped_image = rendered_image.crop((left, top, right, bottom))
+        rendered = SoftwareFrameResult(
+            cropped_image.width,
+            cropped_image.height,
+            cropped_image.tobytes(),
+            rendered.packets_considered,
+            rendered.packets_with_coverage,
+            rendered.pixel_samples,
+        )
     except PrivateCPUFramePreviewError:
         raise
     except (KeyError, IndexError, TypeError, ValueError, OverflowError) as exc:
@@ -192,7 +215,12 @@ def render_private_cpu_frame_preview(
         "all_source_pngs_validated": source_report["all_source_pngs_validated"],
         "active_mask_source": "CLI-supplied; runtime active mask not recovered",
         "player_transform": "identity assumption",
-        "projection": "translate native XY bounds to a transparent content canvas; no scale or camera inferred",
+        "projection": "translate native XY bounds to a transparent canvas and trim only fully transparent padding; no scale or camera inferred",
+        "render_canvas_width": render_canvas_width,
+        "render_canvas_height": render_canvas_height,
+        "output_crop_applied": (
+            rendered.width != render_canvas_width or rendered.height != render_canvas_height
+        ),
         "output_width": rendered.width,
         "output_height": rendered.height,
         "gpu_submission_verified": False,
