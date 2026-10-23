@@ -12,7 +12,7 @@ import struct
 from typing import Sequence
 
 from .sprite_cut_runtime_texture_bounds import allocated_texture_dimensions
-from .sprite_cut_wrap_bounds_audit import SpriteCutWrapAuditError, texture_wrap_mode
+from .sprite_cut_wrap_bounds_audit import texture_wrap_mode
 
 _S32_MIN = -(1 << 31)
 _S32_MAX = (1 << 31) - 1
