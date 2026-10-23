@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import stat
 from pathlib import Path
+from contextlib import redirect_stdout
 from tempfile import TemporaryDirectory
 import unittest
 import warnings
@@ -17,6 +19,7 @@ from heman_tools.private_asset_backup import (
     SHARED,
     PrivateBackupError,
     build_private_backup,
+    main,
     verify_private_backup,
 )
 
@@ -110,6 +113,52 @@ class PrivateAssetBackupTests(unittest.TestCase):
             again["shared_resources"]["archive_sha256"],
             manifest["shared_resources"]["archive_sha256"],
         )
+
+    def test_create_cli_reports_all_three_archive_groups(self):
+        """Exercise the real command-line entry point, not only backup helper."""
+        make_synthetic_ipa(self.ipa)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main([
+                "--ipa", str(self.ipa),
+                "--out-dir", str(self.output),
+                "--expected-source-bytes", str(self.ipa.stat().st_size),
+            ])
+        self.assertEqual(result, 0)
+        rendered = output.getvalue()
+        self.assertIn("screen-med=2 members", rendered)
+        self.assertIn("screen-xlarge=2 members", rendered)
+        self.assertIn("shared-assets=1 members", rendered)
+        self.assertIn("Drive upload and readback still pending", rendered)
+        manifest_hash = hashlib.sha256(
+            (self.output / MANIFEST_NAME).read_bytes()
+        ).hexdigest()
+        output = io.StringIO()
+        with redirect_stdout(output):
+            result = main([
+                "--verify-only",
+                "--out-dir", str(self.output),
+                "--expected-manifest-sha256", manifest_hash,
+            ])
+        self.assertEqual(result, 0)
+        verified = output.getvalue()
+        self.assertIn("shared-assets=1 files", verified)
+        self.assertNotIn("provenance remains unverified", verified)
+
+    def test_empty_shared_group_does_not_break_cli(self):
+        with ZipFile(self.ipa, "w", compression=ZIP_DEFLATED) as source:
+            for screen in SCREENS:
+                source.writestr(
+                    PREFIX + screen + "/sprites/synthetic.wad", b"only-test-data"
+                )
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([
+                "--ipa", str(self.ipa),
+                "--out-dir", str(self.output),
+                "--expected-source-bytes", str(self.ipa.stat().st_size),
+            ]), 0)
+        self.assertIn("shared-assets=0 members", output.getvalue())
 
     def test_wrong_byte_size_blocks_backup_before_output(self):
         make_synthetic_ipa(self.ipa)
