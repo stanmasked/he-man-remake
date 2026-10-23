@@ -36,6 +36,19 @@ Run separately for the paired resolution pack and the opposite direction. The PN
 - The output projection translates the selected frame's native XY bounds into a transparent canvas, then trims only fully transparent padding without resampling any pixels. It does not infer a camera, viewport placement, scene transform, animation interpolation, or player-wide transform.
 - Rendering uses the existing bounded Python reference sampler and blend model. Mipmap mode, alternate payloads, unknown wrap modes, invalid PNGs and out-of-bounds SpriteCut rectangles fail closed.
 
+## Private local validation — 2026-10-23
+
+The owner-held IPA was processed locally for the selected eight-Symbol frame in both directions and both resolution packs:
+
+- All 8 Symbols resolved to 8 drawable CPU packets with pixel coverage.
+- The paired-resolution geometry/UV parity audit passed independently for east and west.
+- The selected frame uses five unique textures: four nearest-filtered and one linear-filtered; no selected texture requests mipmaps, and the alpha transform is disabled for all five.
+- Native-bound render canvases were 756×756 for `screen-med` and 1512×1512 for `screen-xlarge`. Trimming only fully transparent padding produced preview images of 199×182 and 398×363 respectively; the rendered RGBA pixels were not resampled.
+- The full TextureData census matched across both packs: 1,645 records each, 1,353 nearest and 292 linear, zero mipmap selectors, alpha transform disabled for all records, PNG payload path for all records, and no unrecognized S/T wrap selectors.
+- Local Python suite: 2,122 tests passed. Targeted Stage201 assembler and Stage208 textured-quad C99 tests passed under both GCC and Clang. GitHub Actions run 39988119030 also passed Python 3.10/3.12/3.13 and native GCC/Clang before temporary source-handoff cleanup; the post-cleanup run remains the final CI gate.
+
+No original IPA, extracted texture, preview PNG, private selector or detailed local report was committed or uploaded to GitHub.
+
 ## Evidence boundary
 
 The synthetic integration tests validate the decode-to-CPU-render path and ensure unsupported mipmap mode is rejected. A private run against the original IPA is a separate gate. A successful CPU preview proves only that the selected source records and PNG textures can be assembled and rendered by this deterministic reference.
