@@ -463,6 +463,10 @@ def main(argv=None) -> int:
     parser.add_argument("--variant", required=True, type=int, choices=(0, 1))
     parser.add_argument("--direction", required=True, choices=("east", "west"))
     parser.add_argument("--frame", type=int, default=0)
+    parser.add_argument(
+        "--assemble-packet", action="store_true",
+        help="also assemble one bounded CPU packet; report aggregate evidence only",
+    )
     parser.add_argument("--png-out", required=True, type=Path)
     parser.add_argument("--report-out", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -471,7 +475,7 @@ def main(argv=None) -> int:
     destination = private_output_path(args.report_out)
     report = audit_private_single_symbol_crop(
         args.ipa, tuple(args.region), args.alias, args.variant, args.direction,
-        args.frame, args.png_out,
+        args.frame, args.png_out, assemble_packet=args.assemble_packet,
     )
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
