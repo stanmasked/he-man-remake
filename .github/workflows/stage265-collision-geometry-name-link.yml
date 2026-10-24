@@ -1,0 +1,67 @@
+name: He-Man Stage265 geometry name linkage
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/collision_geometry_name_link.py'
+      - 'tests/test_collision_geometry_name_link.py'
+      - 'docs/stage265-collision-geometry-name-link.md'
+      - '.github/workflows/stage265-collision-geometry-name-link.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-collision-resource-name-join:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install existing synthetic image parser dependency
+        run: python -m pip install --disable-pip-version-check pillow
+      - name: Block original commercial files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Synthetic Stage265 cross-resource regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_collision_geometry_name_link.py' -v
+      - name: Generate synthetic-only summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          summary = {
+              "schema": "heman-stage265-collision-geometry-name-ci-v1",
+              "result": "synthetic_geometry_name_join_tests_passed_not_original_evidence",
+              "fictional_tilemaps_tilesets_and_geometry_members_only": True,
+              "original_ipa_loaded": False,
+              "original_resource_names_or_geometry_bytes_exported": False,
+              "original_geometry_runtime_loading_verified": False,
+              "original_collision_response_verified": False,
+              "original_ios_gameplay_trace_compared": False,
+              "native_switch_collision_import_authorized": False
+          }
+          Path("build/stage265_synthetic_summary.json").write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage265-synthetic-geometry-name-census
+          path: build/stage265_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
