@@ -1,0 +1,86 @@
+name: He-Man Stage252 runtime prerequisite preflight
+on:
+  pull_request:
+    paths:
+      - 'tools/stage252_runtime_preflight.py'
+      - 'tests/test_stage252_runtime_preflight.py'
+      - 'docs/stage252-runtime-preflight.md'
+      - '.github/workflows/stage252-runtime-preflight.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Read-only synthetic runtime preflight
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run Stage252 unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage252_runtime_preflight.py' -v
+      - name: Create and audit synthetic paths only
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          mkdir -p "$work/sd" "$work/private" build
+          chmod 700 "$work/private"
+          printf '#!/bin/sh\nexit 99\n' > "$work/synthetic-emulator"
+          chmod 700 "$work/synthetic-emulator"
+          python - "$work/probe.nro" <<'PY'
+          import pathlib, sys
+          pathlib.Path(sys.argv[1]).write_bytes(bytes(16) + b"NRO0" + b"synthetic-fixture")
+          PY
+          set +e
+          python tools/stage252_runtime_preflight.py \
+            --emulator "$work/synthetic-emulator" \
+            --nro "$work/probe.nro" \
+            --sd-root "$work/sd" \
+            --session-dir "$work/private/session" \
+            --output "$PWD/build/stage252_runtime_preflight.json" \
+            --allow-public-output-for-synthetic-ci \
+            -- --no-gui '{nro}'
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("build/stage252_runtime_preflight.json").read_text())
+          assert report["schema"] == "heman-stage252-runtime-preflight-v1"
+          assert report["result"] == "preflight_blocked"
+          assert all(value for key, value in report["checks"].items()
+                     if key != "sd_root_mapping_operator_confirmed")
+          assert report["checks"]["sd_root_mapping_operator_confirmed"] is False
+          assert report["emulator_was_launched"] is False
+          assert report["sd_root_mapping_independently_verified"] is False
+          assert report["runtime_gpu_execution_attested"] is False
+          assert report["gpu_capability_independently_verified"] is False
+          assert report["original_ios_graphics_parity_attested"] is False
+          print("STAGE252_SYNTHETIC_PREFLIGHT_REPORT_VALID_BLOCKED_NO_OPERATOR_ATTESTATION")
+          PY
+      - name: Preserve synthetic preflight report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage252-runtime-preflight
+          path: build/stage252_runtime_preflight.json
+          if-no-files-found: error
+          retention-days: 7
