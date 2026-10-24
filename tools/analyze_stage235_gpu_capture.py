@@ -16,6 +16,7 @@ import re
 import sys
 
 from stage231_capture_session import payload
+from stage234_phase_contract import describe_phase
 
 WIDTH, HEIGHT, CHANNELS = 16, 8, 4
 BYTE_COUNT = WIDTH * HEIGHT * CHANNELS
@@ -149,10 +150,13 @@ def analyze(upload: bytes | None, render: bytes | None,
         if len(phase_bytes) > 256:
             raise DiagnosticError("phase file exceeds 256 bytes")
         m = PHASE_RE.fullmatch(phase_bytes)
+        phase_name = m[2].decode("ascii") if m else ""
+        progress = describe_phase(phase_name)
         report["phase"] = {
+            **progress,
             "sha256": sha(phase_bytes),
             "syntax_valid": bool(m),
-            "phase": m[2].decode("ascii") if m else None,
+            "phase": phase_name if m else None,
             "nonce": m[1].decode("ascii") if m else None,
             "interpretation": "untrusted CPU checkpoint; not GPU attestation",
         }
