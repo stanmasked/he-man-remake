@@ -156,15 +156,26 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
     if collected_path.is_file():
         try:
             candidate = read_json(collected_path, "Stage231 collected report")
+            result_matches = candidate.get("result") == "submitted_capture_matches_challenge_and_pixels"
+            collected_render_matches = bool(
+                raw["render"] is not None
+                and files["render"].get("size_valid")
+                and candidate.get("rgba_sha256") == sha(raw["render"])
+            )
+            collected_ok = (
+                candidate.get("schema") == "stage231-collected-synthetic-gpu-evidence-v1"
+                and candidate.get("nonce") == nonce
+                and candidate.get("nro_sha256") == current_nro_sha
+                and result_matches
+                and collected_render_matches
+                and candidate.get("runtime_provenance_attested") is False
+            )
             collected = {
-                "status": "valid" if (
-                    candidate.get("schema") == "stage231-collected-synthetic-gpu-evidence-v1"
-                    and candidate.get("nonce") == nonce
-                    and candidate.get("nro_sha256") == current_nro_sha
-                    and candidate.get("runtime_provenance_attested") is False
-                ) else "mismatch",
+                "status": "valid" if collected_ok else "mismatch",
                 "nonce_matches_session": candidate.get("nonce") == nonce,
                 "nro_matches": candidate.get("nro_sha256") == current_nro_sha,
+                "result_matches": result_matches,
+                "render_hash_matches": collected_render_matches,
                 "runtime_provenance_attested": candidate.get("runtime_provenance_attested"),
             }
         except BundleError as exc:
@@ -175,7 +186,10 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
     upload = raw["upload"] if files["upload"].get("size_valid") else None
     render = raw["render"] if files["render"].get("size_valid") else None
     if upload is not None or render is not None:
-        diagnostics = analyze(upload, render, raw["phase"])
+        phase_for_diagnostics = raw["phase"]
+        if phase_for_diagnostics is not None and len(phase_for_diagnostics) > 256:
+            phase_for_diagnostics = None
+        diagnostics = analyze(upload, render, phase_for_diagnostics)
     else:
         diagnostics = None
 
@@ -244,8 +258,12 @@ def main() -> int:
         print(f"STAGE236_FAIL: {exc}", file=sys.stderr)
         return 1
     text = json.dumps(report, sort_keys=True, indent=2) + "\n"
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(text, encoding="utf-8")
+    try:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(text, encoding="utf-8")
+    except OSError as exc:
+        print(f"STAGE236_FAIL: cannot preserve report: {exc}", file=sys.stderr)
+        return 1
     print(text, end="")
     if args.require_complete and not report["consistency_gate"]["synthetic_bundle_consistent"]:
         return 2
