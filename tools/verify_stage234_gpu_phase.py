@@ -74,10 +74,13 @@ def audit_source(source: str) -> dict:
     submitted_phase=draw.find('saveStage234Checkpoint("05_render_commands_submitted")')
     idle=draw.find("queue.waitIdle();")
     idle_phase=draw.find('saveStage234Checkpoint("06_render_queue_idle")')
-    readback=draw.find("cmd.copyImageToBuffer(outputView")
-    if not (0 <= submit < submitted_phase < idle < idle_phase < readback):
+    readback_command=draw.find("cmd.copyImageToBuffer(outputView")
+    cpu_readback=draw.find("const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());")
+    if not (0 <= submit < submitted_phase < idle < idle_phase < cpu_readback):
         raise PhaseEvidenceError(
-            "render submission, submitted checkpoint, queue idle and readback are out of order")
+            "render submission, submitted checkpoint, queue idle and CPU readback are out of order")
+    if readback_command < 0 or readback_command >= submit:
+        raise PhaseEvidenceError("render-target copy must be recorded before command submission")
     barrier=re.search(
         r"cmd\.barrier\(DkBarrier_Full,\s*"
         r"DkInvalidateFlags_Image\|DkInvalidateFlags_Descriptors\|\s*"
