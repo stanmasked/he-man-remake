@@ -170,7 +170,9 @@ static bool prepareStage230Capture()
         "sdmc:/switch/heman-stage230/upload.rgba",
         "sdmc:/switch/heman-stage230/upload.rgba.tmp",
         "sdmc:/switch/heman-stage230/gpu_phase.txt",
-        "sdmc:/switch/heman-stage230/gpu_phase.tmp"
+        "sdmc:/switch/heman-stage230/gpu_phase.tmp",
+        "sdmc:/switch/heman-stage230/guest_exit.txt",
+        "sdmc:/switch/heman-stage230/guest_exit.tmp"
     }) {
         if(std::remove(path)!=0 && errno!=ENOENT) return false;
     }
@@ -387,7 +389,28 @@ static bool saveStage233Upload(const uint8_t* pixels)
     return true;
 }
 
-int main(int argc, char** argv)
+// Stage241: CPU-written exit status from the actual NRO control path.
+// A host emulator process can exit 0 without executing this guest code.
+// This nonce-linked receipt is diagnostic evidence, not GPU attestation.
+static bool saveStage241GuestExit(int guestCode)
+{
+    if(!s_stage231Nonce[0]) return false;
+    constexpr const char* temp="sdmc:/switch/heman-stage230/guest_exit.tmp";
+    constexpr const char* target="sdmc:/switch/heman-stage230/guest_exit.txt";
+    FILE* f=std::fopen(temp,"wb");
+    if(!f) return false;
+    const int count=std::fprintf(f,"STAGE241_GUEST_EXIT nonce=%s code=%d\n",
+                                 s_stage231Nonce,guestCode);
+    const bool flushed=std::fflush(f)==0;
+    const bool closed=std::fclose(f)==0;
+    if(count<=0 || !flushed || !closed || std::rename(temp,target)!=0) {
+        std::remove(temp);
+        return false;
+    }
+    return true;
+}
+
+static int runStage241Guest(int argc, char** argv)
 {
     (void)argc; (void)argv;
     if(!buildSyntheticSource()) return 2;
@@ -511,4 +534,14 @@ int main(int argc, char** argv)
     // render target. Cross-building this command path proves no execution.
     return runStage228Draw(device,queue,image,imageDescriptor,samplerDescriptor,
                            vertexShader,fragmentShader);
+}
+
+int main(int argc, char** argv)
+{
+    const int guestCode=runStage241Guest(argc,argv);
+    // Missing/invalid nonce is already a hard failure; do not invent a
+    // status without a valid session. Other failures are recorded too.
+    if(s_stage231Nonce[0] && !saveStage241GuestExit(guestCode))
+        return 30;
+    return guestCode;
 }
