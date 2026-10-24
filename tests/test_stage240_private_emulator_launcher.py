@@ -64,7 +64,7 @@ class Stage240Tests(unittest.TestCase):
         with self.assertRaisesRegex(m.LaunchError,"exactly once"):
             m.build_command(self.exe,self.nro,["{nro}","{nro}"])
         with self.assertRaisesRegex(m.LaunchError,"entire argument"):
-            m.build_command(self.exe,self.nro,["--input={nro}"])
+            m.build_command(self.exe,self.nro,["{nro}","--input={nro}"])
 
     def test_missing_emulator_and_invalid_paths_fail_closed(self):
         with self.assertRaisesRegex(m.LaunchError,"existing absolute"):
