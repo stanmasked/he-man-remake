@@ -16,6 +16,11 @@ import sys
 from stage231_capture_session import nro_sha256, SessionError
 from analyze_stage235_gpu_capture import analyze, DiagnosticError
 from stage241_guest_exit_receipt import check_guest_exit
+from stage243_bounded_evidence import (
+    read_limited, EvidenceReadError, MAX_MANIFEST_BYTES, MAX_LOG_BYTES,
+    MAX_RGBA_BYTES, MAX_RECEIPT_BYTES, MAX_PHASE_BYTES,
+    MAX_NONCE_BYTES, MAX_EXIT_BYTES, MAX_GUEST_EXIT_BYTES,
+)
 
 NONCE = re.compile(r"[0-9a-f]{32}")
 RECEIPT = re.compile(
@@ -43,28 +48,40 @@ def sha(data: bytes) -> str:
 
 def read_json(path: Path, label: str) -> dict:
     try:
-        obj = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise BundleError(f"{label}: cannot read valid JSON: {exc}") from exc
-    if not isinstance(obj, dict):
+        data=read_limited(path,MAX_MANIFEST_BYTES,label)
+        obj=json.loads(data.decode("utf-8"))
+    except (EvidenceReadError,UnicodeError,json.JSONDecodeError) as exc:
+        raise BundleError(f"{label}: cannot read valid bounded JSON: {exc}") from exc
+    if not isinstance(obj,dict):
         raise BundleError(f"{label}: expected JSON object")
     return obj
 
 
-def describe_file(path: Path, expected_bytes: int | None = None) -> tuple[dict, bytes | None]:
+def describe_file(path: Path, expected_bytes: int | None = None,
+                  max_bytes: int | None = None) -> tuple[dict,bytes | None]:
+    """Inventory privately without loading an oversized capture/log."""
     if not path.exists():
-        return {"status": "missing"}, None
+        return {"status":"missing"},None
     if not path.is_file():
-        return {"status": "not_a_regular_file"}, None
+        return {"status":"not_a_regular_file"},None
+    cap=expected_bytes if expected_bytes is not None else max_bytes
+    if cap is None:
+        raise BundleError("inventory maximum size not configured")
     try:
-        data = path.read_bytes()
-    except OSError as exc:
-        return {"status": "read_error", "error": str(exc)}, None
-    info = {"status": "present", "bytes": len(data), "sha256": sha(data)}
+        data=read_limited(path,cap,str(path.name))
+    except EvidenceReadError as exc:
+        status="oversized" if ("oversized" in str(exc) or "grew beyond" in str(exc)) else "read_error"
+        info={"status":status,"error":str(exc),"size_valid":False}
+        try:
+            info["bytes"]=path.stat().st_size
+        except OSError:
+            pass
+        return info,None
+    info={"status":"present","bytes":len(data),"sha256":sha(data)}
     if expected_bytes is not None:
-        info["expected_bytes"] = expected_bytes
-        info["size_valid"] = len(data) == expected_bytes
-    return info, data
+        info["expected_bytes"]=expected_bytes
+        info["size_valid"]=len(data)==expected_bytes
+    return info,data
 
 
 def receipt_info(data: bytes | None, session_nonce: str) -> dict:
@@ -131,21 +148,21 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
 
     sd_dir = sd_root / "switch" / "heman-stage230"
     file_specs = {
-        "upload": (sd_dir / "upload.rgba", BYTE_COUNT),
-        "render": (sd_dir / "readback.rgba", BYTE_COUNT),
-        "phase": (sd_dir / "gpu_phase.txt", None),
-        "receipt": (sd_dir / "readback.receipt", None),
-        "sd_nonce": (sd_dir / "run_nonce.txt", None),
-        "guest_exit": (sd_dir / "guest_exit.txt", None),
-        "private_render": (session_dir / "readback.rgba", BYTE_COUNT),
-        "private_receipt": (session_dir / "readback.receipt", None),
-        "runtime_log": (session_dir / "runtime.log", None),
-        "exit_status": (session_dir / "exit-status.txt", None),
+        "upload": (sd_dir/"upload.rgba",BYTE_COUNT,MAX_RGBA_BYTES),
+        "render": (sd_dir/"readback.rgba",BYTE_COUNT,MAX_RGBA_BYTES),
+        "phase": (sd_dir/"gpu_phase.txt",None,MAX_PHASE_BYTES),
+        "receipt": (sd_dir/"readback.receipt",None,MAX_RECEIPT_BYTES),
+        "sd_nonce": (sd_dir/"run_nonce.txt",None,MAX_NONCE_BYTES),
+        "guest_exit": (sd_dir/"guest_exit.txt",None,MAX_GUEST_EXIT_BYTES),
+        "private_render": (session_dir/"readback.rgba",BYTE_COUNT,MAX_RGBA_BYTES),
+        "private_receipt": (session_dir/"readback.receipt",None,MAX_RECEIPT_BYTES),
+        "runtime_log": (session_dir/"runtime.log",None,MAX_LOG_BYTES),
+        "exit_status": (session_dir/"exit-status.txt",None,MAX_EXIT_BYTES),
     }
     files = {}
     raw = {}
-    for label, (path, expected_bytes) in file_specs.items():
-        info, data = describe_file(path, expected_bytes)
+    for label, (path, expected_bytes, limit) in file_specs.items():
+        info, data = describe_file(path, expected_bytes, limit)
         files[label] = info
         raw[label] = data
 
@@ -154,9 +171,18 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         sd_nonce_matches = None
     else:
         sd_nonce_matches = sd_nonce_data == (nonce + "\n").encode("ascii")
-    phase = phase_info(raw["phase"], nonce)
-    receipt = receipt_info(raw["receipt"], nonce)
-    guest_exit = check_guest_exit(raw["guest_exit"], nonce)
+    phase = phase_info(raw["phase"],nonce)
+    if files["phase"]["status"]=="oversized":
+        phase={"status":"oversized","nonce_matches_session":False}
+    receipt = receipt_info(raw["receipt"],nonce)
+    if files["receipt"]["status"]=="oversized":
+        receipt={"status":"oversized","nonce_matches_session":False}
+    guest_exit = check_guest_exit(raw["guest_exit"],nonce)
+    if files["guest_exit"]["status"]=="oversized":
+        guest_exit={"status":"oversized_or_unreadable",
+                    "guest_exit_code":None,"nonce_matches_session":False,
+                    "guest_reported_success":False,
+                    "runtime_gpu_execution_attested":False}
 
     collected_path = session_dir / "stage231_collected.json"
     collected = None
