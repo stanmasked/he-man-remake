@@ -69,7 +69,7 @@ class PhaseTests(unittest.TestCase):
         cpp=(Path(__file__).resolve().parents[1]/
              "switch_gpu_png"/"source"/"main.cpp").read_text(encoding="utf-8")
         result=m.audit_source(cpp)
-        self.assertEqual(result["checkpoint_count"],6)
+        self.assertEqual(result["checkpoint_count"],7)
         self.assertFalse(result["gpu_executed"])
 
     def test_omit_texture_cache_flag_rejected(self):
@@ -92,8 +92,8 @@ class PhaseTests(unittest.TestCase):
     def test_source_multiple_call_and_wrong_render_barrier(self):
         source=(Path(__file__).resolve().parents[1]/
                 "switch_gpu_png"/"source"/"main.cpp").read_text()
-        duplicated=source.replace('saveStage234Checkpoint("05_render_queue_idle")',
-                                  'saveStage234Checkpoint("05_render_queue_idle") && saveStage234Checkpoint("05_render_queue_idle")')
+        duplicated=source.replace('saveStage234Checkpoint("06_render_queue_idle")',
+                                  'saveStage234Checkpoint("06_render_queue_idle") && saveStage234Checkpoint("06_render_queue_idle")')
         with self.assertRaises(m.PhaseEvidenceError):
             m.audit_source(duplicated)
         no_full=source.replace("cmd.barrier(DkBarrier_Full,",

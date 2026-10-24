@@ -39,7 +39,7 @@ if mode in ("success","success_no_guest"):
         "pixels=128 mismatches=0 nonce="+nonce+"\n",encoding="ascii")
     (root/"gpu_phase.txt").write_text(
         "STAGE234_GPU_PHASE nonce="+nonce+
-        " phase=06_receipt_committed\n",encoding="ascii")
+        " phase=07_receipt_committed\n",encoding="ascii")
     if mode=="success":
         (root/"guest_exit.txt").write_text(
             "STAGE241_GUEST_EXIT nonce="+nonce+" code=0\n",encoding="ascii")

@@ -12,7 +12,7 @@ from stage231_capture_session import payload
 
 NONCE="a"*32
 GPU_MARK="STAGE241_GUEST_EXIT nonce="+NONCE+" code=0\n"
-PHASE="STAGE234_GPU_PHASE nonce="+NONCE+" phase=06_receipt_committed\n"
+PHASE="STAGE234_GPU_PHASE nonce="+NONCE+" phase=07_receipt_committed\n"
 RECEIPT=("STAGE230_GPU_READBACK width=16 height=8 bytes=512 "
          "pixels=128 mismatches=0 nonce="+NONCE+"\n")
 CASES=(

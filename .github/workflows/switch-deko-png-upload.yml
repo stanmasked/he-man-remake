@@ -1,4 +1,4 @@
-name: He-Man Stage241 nonce-bound guest exit cross-build
+name: He-Man Stage249 render-submit diagnostic cross-build
 on:
   pull_request:
     paths:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage241 guest exit receipt GPU probe
+    name: Cross-build Stage249 render-submit checkpoint GPU probe
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -56,7 +56,9 @@ jobs:
           grep -aFq 'STAGE233_GPU_UPLOAD_ROUNDTRIP' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/upload.rgba' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'STAGE234_GPU_PHASE nonce=' switch_gpu_png/heman_deko_png_transfer.elf
-          grep -aFq '06_receipt_committed' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq '05_render_commands_submitted' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq '06_render_queue_idle' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq '07_receipt_committed' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/gpu_phase.txt' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'STAGE241_GUEST_EXIT nonce=' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/guest_exit.txt' switch_gpu_png/heman_deko_png_transfer.elf
@@ -80,10 +82,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage241 guest-exit receipt GPU probe
+      - name: Archive Stage249 render-submit checkpoint GPU probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage241-synthetic-guest-exit-nro
+          name: heman-stage249-render-submit-checkpoint-nro
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh

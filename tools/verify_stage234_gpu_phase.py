@@ -16,8 +16,9 @@ PHASES=(
     "02_shaders_loaded",
     "03_texture_upload_queue_idle",
     "04_upload_pixels_match",
-    "05_render_queue_idle",
-    "06_receipt_committed",
+    "05_render_commands_submitted",
+    "06_render_queue_idle",
+    "07_receipt_committed",
 )
 PHASE=re.compile(
     rb"STAGE234_GPU_PHASE nonce=([0-9a-f]{32}) phase=([0-9a-z_]+)\n"
@@ -69,6 +70,17 @@ def audit_source(source: str) -> dict:
             positions.append(region.index(marker))
         if positions!=sorted(positions):
             raise PhaseEvidenceError("checkpoint calls are out of order")
+    submit=draw.find("queue.submitCommands(cmd.finishList());")
+    submitted_phase=draw.find('saveStage234Checkpoint("05_render_commands_submitted")')
+    idle=draw.find("queue.waitIdle();")
+    idle_phase=draw.find('saveStage234Checkpoint("06_render_queue_idle")')
+    readback_command=draw.find("cmd.copyImageToBuffer(outputView")
+    cpu_readback=draw.find("const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());")
+    if not (0 <= submit < submitted_phase < idle < idle_phase < cpu_readback):
+        raise PhaseEvidenceError(
+            "render submission, submitted checkpoint, queue idle and CPU readback are out of order")
+    if readback_command < 0 or readback_command >= submit:
+        raise PhaseEvidenceError("render-target copy must be recorded before command submission")
     barrier=re.search(
         r"cmd\.barrier\(DkBarrier_Full,\s*"
         r"DkInvalidateFlags_Image\|DkInvalidateFlags_Descriptors\|\s*"

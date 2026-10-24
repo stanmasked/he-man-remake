@@ -32,18 +32,23 @@ where phase_name is one of:
 2. 02_shaders_loaded
 3. 03_texture_upload_queue_idle
 4. 04_upload_pixels_match
-5. 05_render_queue_idle
-6. 06_receipt_committed
+5. 05_render_commands_submitted
+6. 06_render_queue_idle
+7. 07_receipt_committed
 
 The guest removes the old phase file at start, writes each checkpoint
 to a temporary file, flushes/closes and renames it as a last-known phase.
 If writing a checkpoint fails, the guest returns exit code 29. The
-render completion phase is written only after the Stage230 nonce-bound
-receipt has been committed; early phases are not success receipts.
+05_render_commands_submitted checkpoint is written immediately after
+queue.submitCommands and before queue.waitIdle. If writing this diagnostic
+fails, the guest still waits for submitted GPU work before returning an error.
+06_render_queue_idle is written only after queue idle returns. The final
+07_receipt_committed phase is written only after the Stage230 nonce-bound
+receipt has been committed; earlier phases are not success receipts.
 
 Because the existing Stage231 nonce request is required, a checkpoint
 cannot be accepted as a new run if it refers to another session. A
-process that terminates early may leave a checkpoint at 1–5 without a
+process that terminates early may leave a checkpoint at 1–6 without a
 final render receipt.
 
 These checkpoints are emitted by **CPU control flow** after submitted
@@ -69,9 +74,10 @@ phase. The verifier requires the exact 32-character nonce and known
 phase grammar, checks the final nonce-bound receipt, and explicitly
 returns gpu_execution_independently_attested=false.
 
-The source audit checks stage markers once each, semantic ordering
-inside the main and draw functions, and the explicit draw-time
-texture-cache invalidation before readback. Unit tests deliberately
+The source audit checks all seven phase markers once each, including the
+ordering `queue.submitCommands` → `05_render_commands_submitted` →
+`queue.waitIdle` → `06_render_queue_idle` → render-target readback, as well as
+the explicit draw-time texture-cache invalidation before readback. Unit tests deliberately
 use invented phase files and forged nonce records; passing these tests
 is not GPU evidence.
 

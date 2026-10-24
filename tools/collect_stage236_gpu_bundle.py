@@ -33,7 +33,8 @@ PHASE = re.compile(
 KNOWN_PHASES = {
     "01_nonce_validated", "02_shaders_loaded",
     "03_texture_upload_queue_idle", "04_upload_pixels_match",
-    "05_render_queue_idle", "06_receipt_committed",
+    "05_render_commands_submitted", "06_render_queue_idle",
+    "07_receipt_committed",
 }
 BYTE_COUNT = 512
 
@@ -255,7 +256,7 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         and diagnostics.get("captures", {}).get("upload", {}).get("matches_fixture_exactly")
         and diagnostics.get("captures", {}).get("render", {}).get("matches_fixture_exactly")
     )
-    phase_final = phase.get("phase") == "06_receipt_committed"
+    phase_final = phase.get("phase") == "07_receipt_committed"
     receipt_clean = bool(
         receipt.get("status") == "valid"
         and receipt.get("mismatches") == 0

@@ -330,8 +330,12 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     cmd.copyImageToBuffer(outputView,{0u,0u,0u,kWidth,kHeight,1u},
                           {readbackMem.getGpuAddr(),kWidth*4u,kGpuUploadBytes});
     queue.submitCommands(cmd.finishList());
+    const bool submittedPhaseSaved=
+        saveStage234Checkpoint("05_render_commands_submitted");
+    // Always wait for the submitted GPU work even if a diagnostic write fails.
     queue.waitIdle();
-    if(!saveStage234Checkpoint("05_render_queue_idle")) return 29;
+    if(!submittedPhaseSaved) return 29;
+    if(!saveStage234Checkpoint("06_render_queue_idle")) return 29;
     const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());
     // Stage229 prints the *complete GPU output* before checking it. An
     // independent host verifier must compare these 512 bytes to the
@@ -364,7 +368,7 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     const bool captured=saveStage230Capture(pixels,mismatches);
     if(!captured)
         std::fprintf(stderr,"STAGE230_CAPTURE_FAILED: cannot persist SD readback\n");
-    if(captured && !saveStage234Checkpoint("06_receipt_committed")) return 29;
+    if(captured && !saveStage234Checkpoint("07_receipt_committed")) return 29;
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
     return captured?(mismatches==0?0:25):26;
 }

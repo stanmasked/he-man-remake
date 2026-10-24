@@ -15,7 +15,7 @@ NRO=bytes(16)+b"NRO0"+b"stage236-fake-test-nro"
 NRO_SHA=hashlib.sha256(NRO).hexdigest()
 RECEIPT=("STAGE230_GPU_READBACK width=16 height=8 bytes=512 "
          f"pixels=128 mismatches=0 nonce={NONCE}\n")
-PHASE=f"STAGE234_GPU_PHASE nonce={NONCE} phase=06_receipt_committed\n".encode()
+PHASE=f"STAGE234_GPU_PHASE nonce={NONCE} phase=07_receipt_committed\n".encode()
 GUEST=f"STAGE241_GUEST_EXIT nonce={NONCE} code=0\n".encode()
 DEFAULT=object()
 
@@ -126,7 +126,7 @@ class BundleTests(unittest.TestCase):
         self.assertIsNone(report["pixel_diagnostics"])
 
     def test_wrong_phase_nonce_rejected_by_consistency_gate(self):
-        stale=f"STAGE234_GPU_PHASE nonce={'d'*32} phase=06_receipt_committed\n".encode()
+        stale=f"STAGE234_GPU_PHASE nonce={'d'*32} phase=07_receipt_committed\n".encode()
         with tempfile.TemporaryDirectory() as root:
             report=self.collect(root,phase=stale)
         self.assertFalse(report["session_links"]["phase_nonce_matches_session"])
