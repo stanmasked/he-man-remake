@@ -190,6 +190,42 @@ class BundleTests(unittest.TestCase):
         self.assertIn("upload",report["pixel_diagnostics"]["captures"])
         self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
 
+    def test_oversized_private_log_is_inventory_only_and_fails_hash_join(self):
+        with tempfile.TemporaryDirectory() as root:
+            nro,sd,session=self.prepare(root)
+            self.attach_collected(session)
+            with (session/"runtime.log").open("wb") as out:
+                out.truncate(4*1024*1024+1)
+            report=m.collect_bundle(nro,sd,session)
+        self.assertEqual(report["files"]["runtime_log"]["status"],"oversized")
+        self.assertFalse(report["stage231_collected_report"]["runner_log_hash_matches"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+        self.assertIn("render",report["pixel_diagnostics"]["captures"])
+
+    def test_oversized_receipt_guest_and_nonce_keep_other_diagnostics(self):
+        with tempfile.TemporaryDirectory() as root:
+            nro,sd,session=self.prepare(root)
+            capture=sd/"switch"/"heman-stage230"
+            (capture/"readback.receipt").write_bytes(b"x"*257)
+            (capture/"guest_exit.txt").write_bytes(b"x"*129)
+            (capture/"run_nonce.txt").write_bytes(b"z"*65)
+            report=m.collect_bundle(nro,sd,session)
+        for label in ("receipt","guest_exit","sd_nonce"):
+            self.assertEqual(report["files"][label]["status"],"oversized")
+        self.assertEqual(report["guest_exit"]["status"],"oversized_or_unreadable")
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+        self.assertIn("upload",report["pixel_diagnostics"]["captures"])
+
+    def test_oversized_collected_json_is_reported_without_crashing(self):
+        with tempfile.TemporaryDirectory() as root:
+            nro,sd,session=self.prepare(root)
+            with (session/"stage231_collected.json").open("wb") as out:
+                out.truncate(64*1024+1)
+            report=m.collect_bundle(nro,sd,session)
+        self.assertEqual(report["stage231_collected_report"]["status"],"invalid")
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+        self.assertIn("upload",report["pixel_diagnostics"]["captures"])
+
     def test_bad_session_schema_fails_closed(self):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaisesRegex(m.BundleError,"schema"):
