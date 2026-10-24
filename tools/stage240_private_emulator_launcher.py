@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 from stage231_capture_session import prepare, collect, SessionError, nro_sha256
+from collect_stage236_gpu_bundle import collect_bundle, BundleError
 
 
 class LaunchError(ValueError):
@@ -138,6 +139,16 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         except (SessionError,OSError,UnicodeError,ValueError) as exc:
             collection_error=f"{type(exc).__name__}: {exc}"
 
+    bundle_consistent=False
+    bundle_error=None
+    try:
+        bundle=collect_bundle(nro,sd_root,session_dir)
+        bundle_consistent=bundle["consistency_gate"]["synthetic_bundle_consistent"]
+        (session_dir/"stage240_bundle.json").write_text(
+            json.dumps(bundle,sort_keys=True,indent=2)+"\n",encoding="utf-8")
+    except (BundleError,SessionError,OSError,ValueError) as exc:
+        bundle_error=f"{type(exc).__name__}: {exc}"
+
     manifest={
         "schema":"stage240-host-emulator-attempt-v1",
         "prepared_session_nonce":prepared["nonce"],
@@ -153,6 +164,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "runner_log_bytes":log_path.stat().st_size if log_path.exists() else None,
         "stage231_collected":collected,
         "stage231_collection_error":collection_error,
+        "stage236_bundle_consistent":bundle_consistent,
+        "stage236_bundle_error":bundle_error,
         "emulator_gpu_capability_independently_verified":False,
         "guest_process_exit_independently_verified":False,
         "runtime_gpu_execution_attested":False,
@@ -187,7 +200,7 @@ def main()->int:
         print(f"STAGE240_FAIL: {exc}",file=sys.stderr)
         return 1
     print(json.dumps(result,sort_keys=True,indent=2))
-    return 0 if result["stage231_collected"] else 2
+    return 0 if result["stage231_collected"] and result["stage236_bundle_consistent"] else 2
 
 
 if __name__=="__main__":
