@@ -264,6 +264,17 @@ class Stage231SessionTests(unittest.TestCase):
                             "invented-launcher")
         self.assertFalse(report["runtime_provenance_attested"])
 
+    def test_nro_hash_rejects_symlink_to_valid_nro(self):
+        if not getattr(__import__("os"), "O_NOFOLLOW", 0):
+            self.skipTest("O_NOFOLLOW is unsupported")
+        link = self.sd.parent / "nro-symlink"
+        try:
+            link.symlink_to(self.nro)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        with self.assertRaisesRegex(m.SessionError, "non-symlink file"):
+            m.nro_sha256(link)
+
     def test_bad_nro_after_prepare(self):
         self.nro.write_bytes(FAKE_NRO + b"x")
         with self.assertRaisesRegex(m.SessionError, "different NRO"):
