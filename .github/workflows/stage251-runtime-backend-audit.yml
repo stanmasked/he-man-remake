@@ -3,7 +3,9 @@ on:
   pull_request:
     paths:
       - 'tools/stage251_runtime_backend_audit.py'
+      - 'tools/stage240_private_emulator_launcher.py'
       - 'tests/test_stage251_runtime_backend_audit.py'
+      - 'tests/test_stage240_private_emulator_launcher.py'
       - 'docs/stage251-runtime-backend-audit.md'
       - '.github/workflows/stage251-runtime-backend-audit.yml'
       - 'docs/roadmap.md'
@@ -35,6 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m unittest discover -s tests -p 'test_stage251_runtime_backend_audit.py' -v
+          python -m unittest discover -s tests -p 'test_stage240_private_emulator_launcher.py' -v
       - name: Build synthetic-only backend audit report
         shell: bash
         run: |
