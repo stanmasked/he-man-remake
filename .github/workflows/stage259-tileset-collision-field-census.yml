@@ -1,0 +1,66 @@
+name: He-Man Stage259 tileset collision-field census
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/tileset_collision_field_census.py'
+      - 'tests/test_tileset_collision_field_census.py'
+      - 'docs/stage259-tileset-collision-field-census.md'
+      - '.github/workflows/stage259-tileset-collision-field-census.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-tileset-census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run synthetic Stage259 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_tileset_collision_field_census.py' -v
+      - name: Write synthetic-only capability summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = {
+              "schema": "heman-stage259-tileset-collision-field-census-ci-v1",
+              "result": "synthetic_tileset_field_tests_passed_not_original_evidence",
+              "synthetic_ipa_fixtures_only": True,
+              "original_ipa_loaded": False,
+              "original_tile_names_or_cell_coordinates_exported": False,
+              "original_collision_semantics_verified": False,
+              "native_switch_collision_import_authorized": False,
+              "note": "Public CI validates field parsing and cross-pack checks with fabricated resources only."
+          }
+          Path("build/stage259_synthetic_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE259_SYNTHETIC_TILESET_CENSUS_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic Stage259 summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage259-synthetic-tileset-census
+          path: build/stage259_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
