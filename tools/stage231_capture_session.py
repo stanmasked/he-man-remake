@@ -27,7 +27,7 @@ BYTES = 512
 NONCE = re.compile(r"[0-9a-f]{32}")
 RECEIPT = re.compile(
     r"STAGE230_GPU_READBACK width=(\d+) height=(\d+) bytes=(\d+) "
-    r"pixels=(\d+) mismatches=(\d+) nonce=([0-9a-f]{32})\n?"
+    r"pixels=(\d+) mismatches=(\d+) nonce=([0-9a-f]{32})(?:\r?\n)?"
 )
 
 
@@ -355,7 +355,8 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         nonce_tmp = sd / "run_nonce.txt.tmp"
         nonce_final = sd / "run_nonce.txt"
         try:
-            nonce_tmp.write_text(challenge + "\n", encoding="ascii")
+            # Use bytes so Windows newline translation cannot change the challenge.
+            nonce_tmp.write_bytes((challenge + "\n").encode("ascii"))
             os.replace(nonce_tmp, nonce_final)
         except OSError as exc:
             nonce_tmp.unlink(missing_ok=True)
