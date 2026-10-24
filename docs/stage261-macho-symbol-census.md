@@ -15,7 +15,7 @@ The original executable contains 62,689 nlist32 symbol-table entries and a 2,936
 - Tile-map: 151 / 126
 - Shape2D: 43 / 35
 
-These are substring-category counts over symbol names, not counts of unique classes or runtime calls. Exact symbol names and the executable hash remain owner-private. The source identity and aggregate string counts are preserved in the [Stage260 private Drive handoff](https://docs.google.com/document/d/18qv5q_a8P_fETmdW8lAzBKGoPk5lo0V6TU01iudKFbM/edit).
+These are substring-category counts over symbol names, not counts of unique classes or runtime calls. Exact symbol names and the executable hash remain owner-private in the [Stage261 private Drive handoff](https://docs.google.com/document/d/1AW1W4OMog56D2_FyqN9dspm9VDRfAwAQiTx8CyY_XNc/edit).
 
 ## Method and limits
 
