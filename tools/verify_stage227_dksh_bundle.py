@@ -55,6 +55,54 @@ def inspect_dksh(content: bytes, *, shader_stage: str) -> dict:
     }
 
 
+def inspect_embedded_nro_shaders(
+    nro_bytes: bytes, vertex_bytes: bytes, fragment_bytes: bytes,
+) -> dict:
+    """Require both genuine compiled DKSH programs *inside* the NRO's RomFS.
+
+    An elf2nro executable with --romfsdir alone can contain no ASET section
+    even when the separate shader binary files were compiled successfully.
+    This fails closed instead of treating adjacent artifact files as proof.
+    """
+    inspect_dksh(vertex_bytes, shader_stage="vertex")
+    inspect_dksh(fragment_bytes, shader_stage="fragment")
+    if type(nro_bytes) is not bytes or len(nro_bytes) < 0x70 or (
+        nro_bytes[16:20] != b"NRO0"
+    ):
+        raise DKSHValidationError("Expected complete NRO0 executable")
+    image_end = struct.unpack_from("<I", nro_bytes, 0x18)[0]
+    asset_size = 56
+    if image_end < 0x70 or image_end + asset_size > len(nro_bytes):
+        raise DKSHValidationError("NRO has no embedded ASET/RomFS section")
+    if nro_bytes[image_end:image_end+4] != b"ASET":
+        raise DKSHValidationError("NRO missing embedded ASET magic")
+    version = struct.unpack_from("<I", nro_bytes, image_end + 4)[0]
+    romfs_offset, romfs_length = struct.unpack_from(
+        "<QQ", nro_bytes, image_end + 40,
+    )
+    if version != 0 or romfs_offset < asset_size or romfs_length == 0:
+        raise DKSHValidationError("NRO has invalid RomFS metadata")
+    start = image_end + romfs_offset
+    end = start + romfs_length
+    if start > len(nro_bytes) or end > len(nro_bytes):
+        raise DKSHValidationError("NRO RomFS area extends beyond NRO bytes")
+    payload = nro_bytes[start:end]
+    if payload.count(vertex_bytes) != 1 or payload.count(fragment_bytes) != 1:
+        raise DKSHValidationError(
+            "NRO RomFS missing exact vertex or fragment DKSH program bytes"
+        )
+    return {
+        "nro_executable_magic_verified": True,
+        "aset_magic_verified": True,
+        "embedded_romfs_bytes": romfs_length,
+        "embedded_compiled_shader_count": 2,
+        "vertex_shader_bytes_found": True,
+        "fragment_shader_bytes_found": True,
+        "gpu_program_execution_verified": False,
+        "gpu_fragment_sampling_verified": False,
+    }
+
+
 def check_pair(vertex_path: Path, fragment_path: Path) -> dict:
     first = vertex_path.read_bytes()
     second = fragment_path.read_bytes()
@@ -75,8 +123,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("vertex", type=Path)
     parser.add_argument("fragment", type=Path)
+    parser.add_argument("--nro", type=Path, required=True,
+                        help="Require both shaders to exist inside the actual NRO RomFS")
     args = parser.parse_args()
-    print(json.dumps(check_pair(args.vertex, args.fragment), indent=2, sort_keys=True))
+    report = check_pair(args.vertex, args.fragment)
+    report["nro_romfs"] = inspect_embedded_nro_shaders(
+        args.nro.read_bytes(), args.vertex.read_bytes(), args.fragment.read_bytes(),
+    )
+    print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
 
