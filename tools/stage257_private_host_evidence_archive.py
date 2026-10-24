@@ -401,13 +401,8 @@ def archive_host_evidence(
 
         if "session/stage231_collected.json" in entries:
             collected = _parse_json(entries["session/stage231_collected.json"], "Stage231 collection manifest")
-            for key in (
-                "runtime_gpu_execution_attested",
-                "gpu_capability_independently_verified",
-                "original_ios_graphics_parity_attested",
-            ):
-                if collected.get(key) is not False:
-                    raise ArchiveError(f"Stage231 collection has an invalid evidence flag: {key}")
+            if collected.get("runtime_provenance_attested") is not False:
+                raise ArchiveError("Stage231 collection has an invalid provenance flag")
 
         file_records = [
             {"name": name, "size_bytes": len(data), "sha256": _sha256(data)}
