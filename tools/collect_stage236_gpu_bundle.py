@@ -135,6 +135,10 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         "phase": (sd_dir / "gpu_phase.txt", None),
         "receipt": (sd_dir / "readback.receipt", None),
         "sd_nonce": (sd_dir / "run_nonce.txt", None),
+        "private_render": (session_dir / "readback.rgba", BYTE_COUNT),
+        "private_receipt": (session_dir / "readback.receipt", None),
+        "runtime_log": (session_dir / "runtime.log", None),
+        "exit_status": (session_dir / "exit-status.txt", None),
     }
     files = {}
     raw = {}
@@ -160,14 +164,35 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
             collected_render_matches = bool(
                 raw["render"] is not None
                 and files["render"].get("size_valid")
-                and candidate.get("rgba_sha256") == sha(raw["render"])
+                and raw["private_render"] is not None
+                and files["private_render"].get("size_valid")
+                and candidate.get("rgba_sha256") == sha(raw["private_render"])
+                and raw["private_render"] == raw["render"]
             )
+            receipt_hash_matches = bool(
+                raw["receipt"] is not None
+                and raw["private_receipt"] is not None
+                and candidate.get("receipt_sha256") == sha(raw["receipt"])
+                and raw["private_receipt"] == raw["receipt"]
+            )
+            runner_hash_matches = bool(
+                raw["runtime_log"] is not None
+                and candidate.get("runner_log_sha256") == sha(raw["runtime_log"])
+            )
+            try:
+                exit_status_text = raw["exit_status"].decode("ascii").strip() if raw["exit_status"] is not None else ""
+            except UnicodeDecodeError:
+                exit_status_text = ""
+            exit_status_zero = exit_status_text == "0"
             collected_ok = (
                 candidate.get("schema") == "stage231-collected-synthetic-gpu-evidence-v1"
                 and candidate.get("nonce") == nonce
                 and candidate.get("nro_sha256") == current_nro_sha
                 and result_matches
                 and collected_render_matches
+                and receipt_hash_matches
+                and runner_hash_matches
+                and exit_status_zero
                 and candidate.get("runtime_provenance_attested") is False
             )
             collected = {
@@ -176,6 +201,9 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
                 "nro_matches": candidate.get("nro_sha256") == current_nro_sha,
                 "result_matches": result_matches,
                 "render_hash_matches": collected_render_matches,
+                "receipt_hash_matches": receipt_hash_matches,
+                "runner_log_hash_matches": runner_hash_matches,
+                "exit_status_zero": exit_status_zero,
                 "runtime_provenance_attested": candidate.get("runtime_provenance_attested"),
             }
         except BundleError as exc:
@@ -209,7 +237,11 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         and phase.get("nonce_matches_session") is True
         and receipt.get("nonce_matches_session") is True
     )
-    consistent = bool(all_session_links and phase_final and receipt_clean and both_captures_match)
+    collected_consistent = collected.get("status") in ("valid", "missing")
+    consistent = bool(
+        all_session_links and phase_final and receipt_clean
+        and both_captures_match and collected_consistent
+    )
 
     return {
         "schema": "stage236-private-capture-bundle-v1",
@@ -234,6 +266,7 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
             "phase_final_receipt_committed": phase_final,
             "receipt_reports_zero_mismatches": receipt_clean,
             "both_upload_and_render_match_synthetic_fixture": both_captures_match,
+            "stage231_collected_report_consistent_if_present": collected_consistent,
             "synthetic_bundle_consistent": consistent,
             "runtime_gpu_execution_attested": False,
             "original_ios_graphics_parity_attested": False,
