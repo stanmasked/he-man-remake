@@ -50,8 +50,13 @@ blocked.
 
 The tool does not launch the emulator, create the session directory, write to
 the SD root, or modify input files. It prints a JSON report and optionally
-writes it to a caller-selected absolute path outside the SD/session tree.
-Only basenames and hashes are retained in the report, not absolute host paths.
+writes it to a caller-selected absolute path outside the SD/session tree. The
+report writer refuses to overwrite an existing file and creates new POSIX
+reports with mode 0600. On POSIX, the output parent must also be owner-private;
+the only bypass is an explicit synthetic-CI-only flag used by the public
+workflow. Windows ACLs are not audited by this standard-library tool, so an
+owner-host operator must choose a private destination. Only basenames and
+hashes are retained in the report, not absolute host paths.
 
 ## Evidence boundary
 
