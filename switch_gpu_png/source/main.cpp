@@ -88,7 +88,7 @@ int main(int argc, char** argv)
     if(!cmds) return 10;
     cmds.addMemory(cmdmem,0u,DK_MEMBLOCK_ALIGNMENT);
     dk::ImageView view{image};
-    cmds.copyBufferToImage({staging.getGpuAddr()},view,{0,0,0,kWidth,kHeight,1});
+    cmds.copyBufferToImage({staging.getGpuAddr(),0u,0u},view,{0,0,0,kWidth,kHeight,1});
     queue.submitCommands(cmds.finishList());
     queue.waitIdle();
 
