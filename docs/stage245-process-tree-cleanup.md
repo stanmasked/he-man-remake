@@ -17,8 +17,10 @@ or reaping the parent would not guarantee that the pipe closes.
 - When the runner times out, terminate the isolated tree before waiting for
   the output drain.
 - When the parent exits but output remains open for two seconds, attempt tree
-  cleanup and wait again. If the pipe still does not close, mark the drain
-  incomplete and block Stage231 collection.
+  cleanup and wait again. Any run that required process-tree cleanup after the parent exited is
+  not accepted as a clean Stage231 collection, even if the pipe eventually
+  closes. If the pipe still does not close, mark the drain incomplete and
+  block collection.
 - Record cleanup attempted/success/method/error in the private launch report.
 
 ## Evidence
