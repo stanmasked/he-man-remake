@@ -1,6 +1,7 @@
 """Stage234 nonce checkpoint and cache barrier audit. Invented data only."""
 import importlib.util
 import json
+import sys
 from pathlib import Path
 import unittest
 
