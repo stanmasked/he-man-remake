@@ -1,4 +1,4 @@
-name: He-Man Stage226 deko3d GPU-image upload compile probe
+name: He-Man Stage227 deko3d compiled texture shader bundle
 on:
   pull_request:
     paths:
@@ -47,10 +47,23 @@ jobs:
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_gpu_png/heman_deko_png_transfer.nro
           wc -c switch_gpu_png/heman_deko_png_transfer.nro
+      - name: Inspect both newly compiled DKSH programs, not only GLSL source
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s switch_gpu_png/romfs/shaders/padded_texture_vsh.dksh
+          test -s switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh
+          python3 tools/verify_stage227_dksh_bundle.py \
+            switch_gpu_png/romfs/shaders/padded_texture_vsh.dksh \
+            switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
+            --nro switch_gpu_png/heman_deko_png_transfer.nro
+          sha256sum switch_gpu_png/romfs/shaders/*.dksh
       - name: Archive original-free GPU transfer probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage226-synthetic-deko3d-upload-nro
-          path: switch_gpu_png/heman_deko_png_transfer.nro
+          name: heman-stage227-synthetic-deko3d-shader-bundle
+          path: |
+            switch_gpu_png/heman_deko_png_transfer.nro
+            switch_gpu_png/romfs/shaders/*.dksh
           if-no-files-found: error
           retention-days: 7

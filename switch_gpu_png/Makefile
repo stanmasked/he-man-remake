@@ -8,6 +8,13 @@ DEVKITA64 ?= $(DEVKITPRO)/devkitA64
 CC := $(DEVKITA64)/bin/aarch64-none-elf-gcc
 CXX := $(DEVKITA64)/bin/aarch64-none-elf-g++
 ELF2NRO ?= $(DEVKITPRO)/tools/bin/elf2nro
+UAM ?= $(DEVKITPRO)/tools/bin/uam
+BUILD_ROMFS ?= $(DEVKITPRO)/tools/bin/build_romfs
+ROMFS_IMAGE := stage227-shaders.romfs
+ROMFS := romfs
+VERT_SHADER := $(ROMFS)/shaders/padded_texture_vsh.dksh
+FRAG_SHADER := $(ROMFS)/shaders/padded_texture_fsh.dksh
+SHADER_BINARIES := $(VERT_SHADER) $(FRAG_SHADER)
 ROOT := $(abspath ..)
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 COMMON := -O2 -Wall -Wextra -Werror $(ARCH) -D__SWITCH__ \
@@ -28,7 +35,19 @@ native_upload.o: $(ROOT)/native/src/heman_native_png_upload.c \
 $(TARGET).elf: source/main.cpp native_upload.o
 	$(CXX) $(CXXFLAGS) source/main.cpp native_upload.o \
 	  $(LDFLAGS) -ldeko3d -lnx -lm -o $@
-$(TARGET).nro: $(TARGET).elf
-	$(ELF2NRO) $< $@
+$(ROMFS)/shaders:
+	mkdir -p $@
+$(VERT_SHADER): shaders/padded_texture_vsh.glsl | $(ROMFS)/shaders
+	$(UAM) -s vert -o $@ $<
+$(FRAG_SHADER): shaders/padded_texture_fsh.glsl | $(ROMFS)/shaders
+	$(UAM) -s frag -o $@ $<
+# The pinned elf2nro has an early-exit shortcut when --romfsdir is
+# its sole asset option. Build the raw RomFS image and pass --romfs so the
+# NRO receives an ASET section with actual DKSH bytes.
+$(ROMFS_IMAGE): $(SHADER_BINARIES)
+	$(BUILD_ROMFS) $(abspath $(ROMFS)) $@
+$(TARGET).nro: $(TARGET).elf $(ROMFS_IMAGE)
+	$(ELF2NRO) $< $@ --romfs=$(abspath $(ROMFS_IMAGE))
 clean:
-	rm -f $(TARGET).elf $(TARGET).nro native_upload.o
+	rm -f $(TARGET).elf $(TARGET).nro native_upload.o $(ROMFS_IMAGE)
+	rm -f $(SHADER_BINARIES)
