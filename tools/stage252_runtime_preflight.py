@@ -42,6 +42,17 @@ def _is_within(child: Path, parent: Path) -> bool:
         return False
 
 
+def _path_fingerprint(path: Path) -> str | None:
+    """Hash a normalized path identity without exposing the absolute path."""
+    if not path.is_absolute():
+        return None
+    try:
+        normalized = os.path.normcase(str(path.resolve(strict=False)))
+    except OSError:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def preflight(
     emulator: Path,
     nro: Path,
@@ -240,6 +251,15 @@ def preflight(
         "checks": checks,
         "input_metadata": metadata,
         "sha256": hashes,
+        "path_fingerprints": {
+            "emulator_path_sha256": _path_fingerprint(emulator),
+            "nro_path_sha256": _path_fingerprint(nro),
+            "sd_root_path_sha256": _path_fingerprint(sd_root),
+            "session_dir_path_sha256": _path_fingerprint(session_dir),
+            "launch_args_sha256": hashlib.sha256(
+                json.dumps(launch_args, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
+        },
         "sd_root_mapping_independently_verified": False,
         "emulator_was_launched": False,
         "runtime_gpu_execution_attested": False,
