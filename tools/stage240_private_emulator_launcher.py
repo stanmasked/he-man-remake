@@ -375,7 +375,10 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         if drainer.is_alive():
             # A descendant may have inherited stdout/stderr after the main
             # runner exited. Kill the isolated group/tree before closing pipe.
-            cleanup=terminate_process_tree(proc)
+            cleanup=terminate_process_tree(
+                proc,job=job_object if job_object is not None and job_object.is_open else None)
+            log_state["tree_cleanup_active_processes"]=cleanup.get("active_processes_before_close")
+            log_state["windows_job_object_close_success"]=cleanup.get("job_closed")
             log_state["tree_cleanup_attempted"]=True
             log_state["tree_cleanup_success"]=cleanup["success"]
             log_state["tree_cleanup_method"]=cleanup["method"]
