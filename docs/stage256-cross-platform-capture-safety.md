@@ -19,6 +19,9 @@ The matrix runs on Ubuntu, Windows, and macOS with Python 3.12:
 - A synthetic capability summary records the actual platform and whether
   descriptor-relative I/O is available. Unsupported symlink operations are
   skipped only when the host refuses to create the test symlink.
+- Binary file descriptors include O_BINARY when available. The Windows matrix
+  caught and fixed text-mode handling that could stop an RGBA read at byte 0x1A
+  or translate line endings; the exact-512-byte regression guards this case.
 
 No emulator, GPU, original game assets, IPA, firmware, keys, or private host
 logs are used. Every summary keeps real-launch and GPU-attestation fields false.
