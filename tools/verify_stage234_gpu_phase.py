@@ -51,9 +51,13 @@ def audit_source(source: str) -> dict:
             raise PhaseEvidenceError(f"missing GPU cache/phase source guard: {g}")
     draw_start=source.find("static int runStage228Draw(")
     draw_end=source.find("// Stage233 stores",draw_start)
-    main_start=source.find("int main(int argc, char** argv)")
+    # Stage241 wraps the former guest main so its return can be recorded
+    # separately from the host emulator exit code. Inspect the guest body,
+    # not the tiny outer wrapper, while retaining compatibility with 234.
+    guest_start=source.find("static int runStage241Guest(int argc, char** argv)")
+    main_start=guest_start if guest_start>=0 else source.find("int main(int argc, char** argv)")
     if min(draw_start,draw_end,main_start)<0:
-        raise PhaseEvidenceError("draw/main C++ functions not found")
+        raise PhaseEvidenceError("draw/guest C++ functions not found")
     draw=source[draw_start:draw_end]
     main_source=source[main_start:]
     for subset,region in ((PHASES[:4],main_source),(PHASES[4:],draw)):
