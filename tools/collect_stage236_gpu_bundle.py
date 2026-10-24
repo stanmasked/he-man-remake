@@ -256,7 +256,7 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         and diagnostics.get("captures", {}).get("upload", {}).get("matches_fixture_exactly")
         and diagnostics.get("captures", {}).get("render", {}).get("matches_fixture_exactly")
     )
-    phase_final = phase.get("phase") == "06_receipt_committed"
+    phase_final = phase.get("phase") == "07_receipt_committed"
     receipt_clean = bool(
         receipt.get("status") == "valid"
         and receipt.get("mismatches") == 0
