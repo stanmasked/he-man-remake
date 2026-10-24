@@ -30,7 +30,7 @@ def shape_polygon(vertices, *, flags=0):
 
 def synthetic_tileset(scale=1, *, shape_ref="ramp_a", collision_id_1=5,
                       texture_ref_count=1, trailing=b""):
-    data = struct.pack("<6ifi", 32*scale, 32*scale, 32*scale, 32*scale,
+    data = struct.pack("<6ifi", 32*scale, 32*scale, 32, 32,
                        0xC000, 0xFFFF, 0.0, texture_ref_count)
     if texture_ref_count:
         data += text_field("img_collisiontiles")
