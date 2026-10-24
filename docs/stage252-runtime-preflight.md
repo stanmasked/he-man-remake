@@ -56,7 +56,10 @@ reports with mode 0600. On POSIX, the output parent must also be owner-private;
 the only bypass is an explicit synthetic-CI-only flag used by the public
 workflow. Windows ACLs are not audited by this standard-library tool, so an
 owner-host operator must choose a private destination. Only basenames and
-hashes are retained in the report, not absolute host paths.
+hashes are retained in the report, not absolute host paths. Stage252 also
+records SHA-256 fingerprints of normalized absolute paths and the launch
+argument template. Stage253 uses these fingerprints to bind a recent preflight
+to the exact Stage240 invocation without copying those paths into the report.
 
 ## Evidence boundary
 
