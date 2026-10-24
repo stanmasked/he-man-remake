@@ -204,6 +204,8 @@ def preflight(
             e != n
             and not _is_within(out, s)
             and not _is_within(s, out)
+            and not _is_within(e, s)
+            and not _is_within(n, s)
             and not _is_within(e, out)
             and not _is_within(n, out)
         )
