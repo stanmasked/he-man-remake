@@ -111,21 +111,26 @@ def _ensure_sd_capture_dir(sd_root: Path) -> Path:
 
 def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None = None) -> dict:
     binary_digest = nro_sha256(nro)
-    if output_dir.exists() and any(output_dir.iterdir()):
-        raise SessionError("session output directory is not empty")
+    try:
+        output_info = output_dir.lstat()
+    except FileNotFoundError:
+        output_info = None
+    except OSError as exc:
+        raise SessionError("could not inspect session output directory") from exc
+    if output_info is not None:
+        if stat.S_ISLNK(output_info.st_mode) or not stat.S_ISDIR(output_info.st_mode):
+            raise SessionError("session output must be a non-symlink directory")
+        try:
+            if any(output_dir.iterdir()):
+                raise SessionError("session output directory is not empty")
+        except OSError as exc:
+            raise SessionError("could not inspect session output directory contents") from exc
     if challenge is None:
         challenge = secrets.token_hex(16)
     if not NONCE.fullmatch(challenge):
         raise SessionError("challenge must be 128-bit lowercase hex")
-    if output_dir.exists():
-        try:
-            output_info = output_dir.lstat()
-        except OSError as exc:
-            raise SessionError("could not inspect session output directory") from exc
-        if stat.S_ISLNK(output_info.st_mode) or not stat.S_ISDIR(output_info.st_mode):
-            raise SessionError("session output must be a non-symlink directory")
-    output_dir.mkdir(parents=True, exist_ok=True)
     sd = _ensure_sd_capture_dir(sd_root)
+    output_dir.mkdir(parents=True, exist_ok=True)
     # Recheck the directory chain immediately before touching guest files.
     # This closes the ordinary preflight-to-PREPARE symlink substitution gap;
     # it is not a kernel-level lock against a hostile concurrent writer.
@@ -141,6 +146,7 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         "run_nonce.txt.tmp",
     ):
         (sd / name).unlink(missing_ok=True)
+    sd = _ensure_sd_capture_dir(sd_root)
     nonce_tmp = sd / "run_nonce.txt.tmp"
     nonce_final = sd / "run_nonce.txt"
     try:
