@@ -211,6 +211,13 @@ def inspect_private_geometry_alpha_parity(ipa: Path, map_name: str) -> dict:
             "polygons": screen["tiles"],
         }
 
+    complete_used_shapes = (
+        medium["incomplete_or_nonaligned_used_shape_count"] == 0
+        and large["incomplete_or_nonaligned_used_shape_count"] == 0
+        and len(a) == medium["used_named_shape_count"]
+        and len(b) == large["used_named_shape_count"]
+        and len(a) > 0
+    )
     return {
         "schema": "heman-stage266-polygon-atlas-alpha-comparison-v1",
         "map_name": map_name,
@@ -226,7 +233,8 @@ def inspect_private_geometry_alpha_parity(ipa: Path, map_name: str) -> dict:
             "linked_used_geometry_bytes_equal": True,
             "same_used_polygon_ids": True,
         },
-        "result": "polygon_alpha_comparison_complete",
+        "result": ("polygon_alpha_comparison_complete" if complete_used_shapes
+                   else "partial_used_geometry_unresolved"),
         "original_geometry_vertices_or_bitmap_exported": False,
         "polygon_and_image_overlap_is_runtime_collisions_proof": False,
         "original_collision_material_or_one_way_rules_verified": False,
