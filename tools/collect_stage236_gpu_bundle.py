@@ -15,6 +15,7 @@ import sys
 
 from stage231_capture_session import nro_sha256, SessionError
 from analyze_stage235_gpu_capture import analyze, DiagnosticError
+from stage241_guest_exit_receipt import check_guest_exit
 
 NONCE = re.compile(r"[0-9a-f]{32}")
 RECEIPT = re.compile(
@@ -135,6 +136,7 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         "phase": (sd_dir / "gpu_phase.txt", None),
         "receipt": (sd_dir / "readback.receipt", None),
         "sd_nonce": (sd_dir / "run_nonce.txt", None),
+        "guest_exit": (sd_dir / "guest_exit.txt", None),
         "private_render": (session_dir / "readback.rgba", BYTE_COUNT),
         "private_receipt": (session_dir / "readback.receipt", None),
         "runtime_log": (session_dir / "runtime.log", None),
@@ -154,6 +156,7 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         sd_nonce_matches = sd_nonce_data == (nonce + "\n").encode("ascii")
     phase = phase_info(raw["phase"], nonce)
     receipt = receipt_info(raw["receipt"], nonce)
+    guest_exit = check_guest_exit(raw["guest_exit"], nonce)
 
     collected_path = session_dir / "stage231_collected.json"
     collected = None
@@ -236,11 +239,13 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
         nro_matches and sd_nonce_matches is True
         and phase.get("nonce_matches_session") is True
         and receipt.get("nonce_matches_session") is True
+        and guest_exit.get("nonce_matches_session") is True
     )
     collected_consistent = collected.get("status") in ("valid", "missing")
+    guest_complete = guest_exit.get("guest_reported_success") is True
     consistent = bool(
         all_session_links and phase_final and receipt_clean
-        and both_captures_match and collected_consistent
+        and both_captures_match and collected_consistent and guest_complete
     )
 
     return {
@@ -256,15 +261,18 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
             "sd_nonce_matches_session": sd_nonce_matches,
             "phase_nonce_matches_session": phase.get("nonce_matches_session"),
             "receipt_nonce_matches_session": receipt.get("nonce_matches_session"),
+            "guest_exit_nonce_matches_session": guest_exit.get("nonce_matches_session"),
             "all_session_links_match": all_session_links,
         },
         "phase": phase,
         "receipt": receipt,
+        "guest_exit": guest_exit,
         "stage231_collected_report": collected,
         "pixel_diagnostics": diagnostics,
         "consistency_gate": {
             "phase_final_receipt_committed": phase_final,
             "receipt_reports_zero_mismatches": receipt_clean,
+            "stage241_guest_reported_success": guest_complete,
             "both_upload_and_render_match_synthetic_fixture": both_captures_match,
             "stage231_collected_report_consistent_if_present": collected_consistent,
             "synthetic_bundle_consistent": consistent,

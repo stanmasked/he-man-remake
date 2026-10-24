@@ -1,0 +1,58 @@
+name: He-Man Stage242 synthetic guest-exit consistency matrix
+on:
+  pull_request:
+    paths:
+      - 'tools/collect_stage236_gpu_bundle.py'
+      - 'tools/stage241_guest_exit_receipt.py'
+      - 'tools/stage242_guest_gate_matrix.py'
+      - 'tests/test_stage236_gpu_bundle.py'
+      - 'tests/test_stage240_private_emulator_launcher.py'
+      - '.github/workflows/stage242-guest-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stage242-synthetic-matrix:
+    runs-on: ubuntu-24.04
+    name: Verify nonce-bound guest completion matrix
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject original commercial source assets in tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo "Commercial source assets are prohibited" >&2
+            exit 1
+          fi
+      - name: Run invented five-scenario guest-exit evidence matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 tools/stage242_guest_gate_matrix.py --output build/stage242_guest_gate_matrix.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          obj=json.loads(Path("build/stage242_guest_gate_matrix.json").read_text())
+          assert obj["cases_tested"]==5
+          assert obj["all_synthetic_cases_passed"] is True
+          assert obj["gpu_execution_verified"] is False
+          assert obj["emulator_process_executed"] is False
+          assert obj["original_ios_graphics_parity_verified"] is False
+          assert sum(bool(x["synthetic_bundle_consistent"]) for x in obj["cases"])==1
+          print("STAGE242_SOURCE_ONLY_MATRIX_OK")
+          PY
+          sha256sum build/stage242_guest_gate_matrix.json
+      - name: Preserve source-only Stage242 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage242-original-free-guest-gate
+          path: build/stage242_guest_gate_matrix.json
+          if-no-files-found: error
+          retention-days: 7
