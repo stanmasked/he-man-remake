@@ -52,6 +52,24 @@ class BundleTests(unittest.TestCase):
         nro,sd,session=self.prepare(root,**kwargs)
         return m.collect_bundle(nro,sd,session)
 
+    def attach_collected(self,session):
+        receipt_bytes=RECEIPT.encode("ascii")
+        runner=b"synthetic runner log, not a real execution\n"
+        (session/"readback.rgba").write_bytes(payload())
+        (session/"readback.receipt").write_bytes(receipt_bytes)
+        (session/"runtime.log").write_bytes(runner)
+        (session/"exit-status.txt").write_text("0\n",encoding="ascii")
+        report={
+            "schema":"stage231-collected-synthetic-gpu-evidence-v1",
+            "result":"submitted_capture_matches_challenge_and_pixels",
+            "nonce":NONCE,"nro_sha256":NRO_SHA,
+            "rgba_sha256":hashlib.sha256(payload()).hexdigest(),
+            "receipt_sha256":hashlib.sha256(receipt_bytes).hexdigest(),
+            "runner_log_sha256":hashlib.sha256(runner).hexdigest(),
+            "runtime_provenance_attested":False,
+        }
+        (session/"stage231_collected.json").write_text(json.dumps(report),encoding="utf-8")
+
     def test_complete_consistent_bundle_is_not_gpu_attestation(self):
         with tempfile.TemporaryDirectory() as root:
             report=self.collect(root)
@@ -143,15 +161,24 @@ class BundleTests(unittest.TestCase):
     def test_collected_report_is_not_gpu_attestation(self):
         with tempfile.TemporaryDirectory() as root:
             nro,sd,session=self.prepare(root)
-            report={"schema":"stage231-collected-synthetic-gpu-evidence-v1",
-                    "result":"submitted_capture_matches_challenge_and_pixels",
-                    "nonce":NONCE,"nro_sha256":NRO_SHA,
-                    "rgba_sha256":hashlib.sha256(payload()).hexdigest(),
-                    "runtime_provenance_attested":False}
-            (session/"stage231_collected.json").write_text(json.dumps(report))
+            self.attach_collected(session)
             result=m.collect_bundle(nro,sd,session)
         self.assertEqual(result["stage231_collected_report"]["status"],"valid")
+        self.assertTrue(result["stage231_collected_report"]["receipt_hash_matches"])
+        self.assertTrue(result["stage231_collected_report"]["runner_log_hash_matches"])
+        self.assertTrue(result["stage231_collected_report"]["exit_status_zero"])
         self.assertFalse(result["stage231_collected_report"]["runtime_provenance_attested"])
+
+    def test_collected_runner_hash_mismatch_is_rejected(self):
+        with tempfile.TemporaryDirectory() as root:
+            nro,sd,session=self.prepare(root)
+            self.attach_collected(session)
+            (session/"runtime.log").write_bytes(b"tampered runner log\n")
+            result=m.collect_bundle(nro,sd,session)
+        self.assertEqual(result["stage231_collected_report"]["status"],"mismatch")
+        self.assertFalse(result["stage231_collected_report"]["runner_log_hash_matches"])
+        self.assertFalse(result["consistency_gate"]["stage231_collected_report_consistent_if_present"])
+        self.assertFalse(result["consistency_gate"]["synthetic_bundle_consistent"])
 
 
 if __name__=="__main__":
