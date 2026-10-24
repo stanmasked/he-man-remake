@@ -1,0 +1,67 @@
+name: He-Man Stage262 Thumb direct call census
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/thumb_bl_call_census.py'
+      - 'tests/test_thumb_bl_call_census.py'
+      - 'docs/stage262-thumb-bl-call-census.md'
+      - '.github/workflows/stage262-thumb-bl-call-census.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-thumb-calls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private game assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Synthetic Stage262 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_thumb_bl_call_census.py' -v
+      - name: Write synthetic-only summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          data = {
+              "schema": "heman-stage262-thumb-direct-call-ci-v1",
+              "result": "synthetic_thumb_bl_tests_passed_not_original_evidence",
+              "fabricated_macho_and_thumb_calls_only": True,
+              "original_ipa_loaded": False,
+              "original_executable_loaded": False,
+              "original_disassembly_or_symbol_names_exported": False,
+              "verified_original_call_graph": False,
+              "original_runtime_resource_binding_verified": False,
+              "original_collision_response_verified": False,
+              "native_switch_collision_import_authorized": False
+          }
+          Path("build/stage262_synthetic_summary.json").write_text(
+              json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE262_SYNTHETIC_THUMB_BL_VALIDATED")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage262-synthetic-thumb-direct-call-summary
+          path: build/stage262_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
