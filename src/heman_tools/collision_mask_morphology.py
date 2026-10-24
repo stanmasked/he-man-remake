@@ -166,6 +166,9 @@ def _screen_data(archive: zipfile.ZipFile, screen: str, map_name: str) -> dict:
     atlas_index = atlas_matches[0]
     tileset = parse_tileset(tileset_raw)
     image = _load_rgba_png(texture_raw)
+    for entry in tileset["entries"]:
+        if entry["x"] + entry["width"] > image.width or entry["y"] + entry["height"] > image.height:
+            raise TileSetFormatError("tileset rectangle exceeds texture bounds")
     texture_ref = tileset["texture_ref"].casefold()
     if texture_ref.startswith("img_"):
         texture_ref = texture_ref[4:]
