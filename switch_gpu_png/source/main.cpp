@@ -170,8 +170,8 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
         {0,0,8,DkVtxAttribSize_2x32,DkVtxAttribType_Float,0}
     };
     const DkVtxBufferState buffers[1] = {{sizeof(Stage228Vertex),0}};
-    cmd.bindVtxAttribState(attribs);
-    cmd.bindVtxBufferState(buffers);
+    cmd.bindVtxAttribState({attribs[0],attribs[1]});
+    cmd.bindVtxBufferState({buffers[0]});
     cmd.bindVtxBuffer(0,vertexMem.getGpuAddr(),sizeof kQuad);
     cmd.bindTextures(DkStage_Fragment,0,dkMakeTextureHandle(0,0));
     cmd.draw(DkPrimitive_TriangleStrip,4,1,0,0);
