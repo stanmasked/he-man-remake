@@ -85,6 +85,16 @@ class Stage240Tests(unittest.TestCase):
         self.assertFalse(self.session.exists())
         self.assertFalse((self.sd/"switch").exists())
 
+    def test_test_only_bypass_rejects_unmarked_executable(self):
+        unmarked=self.root/"unmarked-runner.py"
+        unmarked.write_text("#!/usr/bin/env python3\\nraise SystemExit(0)\\n",encoding="utf-8")
+        unmarked.chmod(0o700)
+        with self.assertRaisesRegex(m.LaunchError,"requires the explicit synthetic runner marker"):
+            m.launch(unmarked,self.nro,self.sd,self.session,
+                     self.args("success"),timeout=30,test_runner=True)
+        self.assertFalse(self.session.exists())
+        self.assertFalse((self.sd/"switch").exists())
+
     def test_missing_emulator_and_invalid_paths_fail_closed(self):
         with self.assertRaisesRegex(m.LaunchError,"existing absolute"):
             m.build_command(self.root/"missing",self.nro,["{nro}"])
