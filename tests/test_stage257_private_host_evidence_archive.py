@@ -109,11 +109,12 @@ class Stage257PrivateArchiveTests(unittest.TestCase):
             "runtime_provenance_attested": False,
         }
         self.collected = {
-            "schema": "stage231-capture-collected-v1",
-            "runtime_gpu_execution_attested": False,
-            "gpu_capability_independently_verified": False,
-            "original_ios_graphics_parity_attested": False,
+            "schema": "stage231-collected-synthetic-gpu-evidence-v1",
+            "result": "submitted_capture_matches_challenge_and_pixels",
+            "nonce": self.challenge,
             "rgba_sha256": digest(self.payload),
+            "runtime_provenance_attested": False,
+            "warning": "Synthetic test fixture; does not prove GPU execution.",
         }
         (self.session / "stage240_launch.json").write_bytes(json_bytes(self.launch))
         (self.session / "stage231_session.json").write_bytes(json_bytes(self.session_manifest))
