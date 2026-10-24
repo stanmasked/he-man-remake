@@ -177,11 +177,17 @@ def summarize_tile_shape_field_chain(binary: bytes) -> dict:
                    if t["operation"] == "str"}
     setter_stores = {t["offset_bytes"] for _, t in set_transfers
                      if t["operation"] == "str"}
-    getter_loads = {t["offset_bytes"] for _, t in get_transfers
-                    if t["operation"] == "ldr"}
-    common = sorted(file_stores & setter_stores & getter_loads)
-    # Same base-object offset can also appear on different registers; this is
-    # a candidate structural join, not verified alias/data flow.
+    # The getter is a bounded small leaf; its *first* load is from this.
+    # Its second load dereferences the returned wrapper. Restrict the
+    # candidate to the first load rather than incidental stack accesses
+    # elsewhere in the two larger methods.
+    if not get_transfers or get_transfers[0][1]["operation"] != "ldr":
+        raise ValueError("getter has no first member load")
+    getter_first = get_transfers[0][1]
+    common = sorted((file_stores & setter_stores)
+                    & {getter_first["offset_bytes"]})
+    # Offsets alone do not prove runtime aliases, but this read/write
+    # envelope is narrower than matching arbitrary transfers.
     if len(common) != 1:
         raise ValueError("field-access join is ambiguous or absent")
     offset = common[0]
