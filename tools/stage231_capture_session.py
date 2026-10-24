@@ -69,8 +69,12 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
     sd.mkdir(parents=True, exist_ok=True)
     # Stale artifacts must be removed before guest startup; never touch
     # original commercial files or paths outside the synthetic test folder.
-    for name in ("readback.rgba", "readback.receipt",
-                 "readback.rgba.tmp", "readback.receipt.tmp"):
+    for name in (
+        "readback.rgba", "readback.receipt",
+        "readback.rgba.tmp", "readback.receipt.tmp",
+        "upload.rgba", "upload.rgba.tmp",
+        "gpu_phase.txt", "gpu_phase.tmp",
+    ):
         (sd / name).unlink(missing_ok=True)
     (sd / "run_nonce.txt").write_text(challenge + "\n", encoding="ascii")
     request = {
