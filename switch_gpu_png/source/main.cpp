@@ -53,25 +53,42 @@ static bool buildSyntheticSource()
 struct Stage227Header {
     uint32_t magic, headerSize, controlSize, codeSize, programsOffset, programs;
 };
-static bool verifyPackagedShader(const char* name)
+// Stage232: verify the exact one-program DKSH layout before handing it to
+// deko3d. The SDK expects a complete 64-byte DkshProgramHeader inside the
+// 256-aligned control section, followed by aligned GPU machine code.
+static bool verifyPackagedShader(const char* name, DkStage stage)
 {
     FILE* file=std::fopen(name,"rb");
     if(!file) return false;
     Stage227Header header{};
     bool valid=std::fread(&header,sizeof header,1u,file)==1u;
     if(valid) {
-        valid=(header.magic==0x48534b44u && header.headerSize>=sizeof header &&
-               header.controlSize>=header.headerSize &&
-               header.controlSize<=1024u*1024u &&
-               header.codeSize>0 && header.codeSize<=1024u*1024u &&
-               header.programsOffset>=header.headerSize &&
-               header.programsOffset<header.controlSize &&
-               header.programs>=1u && header.programs<=16u);
-        if(valid && std::fseek(file,0,SEEK_END)==0) {
-            long end=std::ftell(file);
-            valid=end>=0 && (uint64_t)end >=
+        const bool vertex=stage==DkStage_Vertex;
+        const bool fragment=stage==DkStage_Fragment;
+        valid=(vertex||fragment) &&
+            header.magic==0x48534b44u &&
+            header.headerSize==sizeof(Stage227Header) &&
+            header.controlSize>=header.headerSize+64u &&
+            header.controlSize<=4096u &&
+            (header.controlSize%DK_SHADER_CODE_ALIGNMENT)==0 &&
+            header.codeSize>=DK_SHADER_CODE_ALIGNMENT &&
+            header.codeSize<=4096u &&
+            (header.codeSize%DK_SHADER_CODE_ALIGNMENT)==0 &&
+            header.programs==1u &&
+            header.programsOffset>=header.headerSize &&
+            (uint64_t)header.programsOffset+64u<=header.controlSize;
+        if(valid) {
+            uint32_t actualType=UINT32_MAX;
+            valid=std::fseek(file,(long)header.programsOffset,SEEK_SET)==0 &&
+                std::fread(&actualType,sizeof actualType,1u,file)==1u &&
+                actualType==(vertex?0u:1u);
+        }
+        if(valid) {
+            valid=std::fseek(file,0,SEEK_END)==0;
+            const long size=valid?std::ftell(file):-1;
+            valid=size>=0 && (uint64_t)size==
                 (uint64_t)header.controlSize+(uint64_t)header.codeSize;
-        } else valid=false;
+        }
     }
     std::fclose(file);
     return valid;
@@ -90,11 +107,19 @@ static constexpr Stage228Vertex kQuad[4] = {
 static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
                               const char* name, DkStage stage, dk::Shader& shader)
 {
+    if(!verifyPackagedShader(name,stage) ||
+       (offset%DK_SHADER_CODE_ALIGNMENT)!=0) return false;
     FILE* file=std::fopen(name,"rb");
     if(!file) return false;
-    bool ok=std::fseek(file,0,SEEK_END)==0;
-    const long length=ok?std::ftell(file):-1;
-    ok=length>=static_cast<long>(sizeof(Stage227Header)) && length<=2048 &&
+    Stage227Header header{};
+    bool ok=std::fread(&header,sizeof header,1u,file)==1u;
+    const uint64_t length=(uint64_t)header.controlSize+header.codeSize;
+    // The last DK_SHADER_CODE_UNUSABLE_SIZE bytes of every code MemBlock
+    // are reserved by deko3d. Reject overlaps even when CPU memcpy fits.
+    const uint64_t cap=codeMem.getSize();
+    ok=ok && cap>=DK_SHADER_CODE_UNUSABLE_SIZE &&
+       (uint64_t)offset+length<=cap-DK_SHADER_CODE_UNUSABLE_SIZE &&
+       length>0 && length<=8192u &&
        std::fseek(file,0,SEEK_SET)==0;
     if(ok) {
         auto* dst=static_cast<uint8_t*>(codeMem.getCpuAddr());
@@ -102,7 +127,8 @@ static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
     }
     std::fclose(file);
     if(!ok) return false;
-    dk::ShaderMaker{codeMem,offset}.initialize(shader);
+    // The deko3d SDK explicitly supports the inline control+code form.
+    dk::ShaderMaker{codeMem,offset}.setProgramId(0u).initialize(shader);
     return shader.isValid() && shader.getStage()==stage;
 }
 
@@ -317,8 +343,8 @@ int main(int argc, char** argv)
     const Result romfsResult=romfsInit();
     if(R_FAILED(romfsResult)) return 11;
     const bool shadersReady=
-        verifyPackagedShader("romfs:/shaders/padded_texture_vsh.dksh") &&
-        verifyPackagedShader("romfs:/shaders/padded_texture_fsh.dksh");
+        verifyPackagedShader("romfs:/shaders/padded_texture_vsh.dksh",DkStage_Vertex) &&
+        verifyPackagedShader("romfs:/shaders/padded_texture_fsh.dksh",DkStage_Fragment);
     if(!shadersReady) { romfsExit(); return 12; }
     // Unlike Stage225's libnx software framebuffer this creates an actual
     // Tegra image, stages CPU-generated pixels and submits a GPU copy command.
@@ -328,7 +354,7 @@ int main(int argc, char** argv)
     if(!queue) return 4;
 
     // Load the exact packaged DKSH programs into GPU code memory.
-    // The DKSH control section is included in each slot, as in deko3d examples.
+    // Inline DKSH control+code is SDK-supported; Stage232 checks strict bounds.
     auto shaderMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT*4u}
         .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached|
                   DkMemBlockFlags_Code).create();
