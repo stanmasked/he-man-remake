@@ -47,6 +47,8 @@ def read_limited(path: Path, max_bytes: int, label: str) -> bytes:
         if len(content) > max_bytes:
             raise EvidenceReadError(f"{label}: grew beyond {max_bytes} bytes")
         return content
+    except FileNotFoundError as exc:
+        raise EvidenceReadError(f"{label}: missing file") from exc
     except OSError as exc:
         raise EvidenceReadError(f"{label}: cannot read regular file: {exc}") from exc
     finally:
