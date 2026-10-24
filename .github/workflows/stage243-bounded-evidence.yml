@@ -1,0 +1,59 @@
+name: He-Man Stage243 bounded synthetic evidence
+on:
+  pull_request:
+    paths:
+      - 'tools/stage231_capture_session.py'
+      - 'tools/collect_stage236_gpu_bundle.py'
+      - 'tools/stage243_bounded_evidence.py'
+      - 'tools/stage243_limit_matrix.py'
+      - 'tests/test_stage243_bounded_evidence.py'
+      - '.github/workflows/stage243-bounded-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Source-only sparse oversized capture matrix
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject commercial data from tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo 'Commercial input must remain private' >&2
+            exit 1
+          fi
+      - name: Run strict bounded-read regressions
+        run: python3 -m unittest discover -s tests -p 'test_stage243_bounded_evidence.py' -v
+      - name: Generate invented sparse evidence size matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/stage243_limit_matrix.py --output build/stage243_limit_matrix.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/stage243_limit_matrix.json').read_text())
+          assert r['cases_tested']==6
+          assert r['gpu_execution_verified'] is False
+          assert r['emulator_run_verified'] is False
+          assert r['original_ios_parity_verified'] is False
+          assert sum(x['actual_accept'] for x in r['case_results'])==2
+          print('STAGE243_ONLY_SYNTHETIC_INPUTS_VERIFIED')
+          PY
+          sha256sum build/stage243_limit_matrix.json
+      - name: Preserve synthetic Stage243 report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage243-source-only-size-bounds
+          path: build/stage243_limit_matrix.json
+          if-no-files-found: error
+          retention-days: 7

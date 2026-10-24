@@ -4,6 +4,9 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+import sys
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
 
 path = Path(__file__).resolve().parents[1] / "tools" / "stage231_capture_session.py"
 spec = importlib.util.spec_from_file_location("stage231_session", path)
@@ -133,6 +136,34 @@ class Stage231SessionTests(unittest.TestCase):
         self.capture.joinpath("readback.receipt").write_text(RECEIPT)
         self.capture.joinpath("readback.rgba").write_bytes(b"xyz")
         with self.assertRaisesRegex(m.SessionError, "sized GPU"):
+            self.run_collect()
+
+
+    def test_oversized_raw_log_is_rejected_without_collection(self):
+        with self.log.open("wb") as stream:
+            stream.truncate(4*1024*1024+1)
+        with self.assertRaisesRegex(m.SessionError,"runner log.*oversized"):
+            self.run_collect()
+        self.assertFalse((self.out/"stage231_collected.json").exists())
+
+    def test_oversized_receipt_and_nonce_are_rejected(self):
+        self.capture.joinpath("readback.receipt").write_bytes(b"x"*257)
+        with self.assertRaisesRegex(m.SessionError,"completion receipt.*oversized"):
+            self.run_collect()
+        self.capture.joinpath("readback.receipt").write_text(RECEIPT)
+        self.capture.joinpath("run_nonce.txt").write_bytes(b"n"*65)
+        with self.assertRaisesRegex(m.SessionError,"SD request nonce.*oversized"):
+            self.run_collect()
+
+    def test_oversized_prepared_manifest_and_exit_status(self):
+        self.out.joinpath("stage231_session.json").write_bytes(b"x"*(64*1024+1))
+        with self.assertRaisesRegex(m.SessionError,"prepared session manifest.*oversized"):
+            self.run_collect()
+        import json
+        self.out.joinpath("stage231_session.json").write_text(
+            json.dumps(self.session),encoding="utf-8")
+        self.status.write_bytes(b"0"*65)
+        with self.assertRaisesRegex(m.SessionError,"exit status.*oversized"):
             self.run_collect()
 
     def test_nonce_is_not_gpu_proof_even_with_forged_metadata(self):
