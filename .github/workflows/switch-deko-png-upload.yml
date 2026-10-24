@@ -1,4 +1,4 @@
-name: He-Man Stage227 deko3d compiled texture shader bundle
+name: He-Man Stage228 offscreen textured quad and GPU readback cross-build
 on:
   pull_request:
     paths:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build deko3d synthetic GPU image transfer
+    name: Cross-build Stage228 deko3d offscreen textured quad
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -58,10 +58,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive original-free GPU transfer probe
+      - name: Archive Stage228 original-free textured quad probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage227-synthetic-deko3d-shader-bundle
+          name: heman-stage228-synthetic-deko3d-texture-readback
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh
