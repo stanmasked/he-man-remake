@@ -27,7 +27,7 @@ BYTES = 512
 NONCE = re.compile(r"[0-9a-f]{32}")
 RECEIPT = re.compile(
     r"STAGE230_GPU_READBACK width=(\d+) height=(\d+) bytes=(\d+) "
-    r"pixels=(\d+) mismatches=(\d+) nonce=([0-9a-f]{32})\n?"
+    r"pixels=(\d+) mismatches=(\d+) nonce=([0-9a-f]{32})(?:\r?\n)?"
 )
 
 
@@ -51,7 +51,7 @@ def payload() -> bytes:
 def nro_sha256(nro_file: Path) -> str:
     fd = None
     try:
-        fd = os.open(nro_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(nro_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or not 20 <= info.st_size <= 16*1024*1024:
             raise SessionError("invalid NRO size or file type")
@@ -223,7 +223,7 @@ def _unlink_at(directory_fd: int, name: str) -> None:
 def _write_file_at(
     directory_fd: int, name: str, data: bytes, *, exclusive: bool = False
 ) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
     flags |= os.O_EXCL if exclusive else os.O_TRUNC
     fd = None
     created = False
@@ -355,7 +355,8 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         nonce_tmp = sd / "run_nonce.txt.tmp"
         nonce_final = sd / "run_nonce.txt"
         try:
-            nonce_tmp.write_text(challenge + "\n", encoding="ascii")
+            # Use bytes so Windows newline translation cannot change the challenge.
+            nonce_tmp.write_bytes((challenge + "\n").encode("ascii"))
             os.replace(nonce_tmp, nonce_final)
         except OSError as exc:
             nonce_tmp.unlink(missing_ok=True)

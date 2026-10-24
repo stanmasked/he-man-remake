@@ -44,7 +44,10 @@ class BoundedEvidenceTests(unittest.TestCase):
     def test_symlink_is_not_followed_on_supported_platforms(self):
         target=self.root/"target"
         target.write_bytes(b"untouched")
-        self.path.symlink_to(target)
+        try:
+            self.path.symlink_to(target)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable on this host")
         if getattr(os,"O_NOFOLLOW",0):
             with self.assertRaises(EvidenceReadError):
                 read_limited(self.path,512,"symlink")
