@@ -92,6 +92,36 @@ class Stage235Tests(unittest.TestCase):
         with self.assertRaisesRegex(m.DiagnosticError,"exceeds"):
             m.analyze(EXPECTED,None,b"x"*257)
 
+    def test_render_phase_progress_is_conservative_and_ordered(self):
+        cases = (
+            ("05_render_commands_submitted", 5, "wait_for_render_queue_idle"),
+            ("06_render_queue_idle", 6, "cpu_readback_compare_and_commit_receipt"),
+            ("07_receipt_committed", 7, None),
+        )
+        for phase_name, index, next_expected in cases:
+            phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\n"
+                     .encode("ascii"))
+            with self.subTest(phase=phase_name):
+                report = m.analyze(EXPECTED, None, phase)
+                details = report["phase"]
+                self.assertTrue(details["syntax_valid"])
+                self.assertTrue(details["known_phase"])
+                self.assertEqual(details["phase_index"], index)
+                self.assertEqual(details["next_expected"], next_expected)
+                self.assertFalse(details["runtime_gpu_execution_attested"])
+                self.assertFalse(details["original_ios_graphics_parity_attested"])
+                self.assertIn("not", details["progress_interpretation"])
+
+    def test_unknown_but_well_formed_phase_is_not_assigned_progress(self):
+        phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase=99_future_phase\n"
+                 .encode("ascii"))
+        details = m.analyze(EXPECTED, None, phase)["phase"]
+        self.assertTrue(details["syntax_valid"])
+        self.assertFalse(details["known_phase"])
+        self.assertIsNone(details["phase_index"])
+        self.assertIsNone(details["next_expected"])
+        self.assertFalse(details["runtime_gpu_execution_attested"])
+
     def test_nonmatching_data_has_ranked_candidates(self):
         bad=bytes([0xA5])*512
         result=m.classify(bad,EXPECTED)

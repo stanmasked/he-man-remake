@@ -1,10 +1,12 @@
 """Stage234 nonce checkpoint and cache barrier audit. Invented data only."""
 import importlib.util
 import json
+import sys
 from pathlib import Path
 import unittest
 
 module_path=Path(__file__).resolve().parents[1]/"tools"/"verify_stage234_gpu_phase.py"
+sys.path.insert(0,str(module_path.parent))
 spec=importlib.util.spec_from_file_location("stage234_phase",module_path)
 m=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)

@@ -16,6 +16,7 @@ import sys
 from stage231_capture_session import nro_sha256, SessionError
 from analyze_stage235_gpu_capture import analyze, DiagnosticError
 from stage241_guest_exit_receipt import check_guest_exit
+from stage234_phase_contract import PHASES, describe_phase
 from stage243_bounded_evidence import (
     read_limited, EvidenceReadError, MAX_MANIFEST_BYTES, MAX_LOG_BYTES,
     MAX_RGBA_BYTES, MAX_RECEIPT_BYTES, MAX_PHASE_BYTES,
@@ -30,12 +31,7 @@ RECEIPT = re.compile(
 PHASE = re.compile(
     rb"STAGE234_GPU_PHASE nonce=([0-9a-f]{32}) phase=([0-9a-z_]+)\n"
 )
-KNOWN_PHASES = {
-    "01_nonce_validated", "02_shaders_loaded",
-    "03_texture_upload_queue_idle", "04_upload_pixels_match",
-    "05_render_commands_submitted", "06_render_queue_idle",
-    "07_receipt_committed",
-}
+KNOWN_PHASES = frozenset(PHASES)
 BYTE_COUNT = 512
 
 
@@ -121,13 +117,12 @@ def phase_info(data: bytes | None, session_nonce: str) -> dict:
     nonce = match[1].decode("ascii")
     phase = match[2].decode("ascii")
     nonce_matches = nonce == session_nonce
-    known = phase in KNOWN_PHASES
+    progress = describe_phase(phase)
+    known = progress["known_phase"]
     return {
         "status": "valid" if nonce_matches and known else "mismatch",
-        "phase": phase,
-        "phase_index": sorted(KNOWN_PHASES).index(phase) + 1 if known else None,
+        **progress,
         "nonce_matches_session": nonce_matches,
-        "known_phase": known,
         "sha256": sha(data),
         "note": "CPU-side checkpoint only; not GPU execution attestation",
     }

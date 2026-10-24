@@ -11,15 +11,7 @@ from pathlib import Path
 import re
 import sys
 
-PHASES=(
-    "01_nonce_validated",
-    "02_shaders_loaded",
-    "03_texture_upload_queue_idle",
-    "04_upload_pixels_match",
-    "05_render_commands_submitted",
-    "06_render_queue_idle",
-    "07_receipt_committed",
-)
+from stage234_phase_contract import PHASES
 PHASE=re.compile(
     rb"STAGE234_GPU_PHASE nonce=([0-9a-f]{32}) phase=([0-9a-z_]+)\n"
 )
