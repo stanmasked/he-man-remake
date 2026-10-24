@@ -90,6 +90,18 @@ class Stage252RuntimePreflightTests(unittest.TestCase):
         self.assertFalse(report["checks"]["emulator_regular_non_symlink"])
         self.assertEqual(report["result"], "preflight_blocked")
 
+    def test_symlinked_stage230_directory_chain_is_rejected(self):
+        external = self.root / "external-sd-output"
+        external.mkdir()
+        link = self.sd_root / "switch"
+        try:
+            link.symlink_to(external, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        report = self.run_preflight()
+        self.assertFalse(report["checks"]["sd_capture_directory_chain_safe"])
+        self.assertEqual(report["result"], "preflight_blocked")
+
     def test_symlinked_sd_root_is_rejected(self):
         link = self.root / "sd-link"
         try:
