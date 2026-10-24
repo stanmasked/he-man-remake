@@ -99,7 +99,7 @@ class Stage235Tests(unittest.TestCase):
             ("07_receipt_committed", 7, None),
         )
         for phase_name, index, next_expected in cases:
-            phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\\n"
+            phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\n"
                      .encode("ascii"))
             with self.subTest(phase=phase_name):
                 report = m.analyze(EXPECTED, None, phase)
@@ -113,7 +113,7 @@ class Stage235Tests(unittest.TestCase):
                 self.assertIn("not", details["progress_interpretation"])
 
     def test_unknown_but_well_formed_phase_is_not_assigned_progress(self):
-        phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase=99_future_phase\\n"
+        phase = (f"STAGE234_GPU_PHASE nonce={NONCE} phase=99_future_phase\n"
                  .encode("ascii"))
         details = m.analyze(EXPECTED, None, phase)["phase"]
         self.assertTrue(details["syntax_valid"])
