@@ -16,12 +16,13 @@ NRO_SHA=hashlib.sha256(NRO).hexdigest()
 RECEIPT=("STAGE230_GPU_READBACK width=16 height=8 bytes=512 "
          f"pixels=128 mismatches=0 nonce={NONCE}\n")
 PHASE=f"STAGE234_GPU_PHASE nonce={NONCE} phase=06_receipt_committed\n".encode()
+GUEST=f"STAGE241_GUEST_EXIT nonce={NONCE} code=0\n".encode()
 DEFAULT=object()
 
 
 class BundleTests(unittest.TestCase):
     def prepare(self,root,*,upload=DEFAULT,render=DEFAULT,phase=PHASE,receipt=RECEIPT,
-                sd_nonce=NONCE+"\n",session_nonce=NONCE,nro_sha=NRO_SHA,
+                guest_exit=GUEST,sd_nonce=NONCE+"\n",session_nonce=NONCE,nro_sha=NRO_SHA,
                 session_schema="stage231-capture-session-v1"):
         root=Path(root)
         sd=root/"sd"/"switch"/"heman-stage230"
@@ -35,10 +36,11 @@ class BundleTests(unittest.TestCase):
         (session/"stage231_session.json").write_text(json.dumps(manifest),encoding="utf-8")
         values={"upload":payload() if upload is DEFAULT else upload,
                 "render":payload() if render is DEFAULT else render,
-                "phase":phase,"receipt":receipt,
+                "phase":phase,"receipt":receipt,"guest_exit":guest_exit,
                 "sd_nonce":sd_nonce.encode("ascii") if isinstance(sd_nonce,str) else sd_nonce}
         names={"upload":"upload.rgba","render":"readback.rgba",
                "phase":"gpu_phase.txt","receipt":"readback.receipt",
+               "guest_exit":"guest_exit.txt",
                "sd_nonce":"run_nonce.txt"}
         for key,value in values.items():
             path=sd/names[key]
@@ -75,9 +77,44 @@ class BundleTests(unittest.TestCase):
             report=self.collect(root)
         gate=report["consistency_gate"]
         self.assertTrue(gate["synthetic_bundle_consistent"])
+        self.assertTrue(gate["stage241_guest_reported_success"])
+        self.assertEqual(report["guest_exit"]["guest_exit_code"],0)
         self.assertTrue(gate["both_upload_and_render_match_synthetic_fixture"])
         self.assertFalse(gate["runtime_gpu_execution_attested"])
         self.assertFalse(gate["original_ios_graphics_parity_attested"])
+
+    def test_missing_guest_receipt_fails_even_with_pixel_perfection(self):
+        with tempfile.TemporaryDirectory() as root:
+            report=self.collect(root,guest_exit=None)
+        self.assertTrue(report["receipt"]["zero_pixel_mismatches"])
+        self.assertTrue(report["consistency_gate"]["both_upload_and_render_match_synthetic_fixture"])
+        self.assertFalse(report["consistency_gate"]["stage241_guest_reported_success"])
+        self.assertFalse(report["session_links"]["all_session_links_match"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+        self.assertEqual(report["guest_exit"]["status"],"missing")
+
+    def test_nonzero_guest_return_fails_even_if_captures_match(self):
+        receipt=GUEST.replace(b"code=0",b"code=25")
+        with tempfile.TemporaryDirectory() as root:
+            report=self.collect(root,guest_exit=receipt)
+        self.assertEqual(report["guest_exit"]["guest_exit_code"],25)
+        self.assertFalse(report["consistency_gate"]["stage241_guest_reported_success"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+
+    def test_stale_guest_nonce_fails_session_link(self):
+        receipt=GUEST.replace(NONCE.encode("ascii"),b"d"*32)
+        with tempfile.TemporaryDirectory() as root:
+            report=self.collect(root,guest_exit=receipt)
+        self.assertEqual(report["guest_exit"]["status"],"nonce_mismatch")
+        self.assertFalse(report["session_links"]["guest_exit_nonce_matches_session"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+
+    def test_malformed_guest_receipt_preserves_diagnostics(self):
+        with tempfile.TemporaryDirectory() as root:
+            report=self.collect(root,guest_exit=b"truncated")
+        self.assertEqual(report["guest_exit"]["status"],"malformed")
+        self.assertIn("upload",report["pixel_diagnostics"]["captures"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
 
     def test_missing_partial_files_remain_diagnostic(self):
         with tempfile.TemporaryDirectory() as root:
