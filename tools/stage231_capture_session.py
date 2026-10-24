@@ -51,7 +51,7 @@ def payload() -> bytes:
 def nro_sha256(nro_file: Path) -> str:
     fd = None
     try:
-        fd = os.open(nro_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(nro_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or not 20 <= info.st_size <= 16*1024*1024:
             raise SessionError("invalid NRO size or file type")
@@ -223,7 +223,7 @@ def _unlink_at(directory_fd: int, name: str) -> None:
 def _write_file_at(
     directory_fd: int, name: str, data: bytes, *, exclusive: bool = False
 ) -> None:
-    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
     flags |= os.O_EXCL if exclusive else os.O_TRUNC
     fd = None
     created = False
