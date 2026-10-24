@@ -55,7 +55,8 @@ jobs:
           test -s switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh
           python3 tools/verify_stage227_dksh_bundle.py \
             switch_gpu_png/romfs/shaders/padded_texture_vsh.dksh \
-            switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh
+            switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
+            --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
       - name: Archive original-free GPU transfer probe
         uses: actions/upload-artifact@v4
