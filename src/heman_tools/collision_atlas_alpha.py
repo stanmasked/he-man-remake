@@ -10,7 +10,6 @@ from collections import Counter
 import hashlib
 import io
 import json
-import os
 from pathlib import Path
 import struct
 import zipfile
@@ -361,7 +360,7 @@ def private_output_path(path: Path) -> Path:
     destination = path.resolve()
     if destination == root or not destination.is_relative_to(root) or destination.suffix != ".json":
         raise ValueError("output must be a .json file beneath local_reports/")
-    if path.exists() and path.is_symlink():
+    if path.is_symlink():
         raise ValueError("output must not be a symbolic link")
     return destination
 
