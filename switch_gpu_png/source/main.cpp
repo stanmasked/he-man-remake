@@ -186,13 +186,13 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
         const auto p=(y*kWidth+x)*4u;
         if(std::memcmp(pixels+p,s_padded+p,4u)!=0) {
             if(mismatches<8u)
-                std::printf("STAGE228_PIXEL_MISMATCH x=%u y=%u expected=%02x%02x%02x%02x got=%02x%02x%02x%02x\\n",
+                std::printf("STAGE228_PIXEL_MISMATCH x=%u y=%u expected=%02x%02x%02x%02x got=%02x%02x%02x%02x\n",
                             x,y,s_padded[p],s_padded[p+1],s_padded[p+2],s_padded[p+3],
                             pixels[p],pixels[p+1],pixels[p+2],pixels[p+3]);
             ++mismatches;
         }
     }
-    std::printf("STAGE228_GPU_QUAD_READBACK pixels=%u mismatches=%u\\n",
+    std::printf("STAGE228_GPU_QUAD_READBACK pixels=%u mismatches=%u\n",
                 kWidth*kHeight,mismatches);
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
     return mismatches==0?0:25;
