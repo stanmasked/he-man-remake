@@ -43,8 +43,8 @@ blocked.
   private parent; rejects symlinked paths and group/world POSIX permissions.
   Python's standard library does not independently audit Windows ACLs, so the
   report says so rather than claiming ACL verification.
-- Path separation: rejects output nesting inside the SD tree and session paths
-  that contain or overlap the emulator/NRO.
+- Path separation: rejects output nesting inside the SD tree, emulator/NRO files
+  located inside the SD tree, and session paths that contain or overlap inputs.
 - Launch arguments: bounded list, no empty/NUL arguments, exactly one standalone
   {nro} placeholder.
 
