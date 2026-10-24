@@ -1,0 +1,46 @@
+name: He-Man Stage246 Windows Job Object
+on:
+  pull_request:
+    paths:
+      - 'tools/stage240_private_emulator_launcher.py'
+      - 'tools/stage246_windows_job_object_matrix.py'
+      - '.github/workflows/stage246-windows-job-object.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-job-object:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    name: Verify kill-on-close terminates descendants
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject original commercial assets
+        shell: pwsh
+        run: |
+          $paths = git ls-files
+          if ($LASTEXITCODE -ne 0) { throw "git ls-files failed" }
+          if ($paths -match '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$') {
+            throw "Commercial source files must remain private"
+          }
+      - name: Run synthetic Windows Job Object matrix
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python tools/stage246_windows_job_object_matrix.py --output build/stage246_windows_job_object.json
+          if ($LASTEXITCODE -ne 0) { throw "Stage246 Windows Job Object test failed" }
+          python -c "import json,pathlib; r=json.loads(pathlib.Path('build/stage246_windows_job_object.json').read_text()); c=r['case']; assert r['synthetic_only'] is True; assert c['parent_exit_code']==0; assert c['pipe_open_after_parent_exit'] is True; assert c['active_processes_before_cleanup']>=1; assert c['cleanup_success'] is True; assert c['job_closed'] is True; assert c['drain_finished_after_cleanup'] is True; assert c['gpu_execution_verified'] is False; assert c['original_ios_parity_verified'] is False; print('STAGE246_WINDOWS_SOURCE_ONLY_REPORT_VALID')"
+          if ($LASTEXITCODE -ne 0) { throw "Stage246 report validation failed" }
+          Get-FileHash build/stage246_windows_job_object.json -Algorithm SHA256
+      - name: Preserve synthetic Windows report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage246-windows-job-object
+          path: build/stage246_windows_job_object.json
+          if-no-files-found: error
+          retention-days: 7
