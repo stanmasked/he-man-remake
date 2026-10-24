@@ -1,4 +1,4 @@
-name: He-Man Stage234 texture cache and GPU checkpoint cross-build
+name: He-Man Stage241 nonce-bound guest exit cross-build
 on:
   pull_request:
     paths:
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage234 cache-synchronized GPU probe
+    name: Cross-build Stage241 guest exit receipt GPU probe
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -58,6 +58,8 @@ jobs:
           grep -aFq 'STAGE234_GPU_PHASE nonce=' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq '06_receipt_committed' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/gpu_phase.txt' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'STAGE241_GUEST_EXIT nonce=' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'sdmc:/switch/heman-stage230/guest_exit.txt' switch_gpu_png/heman_deko_png_transfer.elf
           python3 -c "import pathlib,sys; sys.path.insert(0,'tools'); from verify_stage234_gpu_phase import audit_source; print(audit_source(pathlib.Path('switch_gpu_png/source/main.cpp').read_text()))"
           "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
@@ -78,10 +80,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage234 cache-synchronized GPU probe
+      - name: Archive Stage241 guest-exit receipt GPU probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage234-synthetic-gpu-phase-nro
+          name: heman-stage241-synthetic-guest-exit-nro
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh

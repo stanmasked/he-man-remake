@@ -74,6 +74,7 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         "readback.rgba.tmp", "readback.receipt.tmp",
         "upload.rgba", "upload.rgba.tmp",
         "gpu_phase.txt", "gpu_phase.tmp",
+        "guest_exit.txt", "guest_exit.tmp",
         "run_nonce.txt.tmp",
     ):
         (sd / name).unlink(missing_ok=True)

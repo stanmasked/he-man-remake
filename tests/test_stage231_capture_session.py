@@ -54,7 +54,8 @@ class Stage231SessionTests(unittest.TestCase):
             "readback.rgba", "readback.receipt",
             "readback.rgba.tmp", "readback.receipt.tmp",
             "upload.rgba", "upload.rgba.tmp",
-            "gpu_phase.txt", "gpu_phase.tmp", "run_nonce.txt.tmp",
+            "gpu_phase.txt", "gpu_phase.tmp",
+            "guest_exit.txt", "guest_exit.tmp", "run_nonce.txt.tmp",
         )
         for name in stale_names:
             self.capture.joinpath(name).write_bytes(b"stale-private-test-data")

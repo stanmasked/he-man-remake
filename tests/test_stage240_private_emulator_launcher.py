@@ -17,7 +17,7 @@ root=pathlib.Path(sys.argv[1])/"switch"/"heman-stage230"
 nonce=(root/"run_nonce.txt").read_text(encoding="ascii").strip()
 mode=sys.argv[3]
 print("STAGE240_FAKE_RUNNER_NOT_GPU_EVIDENCE", flush=True)
-if mode=="success":
+if mode in ("success","success_no_guest"):
     pixels=bytearray()
     for y in range(8):
         for x in range(16):
@@ -31,6 +31,9 @@ if mode=="success":
     (root/"gpu_phase.txt").write_text(
         "STAGE234_GPU_PHASE nonce="+nonce+
         " phase=06_receipt_committed\n",encoding="ascii")
+    if mode=="success":
+        (root/"guest_exit.txt").write_text(
+            "STAGE241_GUEST_EXIT nonce="+nonce+" code=0\n",encoding="ascii")
 elif mode=="incomplete":
     (root/"gpu_phase.txt").write_text(
         "STAGE234_GPU_PHASE nonce="+nonce+
@@ -83,6 +86,8 @@ class Stage240Tests(unittest.TestCase):
         self.assertEqual(report["host_process_exit_code"],0)
         self.assertTrue(report["stage231_collected"])
         self.assertTrue(report["stage236_bundle_consistent"])
+        self.assertTrue(report["stage241_guest_exit_receipt_accepted"])
+        self.assertEqual(report["stage241_guest_exit_receipt"]["guest_exit_code"],0)
         self.assertFalse(report["runtime_gpu_execution_attested"])
         self.assertFalse(report["guest_process_exit_independently_verified"])
         self.assertFalse(report["emulator_gpu_capability_independently_verified"])
@@ -92,6 +97,16 @@ class Stage240Tests(unittest.TestCase):
         self.assertEqual((self.session/"runtime.log").read_bytes(),
                          (self.session/"host-launch.log").read_bytes())
         self.assertIn(b"NOT_GPU_EVIDENCE",(self.session/"host-launch.log").read_bytes())
+
+    def test_emulator_host_zero_with_valid_pixels_but_no_guest_exit_is_rejected(self):
+        report=m.launch(self.exe,self.nro,self.sd,self.session,
+                        self.args("success_no_guest"),timeout=30,test_runner=True)
+        self.assertEqual(report["host_process_exit_code"],0)
+        self.assertTrue(report["stage231_collected"])
+        self.assertTrue(report["stage236_bundle_consistent"])
+        self.assertFalse(report["stage241_guest_exit_receipt_accepted"])
+        self.assertEqual(report["stage241_guest_exit_receipt"]["status"],"missing")
+        self.assertFalse(report["runtime_gpu_execution_attested"])
 
     def test_no_capture_on_successful_process_is_not_a_successful_gpu_run(self):
         report=m.launch(self.exe,self.nro,self.sd,self.session,

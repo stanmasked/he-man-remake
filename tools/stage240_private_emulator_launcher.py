@@ -19,6 +19,7 @@ import sys
 
 from stage231_capture_session import prepare, collect, SessionError, nro_sha256
 from collect_stage236_gpu_bundle import collect_bundle, BundleError
+from stage241_guest_exit_receipt import inspect_guest_exit_file
 
 
 class LaunchError(ValueError):
@@ -149,6 +150,13 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
     except (BundleError,SessionError,OSError,ValueError) as exc:
         bundle_error=f"{type(exc).__name__}: {exc}"
 
+    # Stage241: the host process may close with 0 without ever executing the
+    # guest NRO. Require a separate nonce-matching guest-side CPU receipt.
+    # The file itself is forgeable and NEVER attests the GPU backend.
+    guest_exit=inspect_guest_exit_file(
+        sd_root/"switch"/"heman-stage230"/"guest_exit.txt",
+        prepared["nonce"])
+    guest_success=guest_exit["guest_reported_success"]
     manifest={
         "schema":"stage240-host-emulator-attempt-v1",
         "prepared_session_nonce":prepared["nonce"],
@@ -166,6 +174,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "stage231_collection_error":collection_error,
         "stage236_bundle_consistent":bundle_consistent,
         "stage236_bundle_error":bundle_error,
+        "stage241_guest_exit_receipt":guest_exit,
+        "stage241_guest_exit_receipt_accepted":guest_success,
         "emulator_gpu_capability_independently_verified":False,
         "guest_process_exit_independently_verified":False,
         "runtime_gpu_execution_attested":False,
@@ -200,7 +210,7 @@ def main()->int:
         print(f"STAGE240_FAIL: {exc}",file=sys.stderr)
         return 1
     print(json.dumps(result,sort_keys=True,indent=2))
-    return 0 if result["stage231_collected"] and result["stage236_bundle_consistent"] else 2
+    return 0 if result["stage231_collected"] and result["stage236_bundle_consistent"] and result["stage241_guest_exit_receipt_accepted"] else 2
 
 
 if __name__=="__main__":
