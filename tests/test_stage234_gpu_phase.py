@@ -93,7 +93,7 @@ class PhaseTests(unittest.TestCase):
         source=(Path(__file__).resolve().parents[1]/
                 "switch_gpu_png"/"source"/"main.cpp").read_text()
         duplicated=source.replace('saveStage234Checkpoint("06_render_queue_idle")',
-                                  'saveStage234Checkpoint("05_render_queue_idle") && saveStage234Checkpoint("05_render_queue_idle")')
+                                  'saveStage234Checkpoint("06_render_queue_idle") && saveStage234Checkpoint("06_render_queue_idle")')
         with self.assertRaises(m.PhaseEvidenceError):
             m.audit_source(duplicated)
         no_full=source.replace("cmd.barrier(DkBarrier_Full,",
