@@ -1,0 +1,77 @@
+name: He-Man Stage250 canonical phase contract
+on:
+  pull_request:
+    paths:
+      - 'tools/stage234_phase_contract.py'
+      - 'tools/verify_stage234_gpu_phase.py'
+      - 'tools/analyze_stage235_gpu_capture.py'
+      - 'tools/collect_stage236_gpu_bundle.py'
+      - 'tools/stage250_phase_contract_matrix.py'
+      - 'tests/test_stage250_phase_contract.py'
+      - 'tests/test_stage234_gpu_phase.py'
+      - 'tests/test_stage235_gpu_capture_diagnostics.py'
+      - 'tests/test_stage236_gpu_bundle.py'
+      - '.github/workflows/stage250-phase-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    name: Verify canonical ordered phase semantics
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run phase contract regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage250_phase_contract.py' -v
+          python -m unittest discover -s tests -p 'test_stage234_gpu_phase.py' -v
+          python -m unittest discover -s tests -p 'test_stage235_gpu_capture_diagnostics.py' -v
+          python -m unittest discover -s tests -p 'test_stage236_gpu_bundle.py' -v
+      - name: Build integrated phase report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/stage250_phase_contract_matrix.py --output build/stage250_phase_contract.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = json.loads(Path("build/stage250_phase_contract.json").read_text())
+          assert p["schema"] == "heman-stage250-phase-contract-v1"
+          assert p["result"] == "stage250_phase_contract_pass"
+          assert p["phase_count"] == 7 and len(p["phases"]) == 7
+          assert p["phase_order"] == [row["phase"] for row in p["phases"]]
+          assert p["phases"][4]["phase_index"] == 5
+          assert p["phases"][4]["next_expected"] == "wait_for_render_queue_idle"
+          assert p["phases"][5]["phase_index"] == 6
+          assert p["phases"][5]["next_expected"] == "cpu_readback_compare_and_commit_receipt"
+          assert p["phases"][6]["phase_index"] == 7
+          assert all(row["analyzer_index"] == row["phase_index"] == row["bundle_index"] for row in p["phases"])
+          assert all(row["runtime_gpu_execution_attested"] is False for row in p["phases"])
+          assert p["runtime_gpu_execution_attested"] is False
+          assert p["original_ios_graphics_parity_attested"] is False
+          print("STAGE250_PHASE_REPORT_VALID")
+          PY
+          sha256sum build/stage250_phase_contract.json
+      - name: Preserve synthetic phase contract report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage250-phase-contract
+          path: build/stage250_phase_contract.json
+          if-no-files-found: error
+          retention-days: 7
