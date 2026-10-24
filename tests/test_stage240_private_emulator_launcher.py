@@ -16,6 +16,11 @@ import sys
 root=pathlib.Path(sys.argv[1])/"switch"/"heman-stage230"
 nonce=(root/"run_nonce.txt").read_text(encoding="ascii").strip()
 mode=sys.argv[3]
+if mode=="noisy":
+    for _ in range(100):
+        sys.stdout.write("X"*65536)
+        sys.stdout.flush()
+    sys.exit(0)
 print("STAGE240_FAKE_RUNNER_NOT_GPU_EVIDENCE", flush=True)
 if mode in ("success","success_no_guest"):
     pixels=bytearray()
@@ -128,6 +133,22 @@ class Stage240Tests(unittest.TestCase):
         self.assertFalse(report["stage231_collected"])
         self.assertFalse(report["stage236_bundle_consistent"])
         self.assertEqual((self.session/"runner-exit-status.txt").read_text(),"7\n")
+
+
+    def test_noisy_process_output_is_capped_and_never_collected_as_complete(self):
+        report=m.launch(self.exe,self.nro,self.sd,self.session,
+                        self.args("noisy"),timeout=30,test_runner=True)
+        log=(self.session/"host-launch.log")
+        self.assertEqual(report["host_process_exit_code"],0)
+        self.assertTrue(report["runner_log_truncated"])
+        self.assertEqual(report["runner_log_limit_bytes"],m.MAX_HOST_LOG_BYTES)
+        self.assertEqual(report["runner_log_bytes_captured"],m.MAX_HOST_LOG_BYTES)
+        self.assertGreater(report["runner_log_bytes_observed"],m.MAX_HOST_LOG_BYTES)
+        self.assertEqual(log.stat().st_size,m.MAX_HOST_LOG_BYTES)
+        self.assertFalse(report["stage231_collected"])
+        self.assertIn("truncated",report["stage231_collection_error"])
+        self.assertFalse(report["stage236_bundle_consistent"])
+        self.assertFalse(report["runtime_gpu_execution_attested"])
 
     def test_no_reuse_of_prepared_session(self):
         m.launch(self.exe,self.nro,self.sd,self.session,
