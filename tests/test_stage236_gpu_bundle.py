@@ -126,7 +126,7 @@ class BundleTests(unittest.TestCase):
         self.assertIsNone(report["pixel_diagnostics"])
 
     def test_wrong_phase_nonce_rejected_by_consistency_gate(self):
-        stale=f"STAGE234_GPU_PHASE nonce={'d'*32} phase=06_receipt_committed\n".encode()
+        stale=f"STAGE234_GPU_PHASE nonce={'d'*32} phase=07_receipt_committed\n".encode()
         with tempfile.TemporaryDirectory() as root:
             report=self.collect(root,phase=stale)
         self.assertFalse(report["session_links"]["phase_nonce_matches_session"])
