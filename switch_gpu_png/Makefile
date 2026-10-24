@@ -8,6 +8,11 @@ DEVKITA64 ?= $(DEVKITPRO)/devkitA64
 CC := $(DEVKITA64)/bin/aarch64-none-elf-gcc
 CXX := $(DEVKITA64)/bin/aarch64-none-elf-g++
 ELF2NRO ?= $(DEVKITPRO)/tools/bin/elf2nro
+UAM ?= $(DEVKITPRO)/tools/bin/uam
+ROMFS := romfs
+VERT_SHADER := $(ROMFS)/shaders/padded_texture_vsh.dksh
+FRAG_SHADER := $(ROMFS)/shaders/padded_texture_fsh.dksh
+SHADER_BINARIES := $(VERT_SHADER) $(FRAG_SHADER)
 ROOT := $(abspath ..)
 ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 COMMON := -O2 -Wall -Wextra -Werror $(ARCH) -D__SWITCH__ \
@@ -28,7 +33,14 @@ native_upload.o: $(ROOT)/native/src/heman_native_png_upload.c \
 $(TARGET).elf: source/main.cpp native_upload.o
 	$(CXX) $(CXXFLAGS) source/main.cpp native_upload.o \
 	  $(LDFLAGS) -ldeko3d -lnx -lm -o $@
-$(TARGET).nro: $(TARGET).elf
-	$(ELF2NRO) $< $@
+$(ROMFS)/shaders:
+	mkdir -p $@
+$(VERT_SHADER): shaders/padded_texture_vsh.glsl | $(ROMFS)/shaders
+	$(UAM) -s vert -o $@ $<
+$(FRAG_SHADER): shaders/padded_texture_fsh.glsl | $(ROMFS)/shaders
+	$(UAM) -s frag -o $@ $<
+$(TARGET).nro: $(TARGET).elf $(SHADER_BINARIES)
+	$(ELF2NRO) $< $@ --romfsdir=$(abspath $(ROMFS))
 clean:
 	rm -f $(TARGET).elf $(TARGET).nro native_upload.o
+	rm -f $(SHADER_BINARIES)
