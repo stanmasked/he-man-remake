@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <cstring>
 #include <cstdio>
+#include <cerrno>
+#include <sys/stat.h>
 
 extern "C" {
 #include "heman_native_png_upload.h"
@@ -102,6 +104,73 @@ static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
     if(!ok) return false;
     dk::ShaderMaker{codeMem,offset}.initialize(shader);
     return shader.isValid() && shader.getStage()==stage;
+}
+
+// Invalidate any previous capture BEFORE starting GPU work, including failed
+// shader initialization or GPU hangs. Never let an old receipt look fresh.
+static bool prepareStage230Capture()
+{
+    if(::mkdir("sdmc:/switch",0777)!=0 && errno!=EEXIST) return false;
+    if(::mkdir("sdmc:/switch/heman-stage230",0777)!=0 && errno!=EEXIST)
+        return false;
+    for(const char* path : {
+        "sdmc:/switch/heman-stage230/readback.receipt",
+        "sdmc:/switch/heman-stage230/readback.rgba",
+        "sdmc:/switch/heman-stage230/readback.rgba.tmp",
+        "sdmc:/switch/heman-stage230/readback.receipt.tmp"
+    }) {
+        if(std::remove(path)!=0 && errno!=ENOENT) return false;
+    }
+    return true;
+}
+
+// Stage230: preserve *observed* bytes without relying on stdout routing.
+// The receipt is committed last; a missing receipt means an incomplete capture.
+// This is a synthetic fixture. Neither the SD card nor this file proves GPU
+// hardware provenance; a real runner/device observation is still required.
+static bool saveStage230Capture(const uint8_t* pixels, uint32_t mismatches)
+{
+    static constexpr const char* base="sdmc:/switch/heman-stage230";
+    static constexpr const char* imageTmp="sdmc:/switch/heman-stage230/readback.rgba.tmp";
+    static constexpr const char* imageFinal="sdmc:/switch/heman-stage230/readback.rgba";
+    static constexpr const char* receiptTmp="sdmc:/switch/heman-stage230/readback.receipt.tmp";
+    static constexpr const char* receiptFinal="sdmc:/switch/heman-stage230/readback.receipt";
+    if(!pixels) return false;
+    if(::mkdir("sdmc:/switch",0777)!=0 && errno!=EEXIST) return false;
+    if(::mkdir(base,0777)!=0 && errno!=EEXIST) return false;
+    // Fail closed against a successful receipt from a prior invocation.
+    if(std::remove(receiptFinal)!=0 && errno!=ENOENT) return false;
+    std::remove(imageTmp);
+    std::remove(receiptTmp);
+    FILE* output=std::fopen(imageTmp,"wb");
+    if(!output) return false;
+    const bool wrote=std::fwrite(pixels,1u,kGpuUploadBytes,output)==kGpuUploadBytes;
+    const bool synced=std::fflush(output)==0;
+    const bool closed=std::fclose(output)==0;
+    if(!wrote||!synced||!closed) {
+        std::remove(imageTmp);
+        return false;
+    }
+    if(std::rename(imageTmp,imageFinal)!=0) {
+        std::remove(imageTmp);
+        return false;
+    }
+    FILE* receipt=std::fopen(receiptTmp,"wb");
+    if(!receipt) return false;
+    const int n=std::fprintf(receipt,
+        "STAGE230_GPU_READBACK width=%u height=%u bytes=%u pixels=%u mismatches=%u\n",
+        kWidth,kHeight,kGpuUploadBytes,kWidth*kHeight,mismatches);
+    const bool receiptSynced=std::fflush(receipt)==0;
+    const bool receiptClosed=std::fclose(receipt)==0;
+    if(n<=0||!receiptSynced||!receiptClosed) {
+        std::remove(receiptTmp);
+        return false;
+    }
+    if(std::rename(receiptTmp,receiptFinal)!=0) {
+        std::remove(receiptTmp);
+        return false;
+    }
+    return true;
 }
 
 static int runStage228Draw(dk::Device device, dk::Queue queue,
@@ -207,14 +276,20 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     std::printf("STAGE229_GPU_READBACK_END mismatches=%u\n",mismatches);
     std::printf("STAGE228_GPU_QUAD_READBACK pixels=%u mismatches=%u\n",
                 kWidth*kHeight,mismatches);
+    // Stage230 requires a persistent capture even if stdout is unavailable.
+    // Save mismatching bytes too, so a failed run remains diagnosable.
+    const bool captured=saveStage230Capture(pixels,mismatches);
+    if(!captured)
+        std::fprintf(stderr,"STAGE230_CAPTURE_FAILED: cannot persist SD readback\n");
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
-    return mismatches==0?0:25;
+    return captured?(mismatches==0?0:25):26;
 }
 
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
     if(!buildSyntheticSource()) return 2;
+    if(!prepareStage230Capture()) return 27; // no SD evidence path
     const Result romfsResult=romfsInit();
     if(R_FAILED(romfsResult)) return 11;
     const bool shadersReady=
