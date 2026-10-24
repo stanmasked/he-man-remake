@@ -19,9 +19,9 @@ The important conclusion is that a layer named collision does not imply that eve
 
 ## Registry correction: special resolves to damage.tileset
 
-The original TilesetData.repo maps the special atlas key to /tilesets/damage.tileset. That tileset references the specialTiles key, which is present in TextureData.repo. The alias is therefore resolved through the authoritative resource registry; the absence of a same-stem special.tileset file is not a missing resource.
+The original TilesetData.repo maps the special atlas key to /tilesets/damage.tileset. That tileset references the specialTiles key, which is present in TextureData.repo. The TextureData.repo offset points to a valid TextureData.wad metadata record whose key and record boundary match the index in both screen packs. The alias and metadata resource path are therefore resolved through the authoritative resource registries; the absence of a same-stem special.tileset file is not a missing resource.
 
-A separate filename-based PNG candidate has different tile-0 alpha coverage across the two screen packs. This does not invalidate the registry mapping and does not prove the runtime texture has the same alpha data: the actual texture key is indexed in TextureData.wad. Do not use the separately named PNG as a collision mask until its relationship to the runtime WAD resource and rendering path is verified.
+A separate filename-based PNG candidate has different tile-0 alpha coverage across the two screen packs. The WAD record confirms the resource name and metadata boundary, not collision behavior or the semantics of its pixels. Do not use the separately named PNG as a collision mask until the runtime texture loading and collision lookup paths are independently established.
 
 The complete owner-private atlas/tile frequencies, registry manifest and candidate PNG comparison are preserved in the private Stage258 Drive handoff.
 
@@ -37,4 +37,4 @@ Public CI uses fabricated multilayer maps and resource registries only. No origi
 
 ## Evidence boundary
 
-The inventory proves source-file parity, resource-registry resolution and aggregate atlas routing. It does not establish collision response, solidity, slope behavior, one-way platforms, hazards, actor ownership, coordinate scale or original gameplay parity. Registry resolution is not proof of physics semantics. All original collision semantics remain unverified, and native Switch collision import remains unauthorized until the runtime lookup and behavior are independently established.
+The inventory proves source-file parity, resource-registry resolution, selected TextureData.wad metadata-record boundaries and aggregate atlas routing. It does not establish collision response, solidity, slope behavior, one-way platforms, hazards, actor ownership, coordinate scale or original gameplay parity. Registry resolution is not proof of physics semantics. All original collision semantics remain unverified, and native Switch collision import remains unauthorized until the runtime lookup and behavior are independently established.
