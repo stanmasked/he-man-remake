@@ -1,4 +1,4 @@
-name: He-Man Stage230 persistent SD GPU readback cross-build
+name: He-Man Stage231 nonce-bound SD GPU capture cross-build
 on:
   pull_request:
     paths:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage230 SD GPU capture probe
+    name: Cross-build Stage231 nonce-bound readback
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -49,6 +49,8 @@ jobs:
           grep -aFq 'STAGE229_GPU_READBACK_END' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'STAGE230_GPU_READBACK width=' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/readback.rgba' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'sdmc:/switch/heman-stage230/run_nonce.txt' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'mismatches=%u nonce=%s' switch_gpu_png/heman_deko_png_transfer.elf
           "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_gpu_png/heman_deko_png_transfer.nro
@@ -64,10 +66,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage230 original-free SD readback probe
+      - name: Archive Stage231 original-free nonce-bound NRO
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage230-synthetic-sd-gpu-readback-nro
+          name: heman-stage231-synthetic-nonce-bound-nro
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh

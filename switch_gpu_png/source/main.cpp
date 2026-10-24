@@ -106,6 +106,29 @@ static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
     return shader.isValid() && shader.getStage()==stage;
 }
 
+// Stage231 host-generated 128-bit challenge binds the SD result to an
+// explicit run request. This is an anti-stale receipt, NOT GPU attestation.
+static char s_stage231Nonce[33] = {};
+
+static bool loadStage231Nonce()
+{
+    FILE* request=std::fopen("sdmc:/switch/heman-stage230/run_nonce.txt","rb");
+    if(!request) return false;
+    char input[34] = {};
+    const size_t got=std::fread(input,1u,sizeof input,request);
+    const bool closed=std::fclose(request)==0;
+    if(!closed || got!=33u || input[32]!='\n')
+        return false;
+    for(size_t i=0;i<32u;++i) {
+        const char c=input[i];
+        if(!((c>='0'&&c<='9')||(c>='a'&&c<='f')))
+            return false;
+    }
+    std::memcpy(s_stage231Nonce,input,32u);
+    s_stage231Nonce[32]='\0';
+    return true;
+}
+
 // Invalidate any previous capture BEFORE starting GPU work, including failed
 // shader initialization or GPU hangs. Never let an old receipt look fresh.
 static bool prepareStage230Capture()
@@ -158,8 +181,8 @@ static bool saveStage230Capture(const uint8_t* pixels, uint32_t mismatches)
     FILE* receipt=std::fopen(receiptTmp,"wb");
     if(!receipt) return false;
     const int n=std::fprintf(receipt,
-        "STAGE230_GPU_READBACK width=%u height=%u bytes=%u pixels=%u mismatches=%u\n",
-        kWidth,kHeight,kGpuUploadBytes,kWidth*kHeight,mismatches);
+        "STAGE230_GPU_READBACK width=%u height=%u bytes=%u pixels=%u mismatches=%u nonce=%s\n",
+        kWidth,kHeight,kGpuUploadBytes,kWidth*kHeight,mismatches,s_stage231Nonce);
     const bool receiptSynced=std::fflush(receipt)==0;
     const bool receiptClosed=std::fclose(receipt)==0;
     if(n<=0||!receiptSynced||!receiptClosed) {
@@ -290,6 +313,7 @@ int main(int argc, char** argv)
     (void)argc; (void)argv;
     if(!buildSyntheticSource()) return 2;
     if(!prepareStage230Capture()) return 27; // no SD evidence path
+    if(!loadStage231Nonce()) return 28; // refuse unbound / stale sessions
     const Result romfsResult=romfsInit();
     if(R_FAILED(romfsResult)) return 11;
     const bool shadersReady=
