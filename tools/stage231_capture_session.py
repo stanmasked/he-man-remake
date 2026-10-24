@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import secrets
 import shutil
 import sys
@@ -60,17 +61,80 @@ def sd_dir(root: Path) -> Path:
     return root / "switch" / "heman-stage230"
 
 
+def _ensure_real_directory(path: Path, *, create: bool = False) -> None:
+    """Require the final path component to be a directory, never a symlink."""
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        if not create:
+            raise SessionError("required SD capture directory is missing")
+        try:
+            path.mkdir()
+        except FileExistsError:
+            # Another process may have created it; validate the resulting inode.
+            pass
+        except OSError as exc:
+            raise SessionError(
+                f"could not create SD capture directory: {type(exc).__name__}"
+            ) from exc
+        try:
+            info = path.lstat()
+        except OSError as exc:
+            raise SessionError("could not inspect created SD capture directory") from exc
+    except OSError as exc:
+        raise SessionError(f"could not inspect SD capture directory: {type(exc).__name__}") from exc
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+        raise SessionError("SD capture path components must be non-symlink directories")
+
+
+def _ensure_sd_capture_dir(sd_root: Path) -> Path:
+    """Create/check the SD capture chain one component at a time."""
+    try:
+        root_info = sd_root.lstat()
+    except FileNotFoundError:
+        try:
+            sd_root.mkdir(parents=True, exist_ok=True)
+            root_info = sd_root.lstat()
+        except OSError as exc:
+            raise SessionError("could not create or inspect SD root") from exc
+    except OSError as exc:
+        raise SessionError("could not inspect SD root") from exc
+    if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+        raise SessionError("SD root must be a non-symlink directory")
+
+    current = sd_root
+    for name in ("switch", "heman-stage230"):
+        current = current / name
+        _ensure_real_directory(current, create=True)
+    return current
+
+
 def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None = None) -> dict:
     binary_digest = nro_sha256(nro)
-    if output_dir.exists() and any(output_dir.iterdir()):
-        raise SessionError("session output directory is not empty")
+    try:
+        output_info = output_dir.lstat()
+    except FileNotFoundError:
+        output_info = None
+    except OSError as exc:
+        raise SessionError("could not inspect session output directory") from exc
+    if output_info is not None:
+        if stat.S_ISLNK(output_info.st_mode) or not stat.S_ISDIR(output_info.st_mode):
+            raise SessionError("session output must be a non-symlink directory")
+        try:
+            if any(output_dir.iterdir()):
+                raise SessionError("session output directory is not empty")
+        except OSError as exc:
+            raise SessionError("could not inspect session output directory contents") from exc
     if challenge is None:
         challenge = secrets.token_hex(16)
     if not NONCE.fullmatch(challenge):
         raise SessionError("challenge must be 128-bit lowercase hex")
+    sd = _ensure_sd_capture_dir(sd_root)
     output_dir.mkdir(parents=True, exist_ok=True)
-    sd = sd_dir(sd_root)
-    sd.mkdir(parents=True, exist_ok=True)
+    # Recheck the directory chain immediately before touching guest files.
+    # This closes the ordinary preflight-to-PREPARE symlink substitution gap;
+    # it is not a kernel-level lock against a hostile concurrent writer.
+    sd = _ensure_sd_capture_dir(sd_root)
     # Stale artifacts must be removed before guest startup; never touch
     # original commercial files or paths outside the synthetic test folder.
     for name in (
@@ -82,6 +146,7 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         "run_nonce.txt.tmp",
     ):
         (sd / name).unlink(missing_ok=True)
+    sd = _ensure_sd_capture_dir(sd_root)
     nonce_tmp = sd / "run_nonce.txt.tmp"
     nonce_final = sd / "run_nonce.txt"
     try:
