@@ -168,7 +168,10 @@ class Stage231SessionTests(unittest.TestCase):
         target.write_text("must remain unchanged", encoding="utf-8")
         nonce_path = self.capture / "run_nonce.txt"
         nonce_path.unlink(missing_ok=True)
-        nonce_path.symlink_to(target)
+        try:
+            nonce_path.symlink_to(target)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable on this host")
         fresh_out = self.out.parent / "fresh-symlink-session"
         m.prepare(self.nro, self.sd, fresh_out, challenge=CHALLENGE)
         self.assertFalse(nonce_path.is_symlink())
