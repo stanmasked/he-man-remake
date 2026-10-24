@@ -45,9 +45,8 @@ class GuestExitTests(unittest.TestCase):
             GOOD.replace(b"a"*32,b"A"*32),
         ]
         for data in invalid:
-            with self.subTest(data=data),self.assertFalse(
-                m.check_guest_exit(data,NONCE)["guest_reported_success"]):
-                pass
+            with self.subTest(data=data):
+                self.assertFalse(m.check_guest_exit(data,NONCE)["guest_reported_success"])
         self.assertEqual(m.check_guest_exit(b"x"*129,NONCE)["status"],
                          "oversized_or_unreadable")
 
