@@ -1,0 +1,57 @@
+name: He-Man Stage244 bounded host output
+on:
+  pull_request:
+    paths:
+      - 'tools/stage240_private_emulator_launcher.py'
+      - 'tools/stage244_output_limit_matrix.py'
+      - 'tests/test_stage240_private_emulator_launcher.py'
+      - '.github/workflows/stage244-bounded-output.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-host-output:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Verify hostile child output remains capped
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject original commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo 'Commercial source files must remain private' >&2
+            exit 1
+          fi
+      - name: Test bounded output with invented child process
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/stage244_output_limit_matrix.py --output build/stage244_output_limit.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('build/stage244_output_limit.json').read_text())
+          c=r['case']
+          assert r['synthetic_only'] is True
+          assert c['bytes_observed_by_reader']==c['bytes_emitted_by_child']
+          assert c['bytes_retained']==c['configured_limit']==c['file_size']
+          assert c['truncated'] is True
+          assert c['gpu_execution_verified'] is False
+          assert c['original_ios_parity_verified'] is False
+          print('STAGE244_SOURCE_ONLY_REPORT_VALID')
+          PY
+          sha256sum build/stage244_output_limit.json
+      - name: Preserve synthetic bounded-output report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage244-source-only-bounded-output
+          path: build/stage244_output_limit.json
+          if-no-files-found: error
+          retention-days: 7

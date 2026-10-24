@@ -16,6 +16,7 @@ from pathlib import Path
 import signal
 import subprocess
 import sys
+import threading
 
 from stage231_capture_session import prepare, collect, SessionError, nro_sha256
 from collect_stage236_gpu_bundle import collect_bundle, BundleError
@@ -32,6 +33,40 @@ def file_sha(path: Path) -> str:
         for chunk in iter(lambda: stream.read(1024*1024), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+MAX_HOST_LOG_BYTES = 4 * 1024 * 1024
+OUTPUT_CHUNK_BYTES = 64 * 1024
+
+
+def drain_bounded_output(stream, log_path: Path, limit: int, state: dict) -> None:
+    """Drain child output continuously while persisting at most limit bytes."""
+    captured = 0
+    total = 0
+    try:
+        with log_path.open("wb") as log:
+            while True:
+                chunk = stream.read(OUTPUT_CHUNK_BYTES)
+                if not chunk:
+                    break
+                total += len(chunk)
+                room = max(0, limit - captured)
+                if room:
+                    retained = chunk[:room]
+                    log.write(retained)
+                    captured += len(retained)
+                if len(chunk) > room:
+                    state["truncated"] = True
+            log.flush()
+    except (OSError, ValueError) as exc:
+        state["error"] = f"{type(exc).__name__}: {exc}"
+    finally:
+        state["captured_bytes"] = captured
+        state["total_bytes"] = total
+        try:
+            stream.close()
+        except (OSError, ValueError):
+            pass
 
 
 def build_command(executable: Path, nro: Path,
@@ -95,28 +130,57 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
     timed_out=False
     exit_code=None
     error=None
+    log_state={"captured_bytes":0,"total_bytes":0,"truncated":False,
+               "error":None,"drain_incomplete":False}
+    drainer=None
+    proc=None
 
-    # Store logs only in owner-private session folder. Never use shell=True.
+    # Stream combined output through a bounded private log sink. Continue
+    # draining after the cap so a noisy process cannot block on a full pipe.
     try:
-        with log_path.open("wb") as log:
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=="nt" else 0
-            proc=subprocess.Popen(cmd,stdout=log,stderr=subprocess.STDOUT,
-                                  start_new_session=(os.name!="nt"),
-                                  creationflags=creationflags)
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=="nt" else 0
+        proc=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                              bufsize=0,start_new_session=(os.name!="nt"),
+                              creationflags=creationflags)
+        if proc.stdout is None:
+            raise LaunchError("host output pipe was not created")
+        drainer=threading.Thread(
+            target=drain_bounded_output,
+            args=(proc.stdout,log_path,MAX_HOST_LOG_BYTES,log_state),
+            name="heman-bounded-host-log",daemon=True)
+        drainer.start()
+        try:
+            exit_code=proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out=True
+            if os.name!="nt":
+                try:
+                    os.killpg(proc.pid,signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            else:
+                proc.kill()
+            exit_code=proc.wait(timeout=10)
+        drainer.join(timeout=10)
+        if drainer.is_alive():
+            log_state["drain_incomplete"]=True
+            log_state["error"]="output drain did not finish within 10 seconds"
             try:
-                exit_code=proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                timed_out=True
-                if os.name!="nt":
-                    try:
-                        os.killpg(proc.pid,signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-                else:
-                    proc.kill()
-                exit_code=proc.wait(timeout=10)
+                proc.stdout.close()
+            except (OSError,ValueError):
+                pass
     except (OSError,subprocess.SubprocessError) as exc:
         error=f"{type(exc).__name__}: {exc}"
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.kill()
+                proc.wait(timeout=10)
+            except (OSError,subprocess.SubprocessError):
+                pass
+        if drainer is not None:
+            drainer.join(timeout=2)
+            if drainer.is_alive():
+                log_state["drain_incomplete"]=True
     ended=dt.datetime.now(dt.timezone.utc).isoformat()
     # Distinguish timeout from an actual process exit code.
     if exit_code is None:
@@ -131,14 +195,21 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
     # An emulator's zero process exit is not necessarily the NRO's guest
     # exit. Stage231 collects bytes only as supplied evidence, never attests.
     if exit_code==0 and not timed_out and error is None:
-        try:
-            collect(nro,sd_root,session_dir,
-                    runner_log_path=log_path,exit_status_path=exit_path,
-                    runtime="gpu_capable_emulator",
-                    command=json.dumps(cmd))
-            collected=True
-        except (SessionError,OSError,UnicodeError,ValueError) as exc:
-            collection_error=f"{type(exc).__name__}: {exc}"
+        if log_state["truncated"]:
+            collection_error=(
+                f"host log exceeded {MAX_HOST_LOG_BYTES} bytes; "
+                "output was truncated and Stage231 collection was skipped")
+        elif log_state["error"] or log_state["drain_incomplete"]:
+            collection_error="host output drain failed or did not complete"
+        else:
+            try:
+                collect(nro,sd_root,session_dir,
+                        runner_log_path=log_path,exit_status_path=exit_path,
+                        runtime="gpu_capable_emulator",
+                        command=json.dumps(cmd))
+                collected=True
+            except (SessionError,OSError,UnicodeError,ValueError) as exc:
+                collection_error=f"{type(exc).__name__}: {exc}"
 
     bundle_consistent=False
     bundle_error=None
@@ -168,8 +239,14 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "host_process_exit_code":exit_code,
         "host_timed_out":timed_out,
         "host_launch_error":error,
-        "runner_log_sha256":file_sha(log_path) if log_path.exists() else None,
-        "runner_log_bytes":log_path.stat().st_size if log_path.exists() else None,
+        "runner_log_sha256":file_sha(log_path) if log_path.exists() and not log_state["drain_incomplete"] else None,
+        "runner_log_bytes":log_path.stat().st_size if log_path.exists() and not log_state["drain_incomplete"] else None,
+        "runner_log_bytes_captured":log_state["captured_bytes"],
+        "runner_log_bytes_observed":log_state["total_bytes"],
+        "runner_log_limit_bytes":MAX_HOST_LOG_BYTES,
+        "runner_log_truncated":log_state["truncated"],
+        "runner_log_drain_error":log_state["error"],
+        "runner_log_drain_incomplete":log_state["drain_incomplete"],
         "stage231_collected":collected,
         "stage231_collection_error":collection_error,
         "stage236_bundle_consistent":bundle_consistent,
