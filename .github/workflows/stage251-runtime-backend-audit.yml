@@ -1,0 +1,67 @@
+name: He-Man Stage251 runtime backend log audit
+on:
+  pull_request:
+    paths:
+      - 'tools/stage251_runtime_backend_audit.py'
+      - 'tests/test_stage251_runtime_backend_audit.py'
+      - 'docs/stage251-runtime-backend-audit.md'
+      - '.github/workflows/stage251-runtime-backend-audit.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-backend-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Classify bounded synthetic runtime log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run bounded backend-audit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage251_runtime_backend_audit.py' -v
+      - name: Build synthetic-only backend audit report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          printf 'emulator startup complete\nGPU Backend: Vulkan\nRenderer: Synthetic Test Adapter\n' > build/synthetic-runtime.log
+          python tools/stage251_runtime_backend_audit.py \
+            --log "$PWD/build/synthetic-runtime.log" \
+            --output "$PWD/build/stage251_runtime_backend_audit.json"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("build/stage251_runtime_backend_audit.json").read_text())
+          assert report["schema"] == "heman-stage251-runtime-backend-audit-v1"
+          assert report["result"] == "stage251_runtime_backend_audit_complete"
+          assert report["classification"] == "graphics_api_reported_no_software_marker"
+          assert report["reported_backends"] == ["vulkan"]
+          assert report["api_reported_without_software_marker"] is True
+          assert report["gpu_capability_independently_verified"] is False
+          assert report["runtime_gpu_execution_attested"] is False
+          assert report["original_ios_graphics_parity_attested"] is False
+          print("STAGE251_RUNTIME_BACKEND_AUDIT_REPORT_VALID")
+          PY
+      - name: Preserve synthetic backend-audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage251-runtime-backend-audit
+          path: build/stage251_runtime_backend_audit.json
+          if-no-files-found: error
+          retention-days: 7
