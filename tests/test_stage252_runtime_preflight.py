@@ -124,6 +124,42 @@ class Stage252RuntimePreflightTests(unittest.TestCase):
         self.assertFalse(report["checks"]["all_input_paths_absolute"])
         self.assertEqual(report["result"], "preflight_blocked")
 
+    def test_output_report_refuses_to_overwrite_existing_evidence(self):
+        report = self.private_parent / "prior-report.json"
+        report.write_text("preserve-me", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            m.write_report(report, '{"new": true}\\n')
+        self.assertEqual(report.read_text(encoding="utf-8"), "preserve-me")
+
+    def test_output_report_requires_private_posix_parent_by_default(self):
+        if os.name == "nt":
+            self.skipTest("Windows ACLs are not audited by the Python standard library")
+        public_parent = self.root / "public-output"
+        public_parent.mkdir(mode=0o755)
+        public_parent.chmod(0o755)
+        report = public_parent / "synthetic.json"
+        with self.assertRaisesRegex(ValueError, "owner-private"):
+            m.write_report(report, '{"synthetic": true}\\n')
+        m.write_report(
+            report,
+            '{"synthetic": true}\\n',
+            allow_public_output_for_synthetic_ci=True,
+        )
+        self.assertEqual(report.read_text(encoding="utf-8"), '{"synthetic": true}\\n')
+        self.assertEqual(report.stat().st_mode & 0o777, 0o600)
+
+    def test_symlink_output_report_is_rejected(self):
+        target = self.private_parent / "target.json"
+        target.write_text("target", encoding="utf-8")
+        link = self.private_parent / "report-link.json"
+        try:
+            link.symlink_to(target)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        with self.assertRaisesRegex(ValueError, "symlink"):
+            m.write_report(link, '{"x": 1}\\n')
+        self.assertEqual(target.read_text(encoding="utf-8"), "target")
+
     @unittest.skipIf(os.name == "nt", "POSIX mode bits are not Windows ACLs")
     def test_publicly_accessible_session_parent_is_rejected(self):
         self.private_parent.chmod(0o755)
