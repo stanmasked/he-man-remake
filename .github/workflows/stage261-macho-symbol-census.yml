@@ -1,0 +1,69 @@
+name: He-Man Stage261 Mach-O symbol census
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/macho_symbol_census.py'
+      - 'tests/test_macho_symbol_census.py'
+      - 'docs/stage261-macho-symbol-census.md'
+      - '.github/workflows/stage261-macho-symbol-census.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-macho-symbol-census:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run synthetic Stage261 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_macho_symbol_census.py' -v
+      - name: Write synthetic-only capability summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = {
+              "schema": "heman-stage261-macho-symbol-census-ci-v1",
+              "result": "synthetic_symbol_table_tests_passed_not_original_evidence",
+              "synthetic_macho_and_nlist_entries_only": True,
+              "original_ipa_loaded": False,
+              "original_executable_loaded": False,
+              "raw_original_symbol_names_exported": False,
+              "original_runtime_resource_binding_verified": False,
+              "original_collision_response_verified": False,
+              "original_ios_gameplay_trace_compared": False,
+              "native_switch_collision_import_authorized": False,
+              "note": "Public CI tests bounded nlist parsing only; no original assets or executable."
+          }
+          Path("build/stage261_synthetic_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE261_SYNTHETIC_MACHO_SYMBOL_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic Stage261 summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage261-synthetic-macho-symbol-census
+          path: build/stage261_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
