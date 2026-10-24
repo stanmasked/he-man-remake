@@ -66,9 +66,9 @@ def audit_source(source: str) -> dict:
         if positions!=sorted(positions):
             raise PhaseEvidenceError("checkpoint calls are out of order")
     barrier=re.search(
-        r"cmd\\.barrier\\(DkBarrier_Full,\\s*"
-        r"DkInvalidateFlags_Image\\|DkInvalidateFlags_Descriptors\\|\\s*"
-        r"DkInvalidateFlags_Shader\\);",draw)
+        r"cmd\.barrier\(DkBarrier_Full,\s*"
+        r"DkInvalidateFlags_Image\|DkInvalidateFlags_Descriptors\|\s*"
+        r"DkInvalidateFlags_Shader\);",draw)
     if not barrier:
         raise PhaseEvidenceError("missing full barrier with all three texture-related cache flags")
     after=draw.find("cmd.copyImageToBuffer(outputView")
