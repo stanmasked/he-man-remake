@@ -105,7 +105,7 @@ class CollisionMaskMorphologyTests(unittest.TestCase):
         self.assertEqual(profile["edge_coverage_pixels"],
                          {"top": 16, "right": 0, "bottom": 16, "left": 32})
         self.assertEqual(profile["horizontal_runs"], 32)
-        self.assertEqual(profile["vertical_runs"], 1)
+        self.assertEqual(profile["vertical_runs"], 16)
         self.assertEqual(profile["exposed_four_neighbor_boundary_edges"], 96)
         self.assertEqual(profile["opaque_bbox_xyxy_exclusive"], [0, 0, 16, 32])
         self.assertEqual(profile["cells_using_tile"], 2)
