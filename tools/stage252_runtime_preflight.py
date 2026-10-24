@@ -253,6 +253,30 @@ def preflight(
     }
 
 
+def write_report(path: Path, serialized: str, *, allow_public_output_for_synthetic_ci: bool = False) -> None:
+    """Create a new report without overwriting evidence; default to private POSIX parent."""
+    if not path.is_absolute():
+        raise ValueError("output report path must be absolute")
+    if path.is_symlink():
+        raise ValueError("output report path must not be a symlink")
+    if path.exists():
+        raise ValueError("output report already exists; choose a new path to preserve prior evidence")
+    parent = path.parent
+    try:
+        parent_info = parent.lstat()
+    except OSError as exc:
+        raise ValueError("output report parent must already exist") from exc
+    if not stat.S_ISDIR(parent_info.st_mode) or stat.S_ISLNK(parent_info.st_mode):
+        raise ValueError("output report parent must be a non-symlink directory")
+    if os.name != "nt" and _private_mode(parent) is False and not allow_public_output_for_synthetic_ci:
+        raise ValueError("output report parent must be owner-private on POSIX")
+    # O_EXCL prevents accidental overwrite of a prior report or a race-created file.
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write(serialized)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--emulator", type=Path, required=True)
@@ -265,6 +289,11 @@ def main() -> int:
         help="operator assertion that this exact directory is the emulator's mapped sdmc root",
     )
     parser.add_argument("--output", type=Path, help="optional owner-private JSON report path")
+    parser.add_argument(
+        "--allow-public-output-for-synthetic-ci",
+        action="store_true",
+        help="allow a non-private output parent only for synthetic public CI fixtures",
+    )
     parser.add_argument("launch_args", nargs=argparse.REMAINDER)
     args = parser.parse_args()
     launch_args = args.launch_args[1:] if args.launch_args[:1] == ["--"] else args.launch_args
@@ -279,10 +308,6 @@ def main() -> int:
     serialized = json.dumps(report, indent=2, sort_keys=True) + "\n"
     try:
         if args.output is not None:
-            if not args.output.is_absolute():
-                raise ValueError("output report path must be absolute")
-            if args.output.is_symlink():
-                raise ValueError("output report path must not be a symlink")
             if args.output.resolve() == args.sd_root.resolve() or _is_within(
                 args.output.resolve(), args.sd_root.resolve()
             ):
@@ -291,9 +316,11 @@ def main() -> int:
                 args.output.resolve(), args.session_dir.resolve()
             ):
                 raise ValueError("output report must not be written into the session directory")
-            if not args.output.parent.is_dir():
-                raise ValueError("output report parent directory must already exist")
-            args.output.write_text(serialized, encoding="utf-8")
+            write_report(
+                args.output,
+                serialized,
+                allow_public_output_for_synthetic_ci=args.allow_public_output_for_synthetic_ci,
+            )
     except (OSError, ValueError) as exc:
         print(f"STAGE252_OUTPUT_FAIL: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
