@@ -269,8 +269,10 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
                 "output was truncated and Stage231 collection was skipped")
         elif log_state["error"] or log_state["drain_incomplete"]:
             collection_error="host output drain failed or did not complete"
-        elif log_state["tree_cleanup_attempted"] and not log_state["tree_cleanup_success"]:
-            collection_error="process-tree cleanup failed; host output channel is not trusted"
+        elif log_state["tree_cleanup_attempted"]:
+            collection_error=(
+                "process-tree cleanup was required after runner exit; "
+                "Stage231 collection skipped")
         else:
             try:
                 collect(nro,sd_root,session_dir,
