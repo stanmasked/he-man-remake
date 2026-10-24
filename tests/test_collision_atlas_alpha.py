@@ -168,6 +168,17 @@ class CollisionAtlasAlphaTests(unittest.TestCase):
             with self.subTest(path=path), self.assertRaises(ValueError):
                 private_output_path(Path(path))
 
+    def test_dangling_symlink_private_output_is_rejected(self):
+        from unittest.mock import patch
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "local_reports").mkdir()
+            link = root / "local_reports" / "report.json"
+            link.symlink_to(root / "local_reports" / "missing.json")
+            with patch("heman_tools.collision_atlas_alpha.Path.cwd", return_value=root):
+                with self.assertRaisesRegex(ValueError, "symbolic link"):
+                    private_output_path(link)
+
     def test_cli_writes_only_private_report(self):
         with TemporaryDirectory() as directory:
             ipa = Path(directory) / "synthetic.ipa"
