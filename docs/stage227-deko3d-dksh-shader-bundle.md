@@ -51,3 +51,30 @@ draw an actual textured quad, capture GPU-rendered pixel evidence, and
 compare every relevant sample with the asset-free C99 reference. Any
 emulator that lacks deko3d GPU operation support must not be treated as
 proof of hardware behavior.
+
+## Discovered packaging regression and strengthened proof
+
+Independent extraction of initial successful workflow artifact
+[#40044129871](https://github.com/stanmasked/he-man-remake/actions/runs/40044129871)
+found both **valid standalone 512-byte DKSH programs** and an NRO with
+a valid NRO0 header, but **without an embedded ASET/RomFS payload**.
+Therefore the initial workflow **did not establish** usable runtime shader
+resources, despite succeeding. The built programs were adjacent files,
+not mounted resources. This regression matters: a guest would fail the
+RomFS preflight and cannot yet use those shaders.
+
+The original elf2nro code has an early-return path if icon, NACP and
+`--romfs=<image>` are all absent; a lone `--romfsdir=<folder>` does not
+prevent this early exit in that implementation. The revised Makefile
+first uses `build_romfs` to create an explicit RomFS binary and then
+passes `--romfs=<image>` to elf2nro.
+
+The revised CI now parses the NRO0 size and embedded **ASET header**,
+bounds the RomFS asset extent, and requires the exact compiled vertex
+and fragment DKSH byte strings to appear inside the RomFS itself.
+Regression tests include an apparently valid NRO without any ASET,
+missing fragment payloads and out-of-bounds asset metadata.
+
+Do not call the shader package verified until the **revised** Actions
+run passes this embedded-byte check. Neither embedded shaders nor
+cross-compilation proves shader execution or GPU pixel sampling.
