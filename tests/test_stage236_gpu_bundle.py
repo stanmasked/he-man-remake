@@ -125,6 +125,21 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(report["phase"]["status"],"missing_or_unreadable")
         self.assertIsNone(report["pixel_diagnostics"])
 
+    def test_phase_index_follows_runtime_order_not_alphabetical_order(self):
+        cases = (
+            ("05_render_commands_submitted", 5, "wait_for_render_queue_idle"),
+            ("06_render_queue_idle", 6, "cpu_readback_compare_and_commit_receipt"),
+            ("07_receipt_committed", 7, None),
+        )
+        for phase_name, index, next_expected in cases:
+            phase = f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\\n".encode()
+            with self.subTest(phase=phase_name), tempfile.TemporaryDirectory() as root:
+                report = self.collect(root, phase=phase)
+                self.assertEqual(report["phase"]["phase_index"], index)
+                self.assertEqual(report["phase"]["next_expected"], next_expected)
+                self.assertTrue(report["phase"]["known_phase"])
+                self.assertFalse(report["phase"]["runtime_gpu_execution_attested"])
+
     def test_wrong_phase_nonce_rejected_by_consistency_gate(self):
         stale=f"STAGE234_GPU_PHASE nonce={'d'*32} phase=07_receipt_committed\n".encode()
         with tempfile.TemporaryDirectory() as root:
