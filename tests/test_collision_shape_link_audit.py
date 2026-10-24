@@ -63,7 +63,7 @@ def write_synthetic_ipa(path, *, shape_med=None, shape_large=None,
         med_tileset = synthetic_tileset(shape_ref=invalid_ref)
     else:
         med_tileset = synthetic_tileset()
-    large_tileset = synthetic_tileset(scale=2, collision_id_1=collision_id_large)
+    large_tileset = synthetic_tileset(scale=2, collision_id_1=collision_id_large, shape_ref=invalid_ref or "ramp_a")
     if shape_med is None:
         shape_med = shape_polygon(((32, 22), (32, 32), (0, 32)))
     if shape_large is None:
