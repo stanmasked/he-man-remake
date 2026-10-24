@@ -22,6 +22,7 @@ from stage231_capture_session import prepare, collect, SessionError, nro_sha256
 from collect_stage236_gpu_bundle import collect_bundle, BundleError
 from stage241_guest_exit_receipt import inspect_guest_exit_file
 from stage251_runtime_backend_audit import analyze_file as audit_runtime_backend_log, AuditError as RuntimeBackendAuditError
+from stage253_preflight_launch_gate import validate_preflight_report, PreflightGateError
 
 
 class LaunchError(ValueError):
@@ -373,13 +374,26 @@ def validate_private_paths(sd_root: Path, session_dir: Path,
 
 
 def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
-           template: list[str], timeout: int, *, test_runner: bool=False) -> dict:
+           template: list[str], timeout: int, *, test_runner: bool=False,
+           preflight_report: Path | None=None) -> dict:
     if type(timeout) is not int or not 10<=timeout<=3600:
         raise LaunchError("timeout must be 10–3600 seconds")
     cmd=build_command(executable,nro,template)
     validate_private_paths(sd_root,session_dir,executable,nro)
     exe_sha=file_sha(executable)
     nro_sha=nro_sha256(nro)
+    preflight_gate = None
+    preflight_gate_status = "bypassed_test_only_runner" if test_runner else "missing"
+    if not test_runner:
+        if preflight_report is None:
+            raise LaunchError("real emulator launch requires a Stage252 --preflight-report")
+        try:
+            preflight_gate = validate_preflight_report(
+                preflight_report, executable, nro, sd_root, session_dir, template
+            )
+            preflight_gate_status = "accepted"
+        except PreflightGateError as exc:
+            raise LaunchError(f"Stage252 preflight gate rejected launch: {exc}") from exc
     prepared=prepare(nro,sd_root,session_dir)
     if prepared["nro_sha256"]!=nro_sha:
         raise LaunchError("NRO changed during session preparation")
@@ -573,6 +587,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "prepared_session_nonce":prepared["nonce"],
         "nro_sha256":nro_sha,
         "emulator_executable_sha256":exe_sha,
+        "stage252_preflight_gate_status":preflight_gate_status,
+        "stage252_preflight_gate":preflight_gate,
         "emulator_command":cmd,
         "host_process_role":"windows_gated_launcher_wrapper" if os.name=="nt" else "emulator_process",
         "windows_gated_launch_used":os.name=="nt",
@@ -630,13 +646,16 @@ def main()->int:
     ap.add_argument("--timeout",type=int,default=300)
     ap.add_argument("--test-only-runner",action="store_true",
                     help="explicit marker for local/CI fake runner regression")
+    ap.add_argument("--preflight-report",type=Path,
+                    help="fresh Stage252 report matching this exact emulator/NRO/SD root/session/argument template")
     ap.add_argument("launch_args",nargs=argparse.REMAINDER,
                     help="after --: exact emulator arguments incl. one literal {nro}")
     a=ap.parse_args()
     args=a.launch_args[1:] if a.launch_args[:1]==["--"] else a.launch_args
     try:
         result=launch(a.emulator,a.nro,a.sd_root,a.session_dir,args,
-                      a.timeout,test_runner=a.test_only_runner)
+                      a.timeout,test_runner=a.test_only_runner,
+                      preflight_report=a.preflight_report)
     except (LaunchError,SessionError,OSError,ValueError) as exc:
         print(f"STAGE240_FAIL: {exc}",file=sys.stderr)
         return 1
