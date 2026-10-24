@@ -39,8 +39,12 @@ where phase_name is one of:
 The guest removes the old phase file at start, writes each checkpoint
 to a temporary file, flushes/closes and renames it as a last-known phase.
 If writing a checkpoint fails, the guest returns exit code 29. The
-render completion phase is written only after the Stage230 nonce-bound
-receipt has been committed; early phases are not success receipts.
+05_render_commands_submitted checkpoint is written immediately after
+queue.submitCommands and before queue.waitIdle. If writing this diagnostic
+fails, the guest still waits for submitted GPU work before returning an error.
+06_render_queue_idle is written only after queue idle returns. The final
+07_receipt_committed phase is written only after the Stage230 nonce-bound
+receipt has been committed; earlier phases are not success receipts.
 
 Because the existing Stage231 nonce request is required, a checkpoint
 cannot be accepted as a new run if it refers to another session. A
