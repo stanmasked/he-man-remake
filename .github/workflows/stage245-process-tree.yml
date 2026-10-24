@@ -1,0 +1,60 @@
+name: He-Man Stage245 process-tree cleanup
+on:
+  pull_request:
+    paths:
+      - 'tools/stage240_private_emulator_launcher.py'
+      - 'tools/stage245_process_tree_matrix.py'
+      - 'tests/test_stage240_private_emulator_launcher.py'
+      - '.github/workflows/stage245-process-tree.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  process-tree-cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    name: Verify inherited pipe closes after parent exit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject original commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo 'Commercial source files must remain private' >&2
+            exit 1
+          fi
+      - name: Run Stage240 host launcher regression tests
+        run: python3 -m unittest discover -s tests -p 'test_stage240_private_emulator_launcher.py' -v
+      - name: Generate Stage245 source-only process-tree report
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/stage245_process_tree_matrix.py --output build/stage245_process_tree.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=json.loads(Path('build/stage245_process_tree.json').read_text())
+          c=report['case']
+          assert report['synthetic_only'] is True
+          assert c['parent_exit_code']==0
+          assert c['pipe_stayed_open_after_parent_exit'] is True
+          assert c['process_tree_cleanup']['success'] is True
+          assert c['drain_finished_after_cleanup'] is True
+          assert c['gpu_execution_verified'] is False
+          assert c['original_ios_parity_verified'] is False
+          print('STAGE245_SOURCE_ONLY_REPORT_VALID')
+          PY
+          sha256sum build/stage245_process_tree.json
+      - name: Preserve synthetic process-tree report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage245-source-only-process-tree
+          path: build/stage245_process_tree.json
+          if-no-files-found: error
+          retention-days: 7
