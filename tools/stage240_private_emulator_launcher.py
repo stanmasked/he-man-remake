@@ -326,6 +326,14 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
                "tree_cleanup_method":None,"tree_cleanup_error":None}
     drainer=None
     proc=None
+    job_object=None
+    log_state.update({
+        "windows_job_object_assigned":False,
+        "windows_job_object_active_processes_after_parent_exit":None,
+        "windows_job_object_close_success":None,
+        "windows_job_object_query_error":None,
+        "tree_cleanup_active_processes":None,
+    })
 
     # Stream combined output through a bounded private log sink. Continue
     # draining after the cap so a noisy process cannot block on a full pipe.
@@ -334,6 +342,12 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         proc=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
                               bufsize=0,start_new_session=(os.name!="nt"),
                               creationflags=creationflags)
+        if os.name=="nt":
+            # Assign immediately so any ordinary descendants join the Job.
+            # Failure is fail-closed: do not run an unmanaged emulator tree.
+            job_object=WindowsJobObject()
+            job_object.assign(proc)
+            log_state["windows_job_object_assigned"]=True
         if proc.stdout is None:
             raise LaunchError("host output pipe was not created")
         drainer=threading.Thread(
@@ -345,7 +359,9 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
             exit_code=proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out=True
-            cleanup=terminate_process_tree(proc)
+            cleanup=terminate_process_tree(proc,job=job_object)
+            log_state["tree_cleanup_active_processes"]=cleanup.get("active_processes_before_close")
+            log_state["windows_job_object_close_success"]=cleanup.get("job_closed")
             log_state["tree_cleanup_attempted"]=True
             log_state["tree_cleanup_success"]=cleanup["success"]
             log_state["tree_cleanup_method"]=cleanup["method"]
@@ -373,6 +389,36 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
             except (OSError,ValueError):
                 pass
             drainer.join(timeout=1)
+        # If the parent exited cleanly but no pipe was left open, still query
+        # the Job Object: descendants may be running without inheriting stdout.
+        if (os.name=="nt" and job_object is not None and job_object.is_open
+                and exit_code is not None):
+            try:
+                active=job_object.active_process_count()
+                log_state["windows_job_object_active_processes_after_parent_exit"]=active
+                if active>0:
+                    cleanup=terminate_process_tree(proc,job=job_object)
+                    log_state["tree_cleanup_active_processes"]=cleanup.get("active_processes_before_close")
+                    log_state["windows_job_object_close_success"]=cleanup.get("job_closed")
+                    log_state["tree_cleanup_attempted"]=True
+                    log_state["tree_cleanup_success"]=cleanup["success"]
+                    log_state["tree_cleanup_method"]=cleanup["method"]
+                    log_state["tree_cleanup_error"]=cleanup["error"]
+                else:
+                    closed=job_object.close()
+                    log_state["windows_job_object_close_success"]=closed
+                    if not closed:
+                        log_state["error"]="could not close empty Windows Job Object"
+            except OSError as exc:
+                log_state["windows_job_object_query_error"]=f"{type(exc).__name__}: {exc}"
+                cleanup=terminate_process_tree(proc,job=job_object)
+                log_state["tree_cleanup_active_processes"]=cleanup.get("active_processes_before_close")
+                log_state["windows_job_object_close_success"]=cleanup.get("job_closed")
+                log_state["tree_cleanup_attempted"]=True
+                log_state["tree_cleanup_success"]=False
+                log_state["tree_cleanup_method"]=cleanup["method"]
+                log_state["tree_cleanup_error"]=str(exc)
+                log_state["error"]="could not verify Windows Job Object process count"
     except (OSError,subprocess.SubprocessError) as exc:
         error=f"{type(exc).__name__}: {exc}"
         if proc is not None and proc.poll() is None:
@@ -381,6 +427,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
                 proc.wait(timeout=10)
             except (OSError,subprocess.SubprocessError):
                 pass
+        if job_object is not None and job_object.is_open:
+            log_state["windows_job_object_close_success"]=job_object.close()
         if drainer is not None:
             drainer.join(timeout=2)
             if drainer.is_alive():
@@ -459,6 +507,11 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "process_tree_cleanup_success":log_state["tree_cleanup_success"],
         "process_tree_cleanup_method":log_state["tree_cleanup_method"],
         "process_tree_cleanup_error":log_state["tree_cleanup_error"],
+        "process_tree_cleanup_active_processes":log_state["tree_cleanup_active_processes"],
+        "windows_job_object_assigned":log_state["windows_job_object_assigned"],
+        "windows_job_object_active_processes_after_parent_exit":log_state["windows_job_object_active_processes_after_parent_exit"],
+        "windows_job_object_close_success":log_state["windows_job_object_close_success"],
+        "windows_job_object_query_error":log_state["windows_job_object_query_error"],
         "stage231_collected":collected,
         "stage231_collection_error":collection_error,
         "stage236_bundle_consistent":bundle_consistent,
