@@ -195,3 +195,5 @@ No original IPA or extracted copyrighted resource may be committed, uploaded as 
 - [ ] Stage235 adds a private host-side diagnostic for Stage233 upload and Stage230 render captures: exact byte/pixel diffs, per-row mismatch counts, candidate horizontal/vertical flips and RGBA channel permutations, and cautious triage hints. It does not attest GPU execution; raw captures remain private. See [Stage235](stage235-gpu-capture-diagnostics.md).
 
 - [ ] Stage236 joins the prepared NRO/session, SD nonce, Stage234 phase, Stage230 receipt, and Stage233 upload/render captures into a single private bundle report. Stage235 mismatch analysis is retained for incomplete or failing runs; `--require-complete` gates synthetic consistency only and never claims GPU provenance. See [Stage236](stage236-private-capture-bundle.md).
+
+- [ ] Stage237 extends Stage231 PREPARE to remove stale Stage233 `upload.rgba` and Stage234 `gpu_phase.txt` files and their temporary paths, alongside the existing render capture/receipt. Regression coverage seeds all eight stale files before PREPARE and confirms cleanup before a new nonce is used. See [Stage237](stage237-stale-capture-invalidation.md).
