@@ -1,0 +1,56 @@
+name: He-Man Stage226 deko3d GPU-image upload compile probe
+on:
+  pull_request:
+    paths:
+      - 'switch_gpu_png/**'
+      - 'native/src/heman_native_png_upload.c'
+      - 'native/include/heman_native_png_upload.h'
+      - '.github/workflows/switch-deko-png-upload.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deko3d-gpu-transfer:
+    name: Cross-build deko3d synthetic GPU image transfer
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: devkitpro/devkita64:latest
+    env:
+      DEVKITPRO: /opt/devkitpro
+      DEVKITA64: /opt/devkitpro/devkitA64
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject original game assets from tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          if git ls-files | grep -Ei '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$'; then
+            echo "Commercial source assets are not permitted in public CI" >&2
+            exit 1
+          fi
+      - name: Build separate deko3d upload NRO and inspect its container
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -C switch_gpu_png clean all
+          test -s switch_gpu_png/heman_deko_png_transfer.elf
+          test -s switch_gpu_png/heman_deko_png_transfer.nro
+          "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
+          test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
+          sha256sum switch_gpu_png/heman_deko_png_transfer.nro
+          wc -c switch_gpu_png/heman_deko_png_transfer.nro
+      - name: Archive original-free GPU transfer probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage226-synthetic-deko3d-upload-nro
+          path: switch_gpu_png/heman_deko_png_transfer.nro
+          if-no-files-found: error
+          retention-days: 7
