@@ -69,6 +69,60 @@ def drain_bounded_output(stream, log_path: Path, limit: int, state: dict) -> Non
             pass
 
 
+OUTPUT_DRAIN_GRACE_SECONDS = 2
+
+
+def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10) -> dict:
+    """Best-effort termination of the isolated runner tree; never use a shell."""
+    result = {
+        "attempted": True,
+        "method": "posix_process_group" if os.name != "nt" else "windows_taskkill_tree",
+        "success": False,
+        "error": None,
+        "parent_reaped": False,
+    }
+    if os.name != "nt":
+        try:
+            os.killpg(proc.pid, signal.SIGKILL)
+            result["signal_sent"] = True
+        except ProcessLookupError:
+            result["signal_sent"] = False
+            result["already_gone"] = True
+        except OSError as exc:
+            result["error"] = f"{type(exc).__name__}: {exc}"
+    else:
+        try:
+            task = subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=grace_seconds, check=False,
+            )
+            result["taskkill_returncode"] = task.returncode
+            if task.returncode != 0:
+                result["error"] = f"taskkill returned {task.returncode}"
+        except (OSError, subprocess.SubprocessError) as exc:
+            result["error"] = f"{type(exc).__name__}: {exc}"
+    if proc.poll() is None:
+        try:
+            proc.wait(timeout=grace_seconds)
+        except subprocess.TimeoutExpired:
+            try:
+                proc.kill()
+                proc.wait(timeout=grace_seconds)
+            except (OSError, subprocess.SubprocessError) as exc:
+                result["error"] = f"{type(exc).__name__}: {exc}"
+    result["parent_reaped"] = proc.poll() is not None
+    if os.name != "nt":
+        result["success"] = result["parent_reaped"] and (
+            result.get("signal_sent", False) or result.get("already_gone", False)
+        ) and result["error"] is None
+    else:
+        result["success"] = result["parent_reaped"] and (
+            result.get("taskkill_returncode") == 0
+        ) and result["error"] is None
+    return result
+
+
 def build_command(executable: Path, nro: Path,
                   template: list[str]) -> list[str]:
     """Require an actual executable and a single exact {nro} argument slot."""
@@ -131,7 +185,9 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
     exit_code=None
     error=None
     log_state={"captured_bytes":0,"total_bytes":0,"truncated":False,
-               "error":None,"drain_incomplete":False}
+               "error":None,"drain_incomplete":False,
+               "tree_cleanup_attempted":False,"tree_cleanup_success":None,
+               "tree_cleanup_method":None,"tree_cleanup_error":None}
     drainer=None
     proc=None
 
@@ -153,22 +209,34 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
             exit_code=proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out=True
-            if os.name!="nt":
-                try:
-                    os.killpg(proc.pid,signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-            else:
-                proc.kill()
-            exit_code=proc.wait(timeout=10)
-        drainer.join(timeout=10)
+            cleanup=terminate_process_tree(proc)
+            log_state["tree_cleanup_attempted"]=True
+            log_state["tree_cleanup_success"]=cleanup["success"]
+            log_state["tree_cleanup_method"]=cleanup["method"]
+            log_state["tree_cleanup_error"]=cleanup["error"]
+            try:
+                exit_code=proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                exit_code=None
+                log_state["error"]="runner process did not exit after tree termination"
+        drainer.join(timeout=OUTPUT_DRAIN_GRACE_SECONDS)
+        if drainer.is_alive():
+            # A descendant may have inherited stdout/stderr after the main
+            # runner exited. Kill the isolated group/tree before closing pipe.
+            cleanup=terminate_process_tree(proc)
+            log_state["tree_cleanup_attempted"]=True
+            log_state["tree_cleanup_success"]=cleanup["success"]
+            log_state["tree_cleanup_method"]=cleanup["method"]
+            log_state["tree_cleanup_error"]=cleanup["error"]
+            drainer.join(timeout=OUTPUT_DRAIN_GRACE_SECONDS)
         if drainer.is_alive():
             log_state["drain_incomplete"]=True
-            log_state["error"]="output drain did not finish within 10 seconds"
+            log_state["error"]="output drain remained open after process-tree cleanup"
             try:
                 proc.stdout.close()
             except (OSError,ValueError):
                 pass
+            drainer.join(timeout=1)
     except (OSError,subprocess.SubprocessError) as exc:
         error=f"{type(exc).__name__}: {exc}"
         if proc is not None and proc.poll() is None:
@@ -201,6 +269,10 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
                 "output was truncated and Stage231 collection was skipped")
         elif log_state["error"] or log_state["drain_incomplete"]:
             collection_error="host output drain failed or did not complete"
+        elif log_state["tree_cleanup_attempted"]:
+            collection_error=(
+                "process-tree cleanup was required after runner exit; "
+                "Stage231 collection skipped")
         else:
             try:
                 collect(nro,sd_root,session_dir,
@@ -247,6 +319,10 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "runner_log_truncated":log_state["truncated"],
         "runner_log_drain_error":log_state["error"],
         "runner_log_drain_incomplete":log_state["drain_incomplete"],
+        "process_tree_cleanup_attempted":log_state["tree_cleanup_attempted"],
+        "process_tree_cleanup_success":log_state["tree_cleanup_success"],
+        "process_tree_cleanup_method":log_state["tree_cleanup_method"],
+        "process_tree_cleanup_error":log_state["tree_cleanup_error"],
         "stage231_collected":collected,
         "stage231_collection_error":collection_error,
         "stage236_bundle_consistent":bundle_consistent,
