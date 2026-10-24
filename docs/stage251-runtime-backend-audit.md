@@ -27,6 +27,16 @@ and explicit software/CPU renderer declarations. An API claim plus a software
 indicator is classified as software-rendering evidence. Multiple API claims
 are treated as ambiguous; no backend is guessed when no known marker appears.
 
+## Stage240 launcher integration
+
+The Stage240 private launcher now includes the audit result in
+`stage240_launch.json` under `runtime_backend_log_audit`, with a separate
+`runtime_backend_log_audit_status`. A complete, untruncated host log is
+classified automatically after process output has drained. If the log was
+truncated, unavailable, or could not be read safely, the report records a
+skipped/failed status rather than classifying a partial log as complete.
+This integration does not alter Stage231/236 collection acceptance.
+
 ## Evidence boundary
 
 This is a **log classifier, not an emulator validator**. Runtime logs may be
