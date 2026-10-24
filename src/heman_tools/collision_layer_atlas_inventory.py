@@ -221,7 +221,7 @@ def main(argv=None) -> int:
     except (OSError, zipfile.BadZipFile, TileMapFormatError, ValueError, KeyError) as exc:
         parser.error(f"collision atlas routing audit failed: {type(exc).__name__}: {exc}")
     print(
-        f"Stage258 parsed {report['screen_pack_map_audit']['normal_multilayer_maps_parsed']} "
+        f"Stage258 parsed {report['screen_pack_map_pair_audit']['normal_multilayer_maps_parsed']} "
         f"normal maps and {report['collision_layer_summary']['collision_named_layers']} "
         "collision layers; private aggregate saved under local_reports/"
     )
