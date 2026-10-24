@@ -1,0 +1,70 @@
+name: He-Man Stage259 collision mask morphology
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/collision_mask_morphology.py'
+      - 'tests/test_collision_mask_morphology.py'
+      - 'docs/stage259-collision-mask-morphology.md'
+      - '.github/workflows/stage259-collision-mask-morphology.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-mask-morphology:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test-only image dependency
+        run: python -m pip install --disable-pip-version-check pillow
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run synthetic Stage259 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_collision_mask_morphology.py' -v
+      - name: Write synthetic-only capability summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = {
+              "schema": "heman-stage259-collision-mask-morphology-ci-v1",
+              "result": "synthetic_morphology_tests_passed_not_original_evidence",
+              "synthetic_map_tileset_png_fixtures_only": True,
+              "original_ipa_loaded": False,
+              "original_game_assets_loaded": False,
+              "original_mask_pixels_exported": False,
+              "original_collision_semantics_verified": False,
+              "original_ios_gameplay_trace_compared": False,
+              "native_switch_collision_import_authorized": False,
+              "note": "Public CI tests morphology accounting only; no original assets or runtime."
+          }
+          Path("build/stage259_synthetic_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE258_SYNTHETIC_MORPHOLOGY_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic Stage259 summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage259-synthetic-mask-morphology
+          path: build/stage259_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
