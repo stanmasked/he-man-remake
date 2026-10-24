@@ -168,7 +168,9 @@ static bool prepareStage230Capture()
         "sdmc:/switch/heman-stage230/readback.rgba.tmp",
         "sdmc:/switch/heman-stage230/readback.receipt.tmp",
         "sdmc:/switch/heman-stage230/upload.rgba",
-        "sdmc:/switch/heman-stage230/upload.rgba.tmp"
+        "sdmc:/switch/heman-stage230/upload.rgba.tmp",
+        "sdmc:/switch/heman-stage230/gpu_phase.txt",
+        "sdmc:/switch/heman-stage230/gpu_phase.tmp"
     }) {
         if(std::remove(path)!=0 && errno!=ENOENT) return false;
     }
@@ -219,6 +221,29 @@ static bool saveStage230Capture(const uint8_t* pixels, uint32_t mismatches)
     }
     if(std::rename(receiptTmp,receiptFinal)!=0) {
         std::remove(receiptTmp);
+        return false;
+    }
+    return true;
+}
+
+// Stage234: durable stage-local progress marker for diagnosing a real GPU
+// execution attempt when stdout is not exposed by the Switch launcher.
+// Each record is a last-known CPU checkpoint, NOT independent proof of GPU
+// hardware activity. Only an exact nonce-bound full capture can be evaluated.
+static bool saveStage234Checkpoint(const char* phase)
+{
+    if(!phase || !s_stage231Nonce[0]) return false;
+    constexpr const char* temporary="sdmc:/switch/heman-stage230/gpu_phase.tmp";
+    constexpr const char* committed="sdmc:/switch/heman-stage230/gpu_phase.txt";
+    FILE* out=std::fopen(temporary,"wb");
+    if(!out) return false;
+    const int count=std::fprintf(out,"STAGE234_GPU_PHASE nonce=%s phase=%s\n",
+                                s_stage231Nonce,phase);
+    const bool flushed=std::fflush(out)==0;
+    const bool closed=std::fclose(out)==0;
+    if(count<=0 || !flushed || !closed ||
+       std::rename(temporary,committed)!=0) {
+        std::remove(temporary);
         return false;
     }
     return true;
@@ -276,7 +301,11 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     cmd.addMemory(drawCommandMem,0u,DK_MEMBLOCK_ALIGNMENT*2u);
     cmd.bindImageDescriptorSet(descriptorMem.getGpuAddr(),1u);
     cmd.bindSamplerDescriptorSet(samplerMem.getGpuAddr(),1u);
-    cmd.barrier(DkBarrier_None,DkInvalidateFlags_Descriptors|DkInvalidateFlags_Shader);
+    // Stage234: a transfer-produced texture must be made visible to the
+    // fragment sampler. Queue idle is not a texture cache invalidation.
+    cmd.barrier(DkBarrier_Full,
+                DkInvalidateFlags_Image|DkInvalidateFlags_Descriptors|
+                DkInvalidateFlags_Shader);
     cmd.bindShaders(DkStageFlag_GraphicsMask,{&vertexShader,&fragmentShader});
     cmd.bindRenderTargets({&outputView});
     cmd.setViewports(0,DkViewport{0.0f,0.0f,(float)kWidth,(float)kHeight,0.0f,1.0f});
@@ -300,6 +329,7 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
                           {readbackMem.getGpuAddr(),kWidth*4u,kGpuUploadBytes});
     queue.submitCommands(cmd.finishList());
     queue.waitIdle();
+    if(!saveStage234Checkpoint("05_render_queue_idle")) return 29;
     const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());
     // Stage229 prints the *complete GPU output* before checking it. An
     // independent host verifier must compare these 512 bytes to the
@@ -332,6 +362,7 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     const bool captured=saveStage230Capture(pixels,mismatches);
     if(!captured)
         std::fprintf(stderr,"STAGE230_CAPTURE_FAILED: cannot persist SD readback\n");
+    if(captured && !saveStage234Checkpoint("06_receipt_committed")) return 29;
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
     return captured?(mismatches==0?0:25):26;
 }
@@ -362,6 +393,7 @@ int main(int argc, char** argv)
     if(!buildSyntheticSource()) return 2;
     if(!prepareStage230Capture()) return 27; // no SD evidence path
     if(!loadStage231Nonce()) return 28; // refuse unbound / stale sessions
+    if(!saveStage234Checkpoint("01_nonce_validated")) return 29;
     const Result romfsResult=romfsInit();
     if(R_FAILED(romfsResult)) return 11;
     const bool shadersReady=
@@ -389,6 +421,7 @@ int main(int argc, char** argv)
             "romfs:/shaders/padded_texture_fsh.dksh",DkStage_Fragment,fragmentShader);
     romfsExit();
     if(!loaded) return 14;
+    if(!saveStage234Checkpoint("02_shaders_loaded")) return 29;
 
     dk::ImageLayout layout;
     dk::ImageLayoutMaker{device}.setFormat(DkImageFormat_RGBA8_Unorm)
@@ -431,6 +464,7 @@ int main(int argc, char** argv)
                            view,{0,0,0,kWidth,kHeight,1});
     queue.submitCommands(cmds.finishList());
     queue.waitIdle();
+    if(!saveStage234Checkpoint("03_texture_upload_queue_idle")) return 29;
 
     // Stage233 is a SECOND GPU transfer: image -> a distinct uncached CPU
     // buffer. It is not the original staging buffer and not the rendered
@@ -465,6 +499,7 @@ int main(int argc, char** argv)
                 kWidth*kHeight,uploadMismatches);
     std::fflush(stdout);
     if(uploadMismatches) return 16;
+    if(!saveStage234Checkpoint("04_upload_pixels_match")) return 29;
 
     dk::Sampler sampler;
     sampler.setFilter(DkFilter_Nearest,DkFilter_Nearest);
