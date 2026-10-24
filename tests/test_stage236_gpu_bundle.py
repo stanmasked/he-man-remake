@@ -16,10 +16,11 @@ NRO_SHA=hashlib.sha256(NRO).hexdigest()
 RECEIPT=("STAGE230_GPU_READBACK width=16 height=8 bytes=512 "
          f"pixels=128 mismatches=0 nonce={NONCE}\n")
 PHASE=f"STAGE234_GPU_PHASE nonce={NONCE} phase=06_receipt_committed\n".encode()
+DEFAULT=object()
 
 
 class BundleTests(unittest.TestCase):
-    def prepare(self,root,*,upload=None,render=None,phase=PHASE,receipt=RECEIPT,
+    def prepare(self,root,*,upload=DEFAULT,render=DEFAULT,phase=PHASE,receipt=RECEIPT,
                 sd_nonce=NONCE+"\n",session_nonce=NONCE,nro_sha=NRO_SHA,
                 session_schema="stage231-capture-session-v1"):
         root=Path(root)
@@ -32,8 +33,8 @@ class BundleTests(unittest.TestCase):
         manifest={"schema":session_schema,"nonce":session_nonce,
                   "nro_sha256":nro_sha,"runtime_provenance_attested":False}
         (session/"stage231_session.json").write_text(json.dumps(manifest),encoding="utf-8")
-        values={"upload":upload if upload is not None else payload(),
-                "render":render if render is not None else payload(),
+        values={"upload":payload() if upload is DEFAULT else upload,
+                "render":payload() if render is DEFAULT else render,
                 "phase":phase,"receipt":receipt,
                 "sd_nonce":sd_nonce.encode("ascii") if isinstance(sd_nonce,str) else sd_nonce}
         names={"upload":"upload.rgba","render":"readback.rgba",
