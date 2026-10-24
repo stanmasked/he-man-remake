@@ -1,0 +1,46 @@
+name: He-Man Stage248 Windows exit contract
+on:
+  pull_request:
+    paths:
+      - 'tools/stage240_private_emulator_launcher.py'
+      - 'tools/stage248_windows_exit_contract_matrix.py'
+      - '.github/workflows/stage248-windows-exit-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-exit-contract:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    name: Verify gated launcher exit and failure propagation
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject original commercial assets
+        shell: pwsh
+        run: |
+          $paths = git ls-files
+          if ($LASTEXITCODE -ne 0) { throw "git ls-files failed" }
+          if ($paths -match '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$') {
+            throw "Commercial source files must remain private"
+          }
+      - name: Run Windows exit-contract matrix
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python tools/stage248_windows_exit_contract_matrix.py --output build/stage248_windows_exit_contract.json
+          if ($LASTEXITCODE -ne 0) { throw "Stage248 exit-contract test failed" }
+          python -c "import json,pathlib; r=json.loads(pathlib.Path('build/stage248_windows_exit_contract.json').read_text()); a=r['exit_code_propagation']; b=r['child_launch_failure']; assert r['synthetic_only'] is True; assert a['exit_code']==7 and a['expected_exit_code']==7; assert a['job_assigned_before_target_started'] is True and a['active_processes_after_exit']==0 and a['output_drain_finished'] is True; assert b['exit_code']==127 and b['marker_seen'] is True and b['active_processes_after_exit']==0; assert r['gpu_execution_verified'] is False and r['original_ios_parity_verified'] is False; print('STAGE248_WINDOWS_EXIT_REPORT_VALID')"
+          if ($LASTEXITCODE -ne 0) { throw "Stage248 report validation failed" }
+          Get-FileHash build/stage248_windows_exit_contract.json -Algorithm SHA256
+      - name: Preserve synthetic Windows exit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage248-windows-exit-contract
+          path: build/stage248_windows_exit_contract.json
+          if-no-files-found: error
+          retention-days: 7
