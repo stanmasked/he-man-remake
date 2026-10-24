@@ -1,4 +1,4 @@
-name: He-Man Stage232 strict DKSH loader cross-build
+name: He-Man Stage233 GPU upload roundtrip cross-build
 on:
   pull_request:
     paths:
@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage232 validated DKSH loader
+    name: Cross-build Stage233 two independent GPU readbacks
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -52,6 +52,8 @@ jobs:
           grep -aFq 'sdmc:/switch/heman-stage230/readback.rgba' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/run_nonce.txt' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'mismatches=%u nonce=%s' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'STAGE233_GPU_UPLOAD_ROUNDTRIP' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'sdmc:/switch/heman-stage230/upload.rgba' switch_gpu_png/heman_deko_png_transfer.elf
           "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_gpu_png/heman_deko_png_transfer.nro
@@ -71,10 +73,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage232 bounded shader loader NRO
+      - name: Archive Stage233 upload plus render probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage232-synthetic-validated-dksh-nro
+          name: heman-stage233-synthetic-upload-render-readbacks
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh
