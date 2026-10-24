@@ -1,0 +1,88 @@
+name: He-Man Stage257 private host evidence archive
+on:
+  pull_request:
+    paths:
+      - 'tools/stage257_private_host_evidence_archive.py'
+      - 'tools/stage231_capture_session.py'
+      - 'tools/stage243_bounded_evidence.py'
+      - 'tests/test_stage257_private_host_evidence_archive.py'
+      - 'docs/stage257-private-host-evidence-archive.md'
+      - '.github/workflows/stage257-private-host-evidence-archive.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-host-archive:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    name: Private archive validation on ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run Stage257 private archive tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage257_private_host_evidence_archive.py' -v
+      - name: Run Stage231 and Stage243 evidence regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage231_capture_session.py' -v
+          python -m unittest discover -s tests -p 'test_stage243_bounded_evidence.py' -v
+      - name: Write synthetic-only Stage257 summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, "tools")
+          import stage231_capture_session as stage231
+          report = {
+              "schema": "heman-stage257-private-host-archive-ci-v1",
+              "result": "synthetic_archive_tests_passed_not_runtime_evidence",
+              "platform": sys.platform,
+              "descriptor_relative_io_supported": stage231._supports_descriptor_io(),
+              "archive_hash_validation": True,
+              "report_gate_hash_binding": True,
+              "symlink_rejection": True,
+              "private_output_checks": True,
+              "original_emulator_and_nro_binaries_included": False,
+              "real_emulator_launch_performed": False,
+              "runtime_gpu_execution_attested": False,
+              "gpu_capability_independently_verified": False,
+              "original_ios_graphics_parity_attested": False,
+              "note": "Synthetic temporary fixtures only; no original game resources or real emulator."
+          }
+          Path("build/stage257_private_host_archive_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE257_SYNTHETIC_ARCHIVE_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic Stage257 summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage257-private-archive-${{ matrix.os }}
+          path: build/stage257_private_host_archive_summary.json
+          if-no-files-found: error
+          retention-days: 7
