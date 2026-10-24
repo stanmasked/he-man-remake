@@ -14,21 +14,59 @@ import math
 import struct
 import zipfile
 
-from .collision_atlas_alpha import (
-    MAX_TILESET_BYTES,
-    _read_archive_entry,
-    _sha256_file,
-    _valid_map_name,
-    private_output_path,
-)
 from .lvl import LevelFormatError
 from .shapes import parse_shape
 from .tilemap import MAX_FILE as MAX_MAP_BYTES, TileMapFormatError, parse_tilemap
 
+MAX_TILESET_BYTES = 1_000_000
 MAX_TILE_RECORDS = 4096
 MAX_TEXTURE_REFS = 32
 MAX_STRING_UNITS = 512
 MAX_SHAPE_BYTES = 1_048_576
+
+
+def _valid_map_name(name: str) -> bool:
+    return (
+        isinstance(name, str) and 1 < len(name) <= 128
+        and name.endswith(".map") and "/" not in name and "\\" not in name
+        and all(ch not in name for ch in ("\\x00", "\\n", "\\r"))
+        and name not in (".map", "..map")
+    )
+
+
+def _read_archive_entry(archive: zipfile.ZipFile, path: str, max_bytes: int) -> bytes:
+    matches = [info for info in archive.infolist() if info.filename == path]
+    if len(matches) != 1:
+        raise ValueError(f"expected exactly one IPA entry: {path}")
+    info = matches[0]
+    if info.file_size < 1 or info.file_size > max_bytes:
+        raise ValueError(f"IPA entry size outside permitted bounds: {path}")
+    raw = archive.read(info)
+    if len(raw) != info.file_size:
+        raise ValueError(f"IPA entry size mismatch: {path}")
+    return raw
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def private_output_path(path: Path) -> Path:
+    """Require ignored local_reports JSON output and reject symlink escapes."""
+    root_path = Path.cwd() / "local_reports"
+    if root_path.is_symlink():
+        raise ValueError("local_reports must not be a symbolic link")
+    root = root_path.resolve()
+    destination = path.resolve()
+    if destination == root or not destination.is_relative_to(root) or destination.suffix != ".json":
+        raise ValueError("output must be a .json file beneath local_reports/")
+    if path.exists() and path.is_symlink():
+        raise ValueError("output must not be a symbolic link")
+    return destination
 
 
 class TilesetFormatError(ValueError):
