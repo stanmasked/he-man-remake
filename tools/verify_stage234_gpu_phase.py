@@ -49,22 +49,27 @@ def audit_source(source: str) -> dict:
     for g in guards:
         if g not in source:
             raise PhaseEvidenceError(f"missing GPU cache/phase source guard: {g}")
-    pos=[]
-    for phase in PHASES:
-        marker=f'saveStage234Checkpoint("{phase}")'
-        if source.count(marker)!=1:
-            raise PhaseEvidenceError(f"expected exactly one call: {phase}")
-        pos.append(source.index(marker))
-    if pos!=sorted(pos) or len(set(pos))!=len(pos):
-        raise PhaseEvidenceError("checkpoint calls are out of order")
-    # The full (ordering) texture barrier must come after the upload
-    # checkpoint and before the render-readback checkpoint. It is in
-    # runStage228Draw, called AFTER the upload roundtrip.
-    before=source.index('cmd.barrier(DkBarrier_Full,')
-    after=source.index('cmd.copyImageToBuffer(outputView')
+    draw_start=source.find("static int runStage228Draw(")
+    draw_end=source.find("// Stage233 stores",draw_start)
+    main_start=source.find("int main(int argc, char** argv)")
+    if min(draw_start,draw_end,main_start)<0:
+        raise PhaseEvidenceError("draw/main C++ functions not found")
+    draw=source[draw_start:draw_end]
+    main_source=source[main_start:]
+    for subset,region in ((PHASES[:4],main_source),(PHASES[4:],draw)):
+        positions=[]
+        for phase in subset:
+            marker=f'saveStage234Checkpoint("{phase}")'
+            if source.count(marker)!=1 or region.count(marker)!=1:
+                raise PhaseEvidenceError(f"expected exactly one ordered call: {phase}")
+            positions.append(region.index(marker))
+        if positions!=sorted(positions):
+            raise PhaseEvidenceError("checkpoint calls are out of order")
+    before=draw.index("cmd.barrier(DkBarrier_Full,")
+    after=draw.index("cmd.copyImageToBuffer(outputView")
     if not before<after:
         raise PhaseEvidenceError("image cache barrier must precede render readback")
-    if source.count('DkInvalidateFlags_Image|DkInvalidateFlags_Descriptors|')!=1:
+    if draw.count('DkInvalidateFlags_Image|DkInvalidateFlags_Descriptors|')!=1:
         raise PhaseEvidenceError("expected single draw-time texture invalidation")
     return {
         "schema":"stage234-source-preflight-v1",
