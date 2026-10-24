@@ -132,7 +132,7 @@ class BundleTests(unittest.TestCase):
             ("07_receipt_committed", 7, None),
         )
         for phase_name, index, next_expected in cases:
-            phase = f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\\n".encode()
+            phase = f"STAGE234_GPU_PHASE nonce={NONCE} phase={phase_name}\n".encode()
             with self.subTest(phase=phase_name), tempfile.TemporaryDirectory() as root:
                 report = self.collect(root, phase=phase)
                 self.assertEqual(report["phase"]["phase_index"], index)
