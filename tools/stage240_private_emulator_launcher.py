@@ -17,6 +17,7 @@ import signal
 import subprocess
 import sys
 import threading
+import stat
 
 from stage231_capture_session import prepare, collect, SessionError, nro_sha256
 from collect_stage236_gpu_bundle import collect_bundle, BundleError
@@ -39,6 +40,24 @@ def file_sha(path: Path) -> str:
 
 MAX_HOST_LOG_BYTES = 4 * 1024 * 1024
 OUTPUT_CHUNK_BYTES = 64 * 1024
+TEST_RUNNER_MARKER = b"Unit-test runner only; fabricates RGBA buffers, executes no GPU instructions."
+
+
+def validate_test_only_runner(executable: Path) -> None:
+    """Only allow the explicit bypass for the repository's synthetic script runner."""
+    try:
+        info = executable.lstat()
+        if executable.is_symlink() or not stat.S_ISREG(info.st_mode):
+            raise LaunchError("--test-only-runner requires a regular non-symlink script")
+        with executable.open("rb") as stream:
+            prefix = stream.read(64 * 1024)
+    except OSError as exc:
+        raise LaunchError(f"could not inspect synthetic test runner: {type(exc).__name__}") from exc
+    if not prefix.startswith(b"#!") or TEST_RUNNER_MARKER not in prefix:
+        raise LaunchError(
+            "--test-only-runner requires the explicit synthetic runner marker; "
+            "real emulator executables cannot use the preflight bypass"
+        )
 
 
 def drain_bounded_output(stream, log_path: Path, limit: int, state: dict) -> None:
@@ -380,6 +399,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         raise LaunchError("timeout must be 10–3600 seconds")
     cmd=build_command(executable,nro,template)
     validate_private_paths(sd_root,session_dir,executable,nro)
+    if test_runner:
+        validate_test_only_runner(executable)
     exe_sha=file_sha(executable)
     nro_sha=nro_sha256(nro)
     preflight_gate = None
