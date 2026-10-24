@@ -19,7 +19,7 @@ import secrets
 import shutil
 import sys
 from stage243_bounded_evidence import (
-    EvidenceReadError, read_limited, MAX_MANIFEST_BYTES, MAX_LOG_BYTES,
+    EvidenceReadError, read_limited, read_limited_at, MAX_MANIFEST_BYTES, MAX_LOG_BYTES,
     MAX_RGBA_BYTES, MAX_RECEIPT_BYTES, MAX_NONCE_BYTES, MAX_EXIT_BYTES,
 )
 
@@ -49,12 +49,30 @@ def payload() -> bytes:
 
 
 def nro_sha256(nro_file: Path) -> str:
-    if not nro_file.is_file() or not 20 <= nro_file.stat().st_size <= 16*1024*1024:
-        raise SessionError("invalid NRO size")
-    data = nro_file.read_bytes()
-    if data[16:20] != b"NRO0":
-        raise SessionError("NRO0 header missing")
-    return digest(data)
+    fd = None
+    try:
+        fd = os.open(nro_file, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or not 20 <= info.st_size <= 16*1024*1024:
+            raise SessionError("invalid NRO size or file type")
+        data = bytearray()
+        while len(data) <= 16*1024*1024:
+            chunk = os.read(fd, min(1024*1024, 16*1024*1024 + 1 - len(data)))
+            if not chunk:
+                break
+            data.extend(chunk)
+        if not 20 <= len(data) <= 16*1024*1024:
+            raise SessionError("invalid NRO size")
+        if data[16:20] != b"NRO0":
+            raise SessionError("NRO0 header missing")
+        return digest(bytes(data))
+    except SessionError:
+        raise
+    except OSError as exc:
+        raise SessionError("NRO must be a readable regular non-symlink file") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
 
 
 def sd_dir(root: Path) -> Path:
@@ -107,6 +125,135 @@ def _ensure_sd_capture_dir(sd_root: Path) -> Path:
         current = current / name
         _ensure_real_directory(current, create=True)
     return current
+
+
+def _supports_descriptor_io() -> bool:
+    dir_fd = getattr(os, "supports_dir_fd", set())
+    fd_ops = getattr(os, "supports_fd", set())
+    return bool(
+        getattr(os, "O_NOFOLLOW", 0)
+        and getattr(os, "O_DIRECTORY", 0)
+        and all(op in dir_fd for op in (os.open, os.mkdir, os.unlink, os.rename, os.stat))
+        and os.listdir in fd_ops
+    )
+
+
+def _open_directory_path(path: Path, label: str) -> int:
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        fd = os.open(path, flags)
+        if not stat.S_ISDIR(os.fstat(fd).st_mode):
+            os.close(fd)
+            raise SessionError(f"{label} must be a non-symlink directory")
+        return fd
+    except SessionError:
+        raise
+    except OSError as exc:
+        raise SessionError(f"{label} must be a readable non-symlink directory") from exc
+
+
+def _open_sd_capture_dir_fd(sd_root: Path, *, create: bool) -> int:
+    """Open and pin each SD path component; no path lookup follows child symlinks."""
+    current_fd = None
+    try:
+        try:
+            root_info = sd_root.lstat()
+        except FileNotFoundError:
+            if not create:
+                raise SessionError("required SD capture directory is missing")
+            try:
+                sd_root.mkdir(parents=True, exist_ok=True)
+                root_info = sd_root.lstat()
+            except OSError as exc:
+                raise SessionError("could not create or inspect SD root") from exc
+        except OSError as exc:
+            raise SessionError("could not inspect SD root") from exc
+        if stat.S_ISLNK(root_info.st_mode) or not stat.S_ISDIR(root_info.st_mode):
+            raise SessionError("SD root must be a non-symlink directory")
+        current_fd = _open_directory_path(sd_root, "SD root")
+        for name in ("switch", "heman-stage230"):
+            try:
+                next_fd = os.open(
+                    name,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=current_fd,
+                )
+            except FileNotFoundError:
+                if not create:
+                    raise SessionError("required SD capture directory is missing")
+                try:
+                    os.mkdir(name, 0o755, dir_fd=current_fd)
+                except FileExistsError:
+                    pass
+                except OSError as exc:
+                    raise SessionError("could not create SD capture directory") from exc
+                try:
+                    next_fd = os.open(
+                        name,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=current_fd,
+                    )
+                except OSError as exc:
+                    raise SessionError(
+                        "SD capture path components must be non-symlink directories"
+                    ) from exc
+            except OSError as exc:
+                raise SessionError(
+                    "SD capture path components must be non-symlink directories"
+                ) from exc
+            os.close(current_fd)
+            current_fd = next_fd
+        result = current_fd
+        current_fd = None
+        return result
+    finally:
+        if current_fd is not None:
+            os.close(current_fd)
+
+
+def _unlink_at(directory_fd: int, name: str) -> None:
+    try:
+        os.unlink(name, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        raise SessionError(f"could not safely remove stale capture entry: {name}") from exc
+
+
+def _write_file_at(
+    directory_fd: int, name: str, data: bytes, *, exclusive: bool = False
+) -> None:
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
+    flags |= os.O_EXCL if exclusive else os.O_TRUNC
+    fd = None
+    try:
+        fd = os.open(name, flags, 0o600, dir_fd=directory_fd)
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            raise SessionError(f"refusing non-regular output entry: {name}")
+        view = memoryview(data)
+        offset = 0
+        while offset < len(view):
+            written = os.write(fd, view[offset:])
+            if written <= 0:
+                raise SessionError(f"short write while creating output entry: {name}")
+            offset += written
+    except SessionError:
+        raise
+    except OSError as exc:
+        raise SessionError(f"could not safely write output entry: {name}") from exc
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _entry_exists_at(directory_fd: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError as exc:
+        raise SessionError(f"could not inspect session entry: {name}") from exc
 
 
 def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None = None) -> dict:
