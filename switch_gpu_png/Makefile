@@ -13,7 +13,9 @@ ARCH := -march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE
 COMMON := -O2 -Wall -Wextra -Werror $(ARCH) -D__SWITCH__ \
           -I$(ROOT)/native/include -I$(DEVKITPRO)/libnx/include
 CFLAGS := -std=c99 $(COMMON)
-CXXFLAGS := -std=gnu++17 -fno-exceptions -fno-rtti $(COMMON)
+# libnx C headers use designated partial initializers accepted by the SDK;
+# suppress only this compiler warning under C++ while keeping other -Werror.
+CXXFLAGS := -std=gnu++17 -fno-exceptions -fno-rtti -Wno-missing-field-initializers $(COMMON)
 LDFLAGS := -specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) \
            -Wl,--gc-sections -L$(DEVKITPRO)/libnx/lib
 TARGET := heman_deko_png_transfer
