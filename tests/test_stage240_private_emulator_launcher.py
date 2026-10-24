@@ -163,6 +163,8 @@ class Stage240Tests(unittest.TestCase):
         self.assertTrue(report["process_tree_cleanup_success"])
         self.assertFalse(report["runner_log_drain_incomplete"])
         self.assertFalse(report["stage231_collected"])
+        self.assertIn("process-tree cleanup was required",
+                      report["stage231_collection_error"])
         self.assertFalse(report["stage236_bundle_consistent"])
         self.assertFalse(report["runtime_gpu_execution_attested"])
         self.assertEqual(report["process_tree_cleanup_method"],"posix_process_group"
