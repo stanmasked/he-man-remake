@@ -181,6 +181,18 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     queue.submitCommands(cmd.finishList());
     queue.waitIdle();
     const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());
+    // Stage229 prints the *complete GPU output* before checking it. An
+    // independent host verifier must compare these 512 bytes to the
+    // synthetic C99/reference fixture. This is never emitted by build CI.
+    std::printf("STAGE229_GPU_READBACK_BEGIN width=%u height=%u bytes=%u\\n",
+                kWidth,kHeight,kGpuUploadBytes);
+    for(uint32_t y=0;y<kHeight;++y) {
+        std::printf("STAGE229_GPU_READBACK_ROW y=%u rgba=",y);
+        for(uint32_t x=0;x<kWidth*4u;++x)
+            std::printf("%02x",(unsigned)pixels[y*kWidth*4u+x]);
+        std::printf("\\n");
+    }
+    std::fflush(stdout);
     uint32_t mismatches=0;
     for(uint32_t y=0;y<kHeight;++y) for(uint32_t x=0;x<kWidth;++x) {
         const auto p=(y*kWidth+x)*4u;
@@ -192,6 +204,7 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
             ++mismatches;
         }
     }
+    std::printf("STAGE229_GPU_READBACK_END mismatches=%u\n",mismatches);
     std::printf("STAGE228_GPU_QUAD_READBACK pixels=%u mismatches=%u\n",
                 kWidth*kHeight,mismatches);
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
