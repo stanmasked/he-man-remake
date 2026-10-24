@@ -190,6 +190,75 @@ class WindowsJobObject:
 OUTPUT_DRAIN_GRACE_SECONDS = 2
 
 
+_WINDOWS_GATED_LAUNCHER = r"""
+import json
+import subprocess
+import sys
+
+try:
+    command_line = sys.stdin.buffer.readline()
+    if not command_line:
+        raise ValueError("missing gated command")
+    command = json.loads(command_line.decode("utf-8"))
+    if (not isinstance(command, list) or not command
+            or any(not isinstance(arg, str) or not arg or "\x00" in arg
+                   for arg in command)):
+        raise ValueError("invalid gated command")
+    if sys.stdin.buffer.readline().strip() != b"GO":
+        raise ValueError("launch gate was not opened")
+    child = subprocess.Popen(command, stdin=subprocess.DEVNULL)
+    raise SystemExit(child.wait())
+except SystemExit:
+    raise
+except BaseException as exc:
+    sys.stderr.write("STAGE247_GATED_LAUNCH_FAIL: %s: %s\n" %
+                     (type(exc).__name__, exc))
+    raise SystemExit(127)
+"""
+
+
+def start_windows_gated_process(command: list[str], job: WindowsJobObject,
+                                log_path: Path, log_state: dict):
+    """Assign a waiting trampoline to the Job before it starts the emulator."""
+    if os.name != "nt":
+        raise OSError("gated Windows launch is only available on Windows")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", _WINDOWS_GATED_LAUNCHER],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, bufsize=0,
+        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+    )
+    drainer = None
+    try:
+        if proc.stdin is None or proc.stdout is None:
+            raise OSError("gated launcher pipes were not created")
+        # The trampoline blocks on stdin and cannot start the emulator yet.
+        job.assign(proc)
+        log_state["windows_job_object_assigned"] = True
+        drainer = threading.Thread(
+            target=drain_bounded_output,
+            args=(proc.stdout, log_path, MAX_HOST_LOG_BYTES, log_state),
+            name="heman-bounded-host-log", daemon=True)
+        drainer.start()
+        payload = json.dumps(command, separators=(",", ":")).encode("utf-8")
+        proc.stdin.write(payload + b"\nGO\n")
+        proc.stdin.flush()
+        proc.stdin.close()
+        return proc, drainer
+    except BaseException:
+        if proc.poll() is None:
+            try:
+                proc.kill()
+                proc.wait(timeout=10)
+            except (OSError, subprocess.SubprocessError):
+                pass
+        if job.is_open:
+            job.close()
+        if drainer is not None:
+            drainer.join(timeout=2)
+        raise
+
+
 def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10,
                           job: WindowsJobObject | None = None) -> dict:
     """Terminate the isolated runner tree without invoking a command shell."""
@@ -338,23 +407,21 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
     # Stream combined output through a bounded private log sink. Continue
     # draining after the cap so a noisy process cannot block on a full pipe.
     try:
-        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name=="nt" else 0
-        proc=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
-                              bufsize=0,start_new_session=(os.name!="nt"),
-                              creationflags=creationflags)
         if os.name=="nt":
-            # Assign immediately so any ordinary descendants join the Job.
-            # Failure is fail-closed: do not run an unmanaged emulator tree.
+            # The gated trampoline waits for a token until after Job assignment.
+            # Its emulator child and later descendants therefore join the Job.
             job_object=WindowsJobObject()
-            job_object.assign(proc)
-            log_state["windows_job_object_assigned"]=True
-        if proc.stdout is None:
-            raise LaunchError("host output pipe was not created")
-        drainer=threading.Thread(
-            target=drain_bounded_output,
-            args=(proc.stdout,log_path,MAX_HOST_LOG_BYTES,log_state),
-            name="heman-bounded-host-log",daemon=True)
-        drainer.start()
+            proc,drainer=start_windows_gated_process(cmd,job_object,log_path,log_state)
+        else:
+            proc=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,
+                                  bufsize=0,start_new_session=True)
+            if proc.stdout is None:
+                raise LaunchError("host output pipe was not created")
+            drainer=threading.Thread(
+                target=drain_bounded_output,
+                args=(proc.stdout,log_path,MAX_HOST_LOG_BYTES,log_state),
+                name="heman-bounded-host-log",daemon=True)
+            drainer.start()
         try:
             exit_code=proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -493,6 +560,8 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "nro_sha256":nro_sha,
         "emulator_executable_sha256":exe_sha,
         "emulator_command":cmd,
+        "host_process_role":"windows_gated_launcher_wrapper" if os.name=="nt" else "emulator_process",
+        "windows_gated_launch_used":os.name=="nt",
         "started_utc":started,
         "ended_utc":ended,
         "host_process_exit_code":exit_code,
