@@ -166,7 +166,9 @@ static bool prepareStage230Capture()
         "sdmc:/switch/heman-stage230/readback.receipt",
         "sdmc:/switch/heman-stage230/readback.rgba",
         "sdmc:/switch/heman-stage230/readback.rgba.tmp",
-        "sdmc:/switch/heman-stage230/readback.receipt.tmp"
+        "sdmc:/switch/heman-stage230/readback.receipt.tmp",
+        "sdmc:/switch/heman-stage230/upload.rgba",
+        "sdmc:/switch/heman-stage230/upload.rgba.tmp"
     }) {
         if(std::remove(path)!=0 && errno!=ENOENT) return false;
     }
@@ -295,7 +297,7 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
     cmd.draw(DkPrimitive_TriangleStrip,4,1,0,0);
     cmd.barrier(DkBarrier_Full,DkInvalidateFlags_Image);
     cmd.copyImageToBuffer(outputView,{0u,0u,0u,kWidth,kHeight,1u},
-                          {readbackMem.getGpuAddr(),0u,0u});
+                          {readbackMem.getGpuAddr(),kWidth*4u,kGpuUploadBytes});
     queue.submitCommands(cmd.finishList());
     queue.waitIdle();
     const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());
@@ -332,6 +334,26 @@ static int runStage228Draw(dk::Device device, dk::Queue queue,
         std::fprintf(stderr,"STAGE230_CAPTURE_FAILED: cannot persist SD readback\n");
     (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
     return captured?(mismatches==0?0:25):26;
+}
+
+// Stage233 stores a separately copied GPU texture. The file is written by
+// GPU->CPU readback, never by the original staging pointer. The Stage230
+// completed render receipt remains absent if upload verification fails.
+static bool saveStage233Upload(const uint8_t* pixels)
+{
+    if(!pixels) return false;
+    constexpr const char* temporary="sdmc:/switch/heman-stage230/upload.rgba.tmp";
+    constexpr const char* committed="sdmc:/switch/heman-stage230/upload.rgba";
+    FILE* out=std::fopen(temporary,"wb");
+    if(!out) return false;
+    const bool wrote=std::fwrite(pixels,1u,kGpuUploadBytes,out)==kGpuUploadBytes;
+    const bool flushed=std::fflush(out)==0;
+    const bool closed=std::fclose(out)==0;
+    if(!wrote||!flushed||!closed || std::rename(temporary,committed)!=0) {
+        std::remove(temporary);
+        return false;
+    }
+    return true;
 }
 
 int main(int argc, char** argv)
@@ -401,9 +423,48 @@ int main(int argc, char** argv)
     if(!cmds) return 10;
     cmds.addMemory(cmdmem,0u,DK_MEMBLOCK_ALIGNMENT);
     dk::ImageView view{image};
-    cmds.copyBufferToImage({staging.getGpuAddr(),0u,0u},view,{0,0,0,kWidth,kHeight,1});
+    // rowLength is a byte pitch, not a pixel count (see deko3d dk_image.cpp).
+    // Specify 64 bytes/row and 512 bytes/layer explicitly instead of relying
+    // on the implicit zero-value pitch convention.
+    constexpr uint32_t rowBytes=kWidth*4u;
+    cmds.copyBufferToImage({staging.getGpuAddr(),rowBytes,kGpuUploadBytes},
+                           view,{0,0,0,kWidth,kHeight,1});
     queue.submitCommands(cmds.finishList());
     queue.waitIdle();
+
+    // Stage233 is a SECOND GPU transfer: image -> a distinct uncached CPU
+    // buffer. It is not the original staging buffer and not the rendered
+    // target. A successful 128-pixel upload test narrows later shader bugs.
+    auto uploadReadback=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    auto uploadCmdMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    if(!uploadReadback||!uploadCmdMem||!uploadReadback.getCpuAddr()) return 15;
+    std::memset(uploadReadback.getCpuAddr(),0xa5,kGpuUploadBytes);
+    auto uploadCmd=dk::CmdBufMaker{device}.create();
+    if(!uploadCmd) return 15;
+    uploadCmd.addMemory(uploadCmdMem,0u,DK_MEMBLOCK_ALIGNMENT);
+    uploadCmd.copyImageToBuffer(
+        view,{0u,0u,0u,kWidth,kHeight,1u},
+        {uploadReadback.getGpuAddr(),rowBytes,kGpuUploadBytes});
+    queue.submitCommands(uploadCmd.finishList());
+    queue.waitIdle();
+
+    const auto* uploaded=static_cast<const uint8_t*>(uploadReadback.getCpuAddr());
+    const bool uploadSaved=saveStage233Upload(uploaded);
+    if(!uploadSaved) return 17;
+    uint32_t uploadMismatches=0;
+    for(uint32_t p=0;p<kGpuUploadBytes;p+=4u) {
+        if(std::memcmp(uploaded+p,s_padded+p,4u)!=0) {
+            if(uploadMismatches<8u)
+                std::printf("STAGE233_UPLOAD_PIXEL_MISMATCH pixel=%u\n",p/4u);
+            ++uploadMismatches;
+        }
+    }
+    std::printf("STAGE233_GPU_UPLOAD_ROUNDTRIP pixels=%u mismatches=%u\n",
+                kWidth*kHeight,uploadMismatches);
+    std::fflush(stdout);
+    if(uploadMismatches) return 16;
 
     dk::Sampler sampler;
     sampler.setFilter(DkFilter_Nearest,DkFilter_Nearest);
