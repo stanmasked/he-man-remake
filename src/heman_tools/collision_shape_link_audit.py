@@ -29,7 +29,7 @@ def _valid_map_name(name: str) -> bool:
     return (
         isinstance(name, str) and 1 < len(name) <= 128
         and name.endswith(".map") and "/" not in name and "\\" not in name
-        and all(ch not in name for ch in ("\\x00", "\\n", "\\r"))
+        and all(ch not in name for ch in ("\x00", "\n", "\r"))
         and name not in (".map", "..map")
     )
 
