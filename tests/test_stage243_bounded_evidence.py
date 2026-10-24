@@ -36,7 +36,7 @@ class BoundedEvidenceTests(unittest.TestCase):
             read_limited(self.path,MAX_LOG_BYTES,"fake log")
 
     def test_missing_and_directory_paths_fail(self):
-        with self.assertRaisesRegex(EvidenceReadError,"cannot read regular"):
+        with self.assertRaisesRegex(EvidenceReadError,"missing file"):
             read_limited(self.path,512,"missing")
         with self.assertRaisesRegex(EvidenceReadError,"regular file"):
             read_limited(self.root,512,"directory")
