@@ -100,6 +100,17 @@ class Stage240Tests(unittest.TestCase):
         self.assertFalse(report["runtime_gpu_execution_attested"])
         self.assertFalse(report["guest_process_exit_independently_verified"])
         self.assertFalse(report["emulator_gpu_capability_independently_verified"])
+        self.assertEqual(report["runtime_backend_log_audit_status"], "complete")
+        self.assertEqual(
+            report["runtime_backend_log_audit"]["classification"],
+            "no_recognized_backend_evidence",
+        )
+        self.assertFalse(
+            report["runtime_backend_log_audit"]["gpu_capability_independently_verified"]
+        )
+        self.assertFalse(
+            report["runtime_backend_log_audit"]["runtime_gpu_execution_attested"]
+        )
         self.assertTrue(report["test_only_runner_declared"])
         private=json.loads((self.session/"stage240_bundle.json").read_text())
         self.assertFalse(private["consistency_gate"]["runtime_gpu_execution_attested"])
@@ -152,6 +163,8 @@ class Stage240Tests(unittest.TestCase):
         self.assertFalse(report["stage231_collected"])
         self.assertIn("truncated",report["stage231_collection_error"])
         self.assertFalse(report["stage236_bundle_consistent"])
+        self.assertEqual(report["runtime_backend_log_audit_status"], "skipped_log_incomplete")
+        self.assertIsNone(report["runtime_backend_log_audit"])
         self.assertFalse(report["runtime_gpu_execution_attested"])
 
 

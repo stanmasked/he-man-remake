@@ -21,6 +21,7 @@ import threading
 from stage231_capture_session import prepare, collect, SessionError, nro_sha256
 from collect_stage236_gpu_bundle import collect_bundle, BundleError
 from stage241_guest_exit_receipt import inspect_guest_exit_file
+from stage251_runtime_backend_audit import analyze_file as audit_runtime_backend_log, AuditError as RuntimeBackendAuditError
 
 
 class LaunchError(ValueError):
@@ -554,6 +555,19 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         sd_root/"switch"/"heman-stage230"/"guest_exit.txt",
         prepared["nonce"])
     guest_success=guest_exit["guest_reported_success"]
+    backend_audit = None
+    backend_audit_status = "skipped_log_unavailable"
+    backend_audit_error = None
+    if log_path.exists():
+        if log_state["truncated"] or log_state["drain_incomplete"] or log_state["error"]:
+            backend_audit_status = "skipped_log_incomplete"
+        else:
+            try:
+                backend_audit = audit_runtime_backend_log(log_path)
+                backend_audit_status = "complete"
+            except (RuntimeBackendAuditError, OSError) as exc:
+                backend_audit_status = "failed"
+                backend_audit_error = f"{type(exc).__name__}: {exc}"
     manifest={
         "schema":"stage240-host-emulator-attempt-v1",
         "prepared_session_nonce":prepared["nonce"],
@@ -575,6 +589,9 @@ def launch(executable: Path, nro: Path, sd_root: Path, session_dir: Path,
         "runner_log_truncated":log_state["truncated"],
         "runner_log_drain_error":log_state["error"],
         "runner_log_drain_incomplete":log_state["drain_incomplete"],
+        "runtime_backend_log_audit_status":backend_audit_status,
+        "runtime_backend_log_audit":backend_audit,
+        "runtime_backend_log_audit_error":backend_audit_error,
         "process_tree_cleanup_attempted":log_state["tree_cleanup_attempted"],
         "process_tree_cleanup_success":log_state["tree_cleanup_success"],
         "process_tree_cleanup_method":log_state["tree_cleanup_method"],
