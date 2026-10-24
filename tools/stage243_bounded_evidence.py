@@ -56,7 +56,7 @@ def read_limited_at(directory_fd: int, name: str, max_bytes: int, label: str) ->
         raise EvidenceReadError("descriptor-relative reads are unsupported on this platform")
     fd = None
     try:
-        fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=directory_fd)
+        fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0), dir_fd=directory_fd)
         result = _read_fd(fd, max_bytes, label)
         os.close(fd)
         fd = None
@@ -79,7 +79,7 @@ def read_limited(path: Path, max_bytes: int, label: str) -> bytes:
     _validate_limit(max_bytes)
     fd = None
     try:
-        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_BINARY", 0))
         content = _read_fd(fd, max_bytes, label)
         os.close(fd)
         fd = None
