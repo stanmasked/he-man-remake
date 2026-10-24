@@ -1,4 +1,4 @@
-name: He-Man Stage246 Windows Job Object
+name: He-Man Stage247 gated Windows launch
 on:
   pull_request:
     paths:
@@ -14,7 +14,7 @@ jobs:
   windows-job-object:
     runs-on: windows-2022
     timeout-minutes: 10
-    name: Verify kill-on-close terminates descendants
+    name: Verify Job assignment precedes emulator launch
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,19 +28,19 @@ jobs:
           if ($paths -match '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|png|jpe?g|wav|mp3|ogg|pvr)$') {
             throw "Commercial source files must remain private"
           }
-      - name: Run synthetic Windows Job Object matrix
+      - name: Run gated Windows launch process-tree matrix
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          python tools/stage246_windows_job_object_matrix.py --output build/stage246_windows_job_object.json
-          if ($LASTEXITCODE -ne 0) { throw "Stage246 Windows Job Object test failed" }
-          python -c "import json,pathlib; r=json.loads(pathlib.Path('build/stage246_windows_job_object.json').read_text()); c=r['case']; assert r['synthetic_only'] is True; assert c['parent_exit_code']==0; assert c['pipe_open_after_parent_exit'] is True; assert c['active_processes_before_cleanup']>=1; assert c['cleanup_success'] is True; assert c['job_closed'] is True; assert c['drain_finished_after_cleanup'] is True; assert c['gpu_execution_verified'] is False; assert c['original_ios_parity_verified'] is False; print('STAGE246_WINDOWS_SOURCE_ONLY_REPORT_VALID')"
-          if ($LASTEXITCODE -ne 0) { throw "Stage246 report validation failed" }
+          python tools/stage246_windows_job_object_matrix.py --output build/stage247_gated_windows_launch.json
+          if ($LASTEXITCODE -ne 0) { throw "Stage247 gated Windows launch test failed" }
+          python -c "import json,pathlib; r=json.loads(pathlib.Path('build/stage246_windows_job_object.json').read_text()); c=r['case']; assert r['synthetic_only'] is True; assert c['parent_exit_code']==0; assert c['pipe_open_after_parent_exit'] is True; assert c['active_processes_before_cleanup']>=1; assert c['cleanup_success'] is True; assert c['job_closed'] is True; assert c['drain_finished_after_cleanup'] is True; assert c['gpu_execution_verified'] is False; assert c['original_ios_parity_verified'] is False; print('STAGE247_GATED_WINDOWS_SOURCE_ONLY_REPORT_VALID')"
+          if ($LASTEXITCODE -ne 0) { throw "Stage247 report validation failed" }
           Get-FileHash build/stage246_windows_job_object.json -Algorithm SHA256
       - name: Preserve synthetic Windows report
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage246-windows-job-object
+          name: heman-stage247-gated-windows-launch
           path: build/stage246_windows_job_object.json
           if-no-files-found: error
           retention-days: 7
