@@ -50,7 +50,7 @@ def read_json(path: Path, label: str) -> dict:
     return obj
 
 
-def describe_file(path: Path) -> tuple[dict, bytes | None]:
+def describe_file(path: Path, expected_bytes: int | None = None) -> tuple[dict, bytes | None]:
     if not path.exists():
         return {"status": "missing"}, None
     if not path.is_file():
@@ -59,13 +59,11 @@ def describe_file(path: Path) -> tuple[dict, bytes | None]:
         data = path.read_bytes()
     except OSError as exc:
         return {"status": "read_error", "error": str(exc)}, None
-    return {
-        "status": "present",
-        "bytes": len(data),
-        "sha256": sha(data),
-        "expected_bytes": BYTE_COUNT,
-        "size_valid": len(data) == BYTE_COUNT,
-    }, data if len(data) == BYTE_COUNT else None
+    info = {"status": "present", "bytes": len(data), "sha256": sha(data)}
+    if expected_bytes is not None:
+        info["expected_bytes"] = expected_bytes
+        info["size_valid"] = len(data) == expected_bytes
+    return info, data
 
 
 def receipt_info(data: bytes | None, session_nonce: str) -> dict:
@@ -132,16 +130,16 @@ def collect_bundle(nro: Path, sd_root: Path, session_dir: Path) -> dict:
 
     sd_dir = sd_root / "switch" / "heman-stage230"
     file_specs = {
-        "upload": sd_dir / "upload.rgba",
-        "render": sd_dir / "readback.rgba",
-        "phase": sd_dir / "gpu_phase.txt",
-        "receipt": sd_dir / "readback.receipt",
-        "sd_nonce": sd_dir / "run_nonce.txt",
+        "upload": (sd_dir / "upload.rgba", BYTE_COUNT),
+        "render": (sd_dir / "readback.rgba", BYTE_COUNT),
+        "phase": (sd_dir / "gpu_phase.txt", None),
+        "receipt": (sd_dir / "readback.receipt", None),
+        "sd_nonce": (sd_dir / "run_nonce.txt", None),
     }
     files = {}
     raw = {}
-    for label, path in file_specs.items():
-        info, data = describe_file(path)
+    for label, (path, expected_bytes) in file_specs.items():
+        info, data = describe_file(path, expected_bytes)
         files[label] = info
         raw[label] = data
 
