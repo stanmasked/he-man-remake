@@ -1,4 +1,4 @@
-name: He-Man Stage228 offscreen textured quad and GPU readback cross-build
+name: He-Man Stage229 full GPU readback capture cross-build
 on:
   pull_request:
     paths:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage228 deko3d offscreen textured quad
+    name: Cross-build Stage229 offscreen RGBA capture
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -43,6 +43,10 @@ jobs:
           make -C switch_gpu_png clean all
           test -s switch_gpu_png/heman_deko_png_transfer.elf
           test -s switch_gpu_png/heman_deko_png_transfer.nro
+          # These markers are compiled but are emitted ONLY by guest GPU execution.
+          grep -aFq 'STAGE229_GPU_READBACK_BEGIN' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'STAGE229_GPU_READBACK_ROW' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'STAGE229_GPU_READBACK_END' switch_gpu_png/heman_deko_png_transfer.elf
           "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_gpu_png/heman_deko_png_transfer.nro
@@ -58,10 +62,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage228 original-free textured quad probe
+      - name: Archive Stage229 original-free readback probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage228-synthetic-deko3d-texture-readback
+          name: heman-stage229-synthetic-gpu-readback-nro
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh
