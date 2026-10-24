@@ -6,6 +6,7 @@
 #include <deko3d.hpp>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 
 extern "C" {
 #include "heman_native_png_upload.h"
@@ -45,10 +46,46 @@ static bool buildSyntheticSource()
     return true;
 }
 
+// Stage227 verifies both DKSH resources in the *installed NRO's RomFS*.
+// This does NOT bind GPU shaders or prove fragment sampling.
+struct Stage227Header {
+    uint32_t magic, headerSize, controlSize, codeSize, programsOffset, programs;
+};
+static bool verifyPackagedShader(const char* name)
+{
+    FILE* file=std::fopen(name,"rb");
+    if(!file) return false;
+    Stage227Header header{};
+    bool valid=std::fread(&header,sizeof header,1u,file)==1u;
+    if(valid) {
+        valid=(header.magic==0x48534b44u && header.headerSize>=sizeof header &&
+               header.controlSize>=header.headerSize &&
+               header.controlSize<=1024u*1024u &&
+               header.codeSize>0 && header.codeSize<=1024u*1024u &&
+               header.programsOffset>=header.headerSize &&
+               header.programsOffset<header.controlSize &&
+               header.programs>=1u && header.programs<=16u);
+        if(valid && std::fseek(file,0,SEEK_END)==0) {
+            long end=std::ftell(file);
+            valid=end>=0 && (uint64_t)end >=
+                (uint64_t)header.controlSize+(uint64_t)header.codeSize;
+        } else valid=false;
+    }
+    std::fclose(file);
+    return valid;
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
     if(!buildSyntheticSource()) return 2;
+    const Result romfsResult=romfsInit();
+    if(R_FAILED(romfsResult)) return 11;
+    const bool shadersReady=
+        verifyPackagedShader("romfs:/shaders/padded_texture_vsh.dksh") &&
+        verifyPackagedShader("romfs:/shaders/padded_texture_fsh.dksh");
+    romfsExit();
+    if(!shadersReady) return 12;
     // Unlike Stage225's libnx software framebuffer this creates an actual
     // Tegra image, stages CPU-generated pixels and submits a GPU copy command.
     auto device = dk::DeviceMaker{}.create();
