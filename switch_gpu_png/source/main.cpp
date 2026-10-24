@@ -75,6 +75,129 @@ static bool verifyPackagedShader(const char* name)
     return valid;
 }
 
+// Stage228: the input and the offscreen output are invented 16x8 RGBA8 data.
+// An NRO cross-build is not evidence of an actual GPU draw or readback.
+struct Stage228Vertex { float x, y, u, v; };
+static constexpr Stage228Vertex kQuad[4] = {
+    {-1.0f,  1.0f, 0.0f, 0.0f},
+    {-1.0f, -1.0f, 0.0f, 1.0f},
+    { 1.0f,  1.0f, 1.0f, 0.0f},
+    { 1.0f, -1.0f, 1.0f, 1.0f}
+};
+
+static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
+                              const char* name, DkStage stage, dk::Shader& shader)
+{
+    FILE* file=std::fopen(name,"rb");
+    if(!file) return false;
+    bool ok=std::fseek(file,0,SEEK_END)==0;
+    const long length=ok?std::ftell(file):-1;
+    ok=length>=static_cast<long>(sizeof(Stage227Header)) && length<=2048 &&
+       std::fseek(file,0,SEEK_SET)==0;
+    if(ok) {
+        auto* dst=static_cast<uint8_t*>(codeMem.getCpuAddr());
+        ok=dst && std::fread(dst+offset,1u,(size_t)length,file)==(size_t)length;
+    }
+    std::fclose(file);
+    if(!ok) return false;
+    dk::ShaderMaker{codeMem,offset}.initialize(shader);
+    return shader.isValid() && shader.getStage()==stage;
+}
+
+static int runStage228Draw(dk::Device device, dk::Queue queue,
+                           dk::Image const& texture,
+                           dk::ImageDescriptor const& imageDesc,
+                           dk::SamplerDescriptor const& samplerDesc,
+                           dk::Shader const& vertexShader,
+                           dk::Shader const& fragmentShader)
+{
+    // Separate resources: the readback must come from the render target,
+    // never from the source staging buffer or an invented CPU-side "GPU" result.
+    dk::ImageLayout outputLayout;
+    dk::ImageLayoutMaker{device}.setFlags(DkImageFlags_UsageRender)
+        .setFormat(DkImageFormat_RGBA8_Unorm)
+        .setDimensions(kWidth,kHeight).initialize(outputLayout);
+    const uint64_t outputAlignment=outputLayout.getAlignment();
+    if(outputAlignment==0 || (outputAlignment&(outputAlignment-1u))!=0 ||
+       outputAlignment>0x100000u || outputLayout.getSize()>0x100000u)
+        return 20;
+    const uint64_t blockAlignment=outputAlignment>DK_MEMBLOCK_ALIGNMENT
+        ?outputAlignment:DK_MEMBLOCK_ALIGNMENT;
+    const uint64_t outputBytes=(outputLayout.getSize()+blockAlignment-1u)
+                              & ~(blockAlignment-1u);
+    if(outputBytes==0 || outputBytes>0x100000u) return 21;
+    auto outputMem=dk::MemBlockMaker{device,(uint32_t)outputBytes}
+        .setFlags(DkMemBlockFlags_GpuCached|DkMemBlockFlags_Image).create();
+    if(!outputMem) return 22;
+    dk::Image outputImage;
+    outputImage.initialize(outputLayout,outputMem,0u);
+    dk::ImageView outputView{outputImage};
+
+    auto descriptorMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    auto samplerMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    auto vertexMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    auto readbackMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    auto drawCommandMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT*2u}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached).create();
+    if(!descriptorMem||!samplerMem||!vertexMem||!readbackMem||!drawCommandMem ||
+       !descriptorMem.getCpuAddr()||!samplerMem.getCpuAddr()||
+       !vertexMem.getCpuAddr()||!readbackMem.getCpuAddr()) return 23;
+    std::memcpy(descriptorMem.getCpuAddr(),&imageDesc,sizeof imageDesc);
+    std::memcpy(samplerMem.getCpuAddr(),&samplerDesc,sizeof samplerDesc);
+    std::memcpy(vertexMem.getCpuAddr(),kQuad,sizeof kQuad);
+    std::memset(readbackMem.getCpuAddr(),0xa5,kGpuUploadBytes);
+
+    auto cmd=dk::CmdBufMaker{device}.create();
+    if(!cmd) return 24;
+    cmd.addMemory(drawCommandMem,0u,DK_MEMBLOCK_ALIGNMENT*2u);
+    cmd.bindImageDescriptorSet(descriptorMem.getGpuAddr(),1u);
+    cmd.bindSamplerDescriptorSet(samplerMem.getGpuAddr(),1u);
+    cmd.barrier(DkBarrier_None,DkInvalidateFlags_Descriptors|DkInvalidateFlags_Shader);
+    cmd.bindShaders(DkStageFlag_GraphicsMask,{&vertexShader,&fragmentShader});
+    cmd.bindRenderTargets({&outputView});
+    cmd.setViewports(0,DkViewport{0.0f,0.0f,(float)kWidth,(float)kHeight,0.0f,1.0f});
+    cmd.setScissors(0,DkScissor{0u,0u,kWidth,kHeight});
+    cmd.bindRasterizerState(dk::RasterizerState{}.setCullMode(DkFace_None));
+    cmd.bindColorState(dk::ColorState{});
+    cmd.bindColorWriteState(dk::ColorWriteState{});
+    cmd.bindDepthStencilState(dk::DepthStencilState{}.setDepthTestEnable(false));
+    const DkVtxAttribState attribs[2] = {
+        {0,0,0,DkVtxAttribSize_2x32,DkVtxAttribType_Float,0},
+        {0,0,8,DkVtxAttribSize_2x32,DkVtxAttribType_Float,0}
+    };
+    const DkVtxBufferState buffers[1] = {{sizeof(Stage228Vertex),0}};
+    cmd.bindVtxAttribState({attribs[0],attribs[1]});
+    cmd.bindVtxBufferState({buffers[0]});
+    cmd.bindVtxBuffer(0,vertexMem.getGpuAddr(),sizeof kQuad);
+    cmd.bindTextures(DkStage_Fragment,0,dkMakeTextureHandle(0,0));
+    cmd.draw(DkPrimitive_TriangleStrip,4,1,0,0);
+    cmd.barrier(DkBarrier_Full,DkInvalidateFlags_Image);
+    cmd.copyImageToBuffer(outputView,{0u,0u,0u,kWidth,kHeight,1u},
+                          {readbackMem.getGpuAddr(),0u,0u});
+    queue.submitCommands(cmd.finishList());
+    queue.waitIdle();
+    const auto* pixels=static_cast<const uint8_t*>(readbackMem.getCpuAddr());
+    uint32_t mismatches=0;
+    for(uint32_t y=0;y<kHeight;++y) for(uint32_t x=0;x<kWidth;++x) {
+        const auto p=(y*kWidth+x)*4u;
+        if(std::memcmp(pixels+p,s_padded+p,4u)!=0) {
+            if(mismatches<8u)
+                std::printf("STAGE228_PIXEL_MISMATCH x=%u y=%u expected=%02x%02x%02x%02x got=%02x%02x%02x%02x\n",
+                            x,y,s_padded[p],s_padded[p+1],s_padded[p+2],s_padded[p+3],
+                            pixels[p],pixels[p+1],pixels[p+2],pixels[p+3]);
+            ++mismatches;
+        }
+    }
+    std::printf("STAGE228_GPU_QUAD_READBACK pixels=%u mismatches=%u\n",
+                kWidth*kHeight,mismatches);
+    (void)texture; // texture lifetime is owned by the caller through queue.waitIdle().
+    return mismatches==0?0:25;
+}
+
 int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
@@ -84,14 +207,29 @@ int main(int argc, char** argv)
     const bool shadersReady=
         verifyPackagedShader("romfs:/shaders/padded_texture_vsh.dksh") &&
         verifyPackagedShader("romfs:/shaders/padded_texture_fsh.dksh");
-    romfsExit();
-    if(!shadersReady) return 12;
+    if(!shadersReady) { romfsExit(); return 12; }
     // Unlike Stage225's libnx software framebuffer this creates an actual
     // Tegra image, stages CPU-generated pixels and submits a GPU copy command.
     auto device = dk::DeviceMaker{}.create();
     if(!device) return 3;
     auto queue = dk::QueueMaker{device}.setFlags(DkQueueFlags_Graphics).create();
     if(!queue) return 4;
+
+    // Load the exact packaged DKSH programs into GPU code memory.
+    // The DKSH control section is included in each slot, as in deko3d examples.
+    auto shaderMem=dk::MemBlockMaker{device,DK_MEMBLOCK_ALIGNMENT*4u}
+        .setFlags(DkMemBlockFlags_CpuUncached|DkMemBlockFlags_GpuCached|
+                  DkMemBlockFlags_Code).create();
+    if(!shaderMem||!shaderMem.getCpuAddr()) {romfsExit(); return 13;}
+    dk::Shader vertexShader{},fragmentShader{};
+    const bool loaded=
+        loadStage228Shader(shaderMem,0u,
+            "romfs:/shaders/padded_texture_vsh.dksh",DkStage_Vertex,vertexShader) &&
+        loadStage228Shader(shaderMem,DK_MEMBLOCK_ALIGNMENT,
+            "romfs:/shaders/padded_texture_fsh.dksh",DkStage_Fragment,fragmentShader);
+    romfsExit();
+    if(!loaded) return 14;
+
     dk::ImageLayout layout;
     dk::ImageLayoutMaker{device}.setFormat(DkImageFormat_RGBA8_Unorm)
         .setDimensions(kWidth,kHeight).initialize(layout);
@@ -135,6 +273,8 @@ int main(int argc, char** argv)
                         DkWrapMode_ClampToEdge,DkWrapMode_ClampToEdge);
     dk::SamplerDescriptor samplerDescriptor;
     samplerDescriptor.initialize(sampler);
-    // Descriptor construction is not shader binding or sampled-pixel proof.
-    return 0;
+    // Stage228 renders an offscreen textured quad, then reads back *that*
+    // render target. Cross-building this command path proves no execution.
+    return runStage228Draw(device,queue,image,imageDescriptor,samplerDescriptor,
+                           vertexShader,fragmentShader);
 }
