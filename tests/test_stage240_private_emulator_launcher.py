@@ -103,8 +103,10 @@ class Stage240Tests(unittest.TestCase):
                         self.args("success_no_guest"),timeout=30,test_runner=True)
         self.assertEqual(report["host_process_exit_code"],0)
         self.assertTrue(report["stage231_collected"])
-        self.assertTrue(report["stage236_bundle_consistent"])
+        self.assertFalse(report["stage236_bundle_consistent"])
         self.assertFalse(report["stage241_guest_exit_receipt_accepted"])
+        bundle=json.loads((self.session/"stage240_bundle.json").read_text())
+        self.assertFalse(bundle["consistency_gate"]["stage241_guest_reported_success"])
         self.assertEqual(report["stage241_guest_exit_receipt"]["status"],"missing")
         self.assertFalse(report["runtime_gpu_execution_attested"])
 
