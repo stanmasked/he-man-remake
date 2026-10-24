@@ -73,31 +73,33 @@ class Stage231SessionTests(unittest.TestCase):
             CHALLENGE + "\n")
 
     def test_prepare_rejects_symlinked_switch_directory(self):
-        sd_root = self.root / "symlinked-switch-sd"
+        root = self.sd.parent
+        sd_root = root / "symlinked-switch-sd"
         sd_root.mkdir()
-        external = self.root / "external-switch-target"
+        external = root / "external-switch-target"
         external.mkdir()
         try:
             (sd_root / "switch").symlink_to(external, target_is_directory=True)
         except (OSError, NotImplementedError):
             self.skipTest("symbolic links are unavailable")
-        fresh_out = self.root / "new-owner-private-switch-test"
+        fresh_out = root / "new-owner-private-switch-test"
         with self.assertRaisesRegex(m.SessionError, "non-symlink directories"):
             m.prepare(self.nro, sd_root, fresh_out, challenge=CHALLENGE)
         self.assertFalse((external / "heman-stage230").exists())
         self.assertFalse((fresh_out / "stage231_session.json").exists())
 
     def test_prepare_rejects_symlinked_heman_stage230_directory(self):
-        sd_root = self.root / "symlinked-stage230-sd"
+        root = self.sd.parent
+        sd_root = root / "symlinked-stage230-sd"
         switch = sd_root / "switch"
         switch.mkdir(parents=True)
-        external = self.root / "external-stage230-target"
+        external = root / "external-stage230-target"
         external.mkdir()
         try:
             (switch / "heman-stage230").symlink_to(external, target_is_directory=True)
         except (OSError, NotImplementedError):
             self.skipTest("symbolic links are unavailable")
-        fresh_out = self.root / "new-owner-private-stage230-test"
+        fresh_out = root / "new-owner-private-stage230-test"
         with self.assertRaisesRegex(m.SessionError, "non-symlink directories"):
             m.prepare(self.nro, sd_root, fresh_out, challenge=CHALLENGE)
         self.assertFalse((external / "run_nonce.txt").exists())
