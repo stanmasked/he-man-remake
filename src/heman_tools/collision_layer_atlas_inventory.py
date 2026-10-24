@@ -20,6 +20,7 @@ MAX_MAPS = 1000
 MAX_REPO_BYTES = 1_000_000
 MAX_REPO_ENTRIES = 5000
 MAX_TILESET_BYTES = 1_000_000
+MAX_WAD_BYTES = 64_000_000
 SPECIAL_FORMAT_MAP = "gs_background_sky.map"
 
 
@@ -91,6 +92,44 @@ def _tileset_texture_ref(data: bytes) -> str:
     return texture_ref
 
 
+def parse_texture_wad_record(data: bytes, offset: int, *, expected_key: str,
+                            next_offset: int) -> dict:
+    """Validate the indexed texture metadata record at its repo-provided offset."""
+    if offset < 0 or offset >= len(data) or next_offset <= offset or next_offset > len(data):
+        raise ResourceRepoFormatError("texture WAD record offset outside bounds")
+    key, pos = _read_text(data, offset)
+    if key != expected_key:
+        raise ResourceRepoFormatError("texture WAD key does not match TextureData.repo")
+    if pos + 15 > len(data):
+        raise ResourceRepoFormatError("truncated texture WAD metadata")
+    marker = struct.unpack_from("<I", data, pos)[0]
+    pos += 4
+    reserved = data[pos:pos + 11]
+    pos += 11
+    if marker != 1 or any(reserved):
+        raise ResourceRepoFormatError("unsupported texture WAD metadata header")
+    texture_name, pos = _read_text(data, pos)
+    if pos != next_offset:
+        raise ResourceRepoFormatError("texture WAD record length disagrees with repository offsets")
+    return {
+        "key": key,
+        "marker": marker,
+        "texture_name": texture_name,
+        "record_length": pos - offset,
+    }
+
+
+def _next_texture_offset(texture_repo: dict, path: str, offset: int, wad_size: int) -> int:
+    offsets = sorted({
+        entry["value"] for entry in texture_repo["entries"].values()
+        if entry["path"] == path
+    })
+    for candidate in offsets:
+        if candidate > offset:
+            return candidate
+    return wad_size
+
+
 def _safe_map_name(name: str) -> bool:
     return (
         isinstance(name, str) and 1 < len(name) <= 256
@@ -147,18 +186,31 @@ def _read_archive_entry(archive: zipfile.ZipFile, path: str, max_bytes: int) -> 
     return raw
 
 
-def _registry_paths(archive: zipfile.ZipFile, screen: str) -> tuple[dict, dict, dict]:
+def _registry_paths(archive: zipfile.ZipFile, screen: str) -> tuple[dict, dict, dict, bytes]:
     prefix = f"Payload/MOTU.app/{screen}/meta/"
     tile_raw = _read_archive_entry(archive, prefix + "TilesetData.repo", MAX_REPO_BYTES)
     texture_raw = _read_archive_entry(archive, prefix + "TextureData.repo", MAX_REPO_BYTES)
     tile_repo = parse_resource_repo(tile_raw, expected_label="TilesetData")
     texture_repo = parse_resource_repo(texture_raw, expected_label="TextureData")
+    wad_paths = {entry["path"] for entry in texture_repo["entries"].values()}
+    if len(wad_paths) != 1:
+        raise ResourceRepoFormatError("TextureData.repo does not use one WAD path")
+    wad_relative = next(iter(wad_paths)).lstrip("/")
+    parts = PurePosixPath(wad_relative).parts
+    if not parts or parts[0] != "textureData" or any(p in ("", ".", "..") for p in parts):
+        raise ResourceRepoFormatError("TextureData WAD path is outside the expected directory")
+    wad_raw = _read_archive_entry(
+        archive, f"Payload/MOTU.app/{screen}/{wad_relative}", MAX_WAD_BYTES
+    )
     return tile_repo, texture_repo, {
         "tileset_repo_size_bytes": len(tile_raw),
         "tileset_repo_sha256": hashlib.sha256(tile_raw).hexdigest(),
         "texture_repo_size_bytes": len(texture_raw),
         "texture_repo_sha256": hashlib.sha256(texture_raw).hexdigest(),
-    }
+        "texture_wad_size_bytes": len(wad_raw),
+        "texture_wad_sha256": hashlib.sha256(wad_raw).hexdigest(),
+        "texture_wad_path": wad_relative,
+    }, wad_raw
 
 
 def audit_collision_atlas_routing(ipa: Path) -> dict:
@@ -171,8 +223,8 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
         if set(med_entries) != set(large_entries):
             raise ValueError("screen packs have different map filename sets")
 
-        med_tiles, med_textures, med_repo_meta = _registry_paths(archive, "screen-med")
-        large_tiles, large_textures, large_repo_meta = _registry_paths(archive, "screen-xlarge")
+        med_tiles, med_textures, med_repo_meta, med_wad = _registry_paths(archive, "screen-med")
+        large_tiles, large_textures, large_repo_meta, large_wad = _registry_paths(archive, "screen-xlarge")
         tileset_registry_equal = (
             med_tiles["entry_count"] == large_tiles["entry_count"]
             and med_tiles["entries"] == large_tiles["entries"]
@@ -183,6 +235,7 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
             and med_textures["entries"] == large_textures["entries"]
             and med_repo_meta["texture_repo_sha256"] == large_repo_meta["texture_repo_sha256"]
         )
+        texture_wad_equal = med_wad == large_wad
         if not tileset_registry_equal or not texture_registry_equal:
             raise ValueError("resource registries differ between screen packs")
 
@@ -246,6 +299,10 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
             texture_ref = None
             texture_key_present = None
             texture_ref_parseable = False
+            texture_wad_record_verified = None
+            texture_wad_texture_name = None
+            texture_wad_record_length = None
+            texture_png_present_both_packs = None
             if registry_entry:
                 normalized = resource_path.lstrip("/")
                 parts = PurePosixPath(normalized).parts
@@ -269,6 +326,38 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
                     # registry path is still authoritative; texture lookup stays unknown.
                     texture_ref_parseable = False
                     texture_key_present = None
+                if texture_key_present:
+                    texture_entry = med_textures["entries"][texture_ref]
+                    texture_offset = texture_entry["value"]
+                    next_offset = _next_texture_offset(
+                        med_textures, texture_entry["path"], texture_offset, len(med_wad)
+                    )
+                    large_entry = large_textures["entries"][texture_ref]
+                    large_next = _next_texture_offset(
+                        large_textures, large_entry["path"], large_entry["value"], len(large_wad)
+                    )
+                    try:
+                        med_record = parse_texture_wad_record(
+                            med_wad, texture_offset, expected_key=texture_ref, next_offset=next_offset
+                        )
+                        large_record = parse_texture_wad_record(
+                            large_wad, large_entry["value"], expected_key=texture_ref, next_offset=large_next
+                        )
+                        texture_wad_record_verified = (
+                            med_record == large_record
+                            and texture_wad_equal
+                            and texture_offset == large_entry["value"]
+                        )
+                        texture_wad_texture_name = med_record["texture_name"]
+                        texture_wad_record_length = med_record["record_length"]
+                        if "/" not in texture_wad_texture_name and chr(92) not in texture_wad_texture_name:
+                            med_png = f"Payload/MOTU.app/screen-med/textures/{texture_wad_texture_name}.png"
+                            large_png = f"Payload/MOTU.app/screen-xlarge/textures/{texture_wad_texture_name}.png"
+                            texture_png_present_both_packs = (
+                                med_png in archive.namelist() and large_png in archive.namelist()
+                            )
+                    except ResourceRepoFormatError:
+                        texture_wad_record_verified = False
             else:
                 unresolved_aliases.append(atlas_name)
 
@@ -284,6 +373,10 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
                 "tileset_texture_ref_parseable": texture_ref_parseable,
                 "tileset_texture_ref": texture_ref,
                 "texture_registry_entry_present": texture_key_present,
+                "texture_wad_record_verified": texture_wad_record_verified,
+                "texture_wad_texture_name": texture_wad_texture_name,
+                "texture_wad_record_length": texture_wad_record_length,
+                "texture_png_present_both_packs": texture_png_present_both_packs,
             })
 
     report = {
@@ -307,6 +400,9 @@ def audit_collision_atlas_routing(ipa: Path) -> dict:
             "texture_registry_entries": med_textures["entry_count"],
             "tileset_registry_exact_bytes_equal_across_packs": tileset_registry_equal,
             "texture_registry_exact_bytes_equal_across_packs": texture_registry_equal,
+            "texture_wad_exact_bytes_equal_across_packs": texture_wad_equal,
+            "texture_wad_size_bytes": med_repo_meta["texture_wad_size_bytes"],
+            "texture_wad_sha256": med_repo_meta["texture_wad_sha256"],
             "tileset_registry_sha256": med_repo_meta["tileset_repo_sha256"],
             "texture_registry_sha256": med_repo_meta["texture_repo_sha256"],
         },
