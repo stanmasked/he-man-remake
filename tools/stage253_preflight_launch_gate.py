@@ -182,6 +182,58 @@ def validate_preflight_report(
     if not os.access(emulator, os.X_OK):
         raise PreflightGateError("emulator is not executable")
     nro_info = _regular_non_symlink(nro)
+
+    try:
+        sd_info = sd_root.lstat()
+    except OSError as exc:
+        raise PreflightGateError("SD root is unavailable") from exc
+    if stat.S_ISLNK(sd_info.st_mode) or not stat.S_ISDIR(sd_info.st_mode):
+        raise PreflightGateError("SD root must be a non-symlink directory")
+    if not os.access(sd_root, os.W_OK | os.X_OK):
+        raise PreflightGateError("SD root is not writable/searchable by the current user")
+
+    # Recheck session freshness/privacy immediately before Stage240 PREPARE.
+    try:
+        session_info = session_dir.lstat()
+        session_exists = True
+    except FileNotFoundError:
+        session_info = None
+        session_exists = False
+    except OSError as exc:
+        raise PreflightGateError("session target cannot be inspected") from exc
+    if session_exists:
+        if (session_info is None or stat.S_ISLNK(session_info.st_mode)
+                or not stat.S_ISDIR(session_info.st_mode)):
+            raise PreflightGateError("session target must be a non-symlink directory")
+        try:
+            if any(session_dir.iterdir()):
+                raise PreflightGateError("session target is no longer empty")
+        except OSError as exc:
+            raise PreflightGateError("session target cannot be listed") from exc
+        privacy_target = session_dir
+    else:
+        privacy_target = session_dir.parent
+        try:
+            parent_info = privacy_target.lstat()
+        except OSError as exc:
+            raise PreflightGateError("session parent is unavailable") from exc
+        if stat.S_ISLNK(parent_info.st_mode) or not stat.S_ISDIR(parent_info.st_mode):
+            raise PreflightGateError("session parent must be a non-symlink directory")
+        if not os.access(privacy_target, os.W_OK | os.X_OK):
+            raise PreflightGateError("session parent is not writable/searchable")
+    if os.name != "nt" and (privacy_target.stat().st_mode & 0o077):
+        raise PreflightGateError("session path is not owner-private on POSIX")
+
+    try:
+        emulator_real = emulator.resolve(strict=True)
+        nro_real = nro.resolve(strict=True)
+    except OSError as exc:
+        raise PreflightGateError("could not normalize input paths") from exc
+    if (_is_within(emulator_real, sd_real) or _is_within(nro_real, sd_real)
+            or _is_within(session_real, sd_real) or _is_within(sd_real, session_real)
+            or _is_within(emulator_real, session_real)
+            or _is_within(nro_real, session_real)):
+        raise PreflightGateError("launch input/output paths overlap")
     if not 20 <= nro_info.st_size <= 16 * 1024 * 1024:
         raise PreflightGateError("NRO size is outside the Stage231 bounds")
     try:
