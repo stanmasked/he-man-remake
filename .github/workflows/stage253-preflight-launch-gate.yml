@@ -1,0 +1,84 @@
+name: He-Man Stage253 preflight-bound launch gate
+on:
+  pull_request:
+    paths:
+      - 'tools/stage252_runtime_preflight.py'
+      - 'tools/stage253_preflight_launch_gate.py'
+      - 'tools/stage240_private_emulator_launcher.py'
+      - 'tests/test_stage252_runtime_preflight.py'
+      - 'tests/test_stage253_preflight_launch_gate.py'
+      - 'tests/test_stage240_private_emulator_launcher.py'
+      - 'docs/stage252-runtime-preflight.md'
+      - 'docs/stage253-preflight-launch-gate.md'
+      - 'docs/stage240-private-emulator-launch.md'
+      - '.github/workflows/stage253-preflight-launch-gate.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-launch-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    name: Synthetic preflight binding and no-real-launch checks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run Stage252 preflight regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage252_runtime_preflight.py' -v
+      - name: Run Stage253 report-binding tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage253_preflight_launch_gate.py' -v
+      - name: Run Stage240 launcher regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m unittest discover -s tests -p 'test_stage240_private_emulator_launcher.py' -v
+      - name: Write synthetic-only gate test summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = {
+              "schema": "heman-stage253-synthetic-gate-test-summary-v1",
+              "result": "synthetic_gate_tests_passed_not_runtime_evidence",
+              "stage252_preflight_gate_tested": True,
+              "real_preflight_report_validated": False,
+              "real_emulator_launch_performed": False,
+              "runtime_gpu_execution_attested": False,
+              "gpu_capability_independently_verified": False,
+              "original_ios_graphics_parity_attested": False,
+              "note": "All tests use synthetic fixtures. The Stage240 test-only runner is not emulator/GPU evidence."
+          }
+          Path("build/stage253_gate_test_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE253_SYNTHETIC_GATE_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic gate test summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage253-preflight-launch-gate
+          path: build/stage253_gate_test_summary.json
+          if-no-files-found: error
+          retention-days: 7
