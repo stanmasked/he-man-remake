@@ -354,7 +354,7 @@ def compare_screen_pair(ipa: Path, map_name: str) -> dict:
         },
         "result": "cross_screen_shape_link_audit_complete" if complete else "partial_or_divergent_shape_links",
         "resource_links_verified": complete,
-        "original_engine_call_path_audited_separately": True,
+        "macho_call_path_disassembly_included_in_this_tool": False,
         "original_collision_semantics_verified": False,
         "original_ios_gameplay_trace_compared": False,
         "native_switch_collision_import_authorized": False,
