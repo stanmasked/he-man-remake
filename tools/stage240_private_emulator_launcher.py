@@ -69,17 +69,140 @@ def drain_bounded_output(stream, log_path: Path, limit: int, state: dict) -> Non
             pass
 
 
+class WindowsJobObject:
+    """Own a Windows Job Object configured to kill all assigned processes on close."""
+    def __init__(self):
+        if os.name != "nt":
+            raise OSError("Windows Job Objects are only available on Windows")
+        import ctypes
+        from ctypes import wintypes
+
+        class BasicLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("PerProcessUserTimeLimit", ctypes.c_longlong),
+                ("PerJobUserTimeLimit", ctypes.c_longlong),
+                ("LimitFlags", wintypes.DWORD),
+                ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t),
+                ("ActiveProcessLimit", wintypes.DWORD),
+                ("Affinity", ctypes.c_size_t),
+                ("PriorityClass", wintypes.DWORD),
+                ("SchedulingClass", wintypes.DWORD),
+            ]
+
+        class IoCounters(ctypes.Structure):
+            _fields_ = [
+                ("ReadOperationCount", ctypes.c_ulonglong),
+                ("WriteOperationCount", ctypes.c_ulonglong),
+                ("OtherOperationCount", ctypes.c_ulonglong),
+                ("ReadTransferCount", ctypes.c_ulonglong),
+                ("WriteTransferCount", ctypes.c_ulonglong),
+                ("OtherTransferCount", ctypes.c_ulonglong),
+            ]
+
+        class ExtendedLimitInformation(ctypes.Structure):
+            _fields_ = [
+                ("BasicLimitInformation", BasicLimitInformation),
+                ("IoInfo", IoCounters),
+                ("ProcessMemoryLimit", ctypes.c_size_t),
+                ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                ("PeakJobMemoryUsed", ctypes.c_size_t),
+            ]
+
+        class BasicAccountingInformation(ctypes.Structure):
+            _fields_ = [
+                ("TotalUserTime", ctypes.c_longlong),
+                ("TotalKernelTime", ctypes.c_longlong),
+                ("ThisPeriodTotalUserTime", ctypes.c_longlong),
+                ("ThisPeriodTotalKernelTime", ctypes.c_longlong),
+                ("TotalPageFaultCount", wintypes.DWORD),
+                ("TotalProcesses", wintypes.DWORD),
+                ("ActiveProcesses", wintypes.DWORD),
+                ("TotalTerminatedProcesses", wintypes.DWORD),
+            ]
+
+        self._ctypes = ctypes
+        self._wintypes = wintypes
+        self._ExtendedLimitInformation = ExtendedLimitInformation
+        self._BasicAccountingInformation = BasicAccountingInformation
+        self._kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        self._kernel32.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
+        self._kernel32.CreateJobObjectW.restype = wintypes.HANDLE
+        self._kernel32.SetInformationJobObject.argtypes = [
+            wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD]
+        self._kernel32.SetInformationJobObject.restype = wintypes.BOOL
+        self._kernel32.AssignProcessToJobObject.argtypes = [
+            wintypes.HANDLE, wintypes.HANDLE]
+        self._kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+        self._kernel32.QueryInformationJobObject.argtypes = [
+            wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD,
+            ctypes.POINTER(wintypes.DWORD)]
+        self._kernel32.QueryInformationJobObject.restype = wintypes.BOOL
+        self._kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        self._kernel32.CloseHandle.restype = wintypes.BOOL
+
+        self.handle = self._kernel32.CreateJobObjectW(None, None)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = ExtendedLimitInformation()
+        # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE: descendants cannot outlive owner.
+        limits.BasicLimitInformation.LimitFlags = 0x00002000
+        ok = self._kernel32.SetInformationJobObject(
+            self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits))
+        if not ok:
+            error = ctypes.WinError(ctypes.get_last_error())
+            self.close()
+            raise error
+
+    @property
+    def is_open(self) -> bool:
+        return bool(self.handle)
+
+    def assign(self, proc: subprocess.Popen) -> None:
+        if not self.is_open:
+            raise OSError("Windows Job Object handle is closed")
+        process_handle = self._wintypes.HANDLE(int(proc._handle))
+        if not self._kernel32.AssignProcessToJobObject(self.handle, process_handle):
+            raise self._ctypes.WinError(self._ctypes.get_last_error())
+
+    def active_process_count(self) -> int:
+        if not self.is_open:
+            raise OSError("Windows Job Object handle is closed")
+        info = self._BasicAccountingInformation()
+        returned = self._wintypes.DWORD()
+        ok = self._kernel32.QueryInformationJobObject(
+            self.handle, 1, self._ctypes.byref(info), self._ctypes.sizeof(info),
+            self._ctypes.byref(returned))
+        if not ok:
+            raise self._ctypes.WinError(self._ctypes.get_last_error())
+        return int(info.ActiveProcesses)
+
+    def close(self) -> bool:
+        if not self.is_open:
+            return True
+        ok = bool(self._kernel32.CloseHandle(self.handle))
+        if ok:
+            self.handle = None
+        return ok
+
+
 OUTPUT_DRAIN_GRACE_SECONDS = 2
 
 
-def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10) -> dict:
-    """Best-effort termination of the isolated runner tree; never use a shell."""
+def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10,
+                          job: WindowsJobObject | None = None) -> dict:
+    """Terminate the isolated runner tree without invoking a command shell."""
     result = {
         "attempted": True,
-        "method": "posix_process_group" if os.name != "nt" else "windows_taskkill_tree",
+        "method": "posix_process_group" if os.name != "nt" else (
+            "windows_job_object_kill_on_close" if job is not None
+            else "windows_taskkill_tree_fallback"),
         "success": False,
         "error": None,
         "parent_reaped": False,
+        "job_closed": None,
+        "active_processes_before_close": None,
     }
     if os.name != "nt":
         try:
@@ -90,6 +213,14 @@ def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10) -> d
             result["already_gone"] = True
         except OSError as exc:
             result["error"] = f"{type(exc).__name__}: {exc}"
+    elif job is not None:
+        try:
+            result["active_processes_before_close"] = job.active_process_count()
+        except OSError as exc:
+            result["error"] = f"cannot query Job Object: {exc}"
+        result["job_closed"] = job.close()
+        if not result["job_closed"]:
+            result["error"] = result["error"] or "CloseHandle(Job Object) failed"
     else:
         try:
             task = subprocess.run(
@@ -117,9 +248,14 @@ def terminate_process_tree(proc: subprocess.Popen, grace_seconds: int = 10) -> d
             result.get("signal_sent", False) or result.get("already_gone", False)
         ) and result["error"] is None
     else:
-        result["success"] = result["parent_reaped"] and (
-            result.get("taskkill_returncode") == 0
-        ) and result["error"] is None
+        if job is not None:
+            result["success"] = result["parent_reaped"] and (
+                result.get("job_closed") is True
+            ) and result["error"] is None
+        else:
+            result["success"] = result["parent_reaped"] and (
+                result.get("taskkill_returncode") == 0
+            ) and result["error"] is None
     return result
 
 
