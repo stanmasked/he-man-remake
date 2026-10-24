@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 import sys
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"tools"))
@@ -105,6 +106,63 @@ class Stage231SessionTests(unittest.TestCase):
         self.assertFalse((external / "run_nonce.txt").exists())
         self.assertFalse((fresh_out / "stage231_session.json").exists())
 
+    def test_prepare_uses_pinned_capture_directory_after_switch_path_replacement(self):
+        if not m._supports_descriptor_io():
+            self.skipTest("descriptor-relative capture I/O is unsupported")
+        root = self.sd.parent
+        sd_root = root / "pinned-prepare-sd"
+        output = root / "pinned-prepare-output"
+        external = root / "replacement-switch-target"
+        external.mkdir()
+        probe = root / "symlink-probe"
+        try:
+            probe.symlink_to(external, target_is_directory=True)
+            probe.unlink()
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        original_open = m._open_sd_capture_dir_fd
+        def open_then_replace(path, *, create):
+            fd = original_open(path, create=create)
+            if path == sd_root:
+                (sd_root / "switch").rename(sd_root / "switch-original")
+                (sd_root / "switch").symlink_to(external, target_is_directory=True)
+            return fd
+        with mock.patch.object(m, "_open_sd_capture_dir_fd", side_effect=open_then_replace):
+            m.prepare(self.nro, sd_root, output, challenge=CHALLENGE)
+        pinned_capture = sd_root / "switch-original" / "heman-stage230"
+        self.assertEqual((pinned_capture / "run_nonce.txt").read_text(), CHALLENGE + "\n")
+        self.assertFalse((external / "run_nonce.txt").exists())
+        self.assertTrue((output / "stage231_session.json").is_file())
+
+    def test_collect_reads_pinned_capture_after_switch_path_replacement(self):
+        if not m._supports_descriptor_io():
+            self.skipTest("descriptor-relative capture I/O is unsupported")
+        root = self.sd.parent
+        external = root / "replacement-collect-target"
+        external.mkdir()
+        (external / "heman-stage230").mkdir()
+        (external / "heman-stage230" / "run_nonce.txt").write_text("f" * 32 + "\n")
+        (external / "heman-stage230" / "readback.rgba").write_bytes(b"X" * 512)
+        (external / "heman-stage230" / "readback.receipt").write_text("decoy receipt")
+        probe = root / "collect-symlink-probe"
+        try:
+            probe.symlink_to(external, target_is_directory=True)
+            probe.unlink()
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        original_open = m._open_sd_capture_dir_fd
+        def open_then_replace(path, *, create):
+            fd = original_open(path, create=create)
+            if path == self.sd and not create:
+                (self.sd / "switch").rename(self.sd / "switch-original")
+                (self.sd / "switch").symlink_to(external, target_is_directory=True)
+            return fd
+        with mock.patch.object(m, "_open_sd_capture_dir_fd", side_effect=open_then_replace):
+            result = self.run_collect()
+        self.assertEqual(result["rgba_sha256"], hashlib.sha256(m.payload()).hexdigest())
+        self.assertEqual((self.out / "readback.rgba").read_bytes(), m.payload())
+        self.assertEqual((external / "heman-stage230" / "readback.rgba").read_bytes(), b"X" * 512)
+
     def test_nonce_replacement_does_not_follow_preexisting_symlink(self):
         target = Path(self.temp.name) / "outside-target.txt"
         target.write_text("must remain unchanged", encoding="utf-8")
@@ -205,6 +263,17 @@ class Stage231SessionTests(unittest.TestCase):
                             b"mock backend calls", "gpu_capable_emulator",
                             "invented-launcher")
         self.assertFalse(report["runtime_provenance_attested"])
+
+    def test_nro_hash_rejects_symlink_to_valid_nro(self):
+        if not getattr(__import__("os"), "O_NOFOLLOW", 0):
+            self.skipTest("O_NOFOLLOW is unsupported")
+        link = self.sd.parent / "nro-symlink"
+        try:
+            link.symlink_to(self.nro)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        with self.assertRaisesRegex(m.SessionError, "non-symlink file"):
+            m.nro_sha256(link)
 
     def test_bad_nro_after_prepare(self):
         self.nro.write_bytes(FAKE_NRO + b"x")
