@@ -66,8 +66,10 @@ unchanged between preflight and launch. If more than 30 minutes pass or any
 input changes, rerun Stage252 and use a new report/session path.
 
 The public CI fake runner is explicitly marked --test-only-runner and is the
-only path allowed to bypass the Stage253 gate. That flag must never be used
-for a real emulator.
+only path allowed to bypass the Stage253 gate. The launcher additionally
+requires a regular non-symlink script with a shebang and the exact synthetic
+runner marker comment in its first 64 KiB; an unmarked executable is rejected
+before Stage231 PREPARE. That flag must never be used for a real emulator.
 
 ## Validation and evidence boundary
 
