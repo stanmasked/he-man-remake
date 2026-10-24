@@ -1,0 +1,66 @@
+name: He-Man Stage258 collision-layer atlas routing
+on:
+  pull_request:
+    paths:
+      - 'src/heman_tools/collision_layer_atlas_inventory.py'
+      - 'tests/test_collision_layer_atlas_inventory.py'
+      - 'docs/stage258-global-collision-layer-atlas-routing.md'
+      - '.github/workflows/stage258-collision-layer-atlas-routing.yml'
+      - 'docs/roadmap.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-atlas-routing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reject private commercial assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(private_assets|original_assets|local_reports)/|\.(ipa|apk|obb|pvr|wav|mp3|ogg)$'; then
+            echo "Private source assets must not enter public CI" >&2
+            exit 1
+          fi
+      - name: Run synthetic Stage258 regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=src python -m unittest discover -s tests -p 'test_collision_layer_atlas_inventory.py' -v
+      - name: Write synthetic-only capability summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = {
+              "schema": "heman-stage258-collision-layer-atlas-routing-ci-v1",
+              "result": "synthetic_atlas_routing_tests_passed_not_original_evidence",
+              "synthetic_map_fixtures_only": True,
+              "original_ipa_loaded": False,
+              "original_map_names_or_cell_coordinates_exported": False,
+              "original_collision_semantics_verified": False,
+              "native_switch_collision_import_authorized": False,
+              "note": "Public CI validates aggregate routing logic only; no original assets or runtime."
+          }
+          Path("build/stage258_synthetic_summary.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print("STAGE258_SYNTHETIC_ROUTING_SUMMARY_VALID")
+          PY
+      - name: Preserve synthetic Stage258 summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: heman-stage258-synthetic-atlas-routing
+          path: build/stage258_synthetic_summary.json
+          if-no-files-found: error
+          retention-days: 7
