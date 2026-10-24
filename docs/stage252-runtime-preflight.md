@@ -67,8 +67,12 @@ or that a GPU is used. These fields remain false:
 - original_ios_graphics_parity_attested
 
 Public CI creates a synthetic executable and synthetic NRO only, runs unit
-tests, and stores a synthetic preflight report. Never put original IPA data,
-Nintendo firmware/keys, private logs or raw captures into public CI.
+tests, and stores a synthetic preflight report. The artifact deliberately omits
+`--confirm-sd-root-mapping` and is expected to say `preflight_blocked`: synthetic
+CI must never imply that a human verified a real emulator's SD mapping. Unit
+tests separately exercise the pass path using only temporary fixtures. Never
+put original IPA data, Nintendo firmware/keys, private logs or raw captures into
+public CI.
 
 ## Acceptance and next step
 
