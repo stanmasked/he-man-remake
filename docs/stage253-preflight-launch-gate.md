@@ -26,7 +26,8 @@ Stage253 rejects a launch unless all of the following hold:
 - The report is no older than 30 minutes and its timestamp is timezone-aware.
 - The report is outside the SD tree and session directory; the SD root and
   session destination are still non-symlink paths, writable/fresh as required,
-  and private on POSIX.
+  and private on POSIX. Existing switch/heman-stage230 path components are
+  rechecked as real directories so PREPARE cannot follow a symlinked output tree.
 
 The gate adds the preflight report SHA-256, creation time, age, and matched
 hashes to stage240_launch.json. This supports audit and troubleshooting; it
