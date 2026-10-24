@@ -30,6 +30,21 @@ def make_tileset(texture_ref):
     return struct.pack("<8I", 32, 32, 32, 32, 49152, 65535, 0, 1) + text_field(texture_ref)
 
 
+def make_texture_wad():
+    rows = [
+        ("img_collisiontiles", "collisionTiles"),
+        ("Collision.collisionCloudTiles", "collisionCloudTiles"),
+        ("specialTiles", "specialTiles"),
+    ]
+    wad = b""
+    repo_rows = []
+    for key, texture_name in rows:
+        offset = len(wad)
+        wad += text_field(key) + struct.pack("<I", 1) + (bytes(11)) + text_field(texture_name)
+        repo_rows.append((key, "textureData/TextureData.wad", offset))
+    return wad, repo_rows
+
+
 def make_collision_map(*, shown=0, atlas_names=("collision", "cloud")):
     if atlas_names == ("collision", "cloud"):
         return sample(layer(
@@ -58,11 +73,7 @@ def write_synthetic_ipa(path, *, divergent_regular=False, missing_large_map=Fals
     ]
     if not missing_special_registry:
         tile_rows.append(("special", "/tilesets/damage.tileset", 0))
-    texture_rows = [
-        ("img_collisiontiles", "textureData/TextureData.wad", 0),
-        ("Collision.collisionCloudTiles", "textureData/TextureData.wad", 100),
-        ("specialTiles", "textureData/TextureData.wad", 200),
-    ]
+    texture_wad, texture_rows = make_texture_wad()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         with zipfile.ZipFile(path, "w") as archive:
@@ -86,6 +97,10 @@ def write_synthetic_ipa(path, *, divergent_regular=False, missing_large_map=Fals
                     f"{prefix}/meta/TextureData.repo",
                     make_repo("TextureData", texture_rows),
                 )
+                archive.writestr(f"{prefix}/textureData/TextureData.wad", texture_wad)
+                archive.writestr(f"{prefix}/textures/collisionTiles.png", b"synthetic-png-collision")
+                archive.writestr(f"{prefix}/textures/collisionCloudTiles.png", b"synthetic-png-cloud")
+                archive.writestr(f"{prefix}/textures/specialTiles.png", b"synthetic-png-special")
                 archive.writestr(
                     f"{prefix}/tilesets/collision.tileset", make_tileset("img_collisiontiles")
                 )
@@ -114,6 +129,7 @@ class CollisionLayerAtlasInventoryTests(unittest.TestCase):
             self.assertEqual(pairs["normal_multilayer_maps_parsed"], 2)
             self.assertTrue(report["resource_registry_summary"]["tileset_registry_exact_bytes_equal_across_packs"])
             self.assertTrue(report["resource_registry_summary"]["texture_registry_exact_bytes_equal_across_packs"])
+            self.assertTrue(report["resource_registry_summary"]["texture_wad_exact_bytes_equal_across_packs"])
             self.assertEqual(summary["collision_named_layers"], 2)
             self.assertEqual(summary["occupied_cells"], 4)
             self.assertEqual(summary["cells_on_atlas_named_collision"], 2)
@@ -126,6 +142,10 @@ class CollisionLayerAtlasInventoryTests(unittest.TestCase):
             self.assertEqual(by_name["special"]["tileset_texture_ref"], "specialTiles")
             self.assertTrue(by_name["special"]["tileset_registry_entry_present"])
             self.assertTrue(by_name["special"]["texture_registry_entry_present"])
+            self.assertTrue(by_name["special"]["texture_wad_record_verified"])
+            self.assertEqual(by_name["special"]["texture_wad_texture_name"], "specialTiles")
+            self.assertEqual(by_name["special"]["texture_wad_record_length"], 67)
+            self.assertTrue(by_name["special"]["texture_png_present_both_packs"])
             self.assertEqual(report["unresolved_tileset_registry_aliases"], [])
             self.assertFalse(report["original_collision_semantics_verified"])
             serialized = json.dumps(report)
