@@ -104,7 +104,7 @@ class BundleTests(unittest.TestCase):
         self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
         self.assertFalse(report["pixel_diagnostics"]["captures"]["upload"]["matches_fixture_exactly"])
         self.assertEqual(report["pixel_diagnostics"]["triage_hint"],
-            "both_captures_deviate_compare_transform_and_per_row_diagnostics")
+            "captures_differ_review_upload_and_draw_paths")
 
     def test_same_wrong_captures_report_shared_deviation(self):
         bad=bytes([0xA5])*512
