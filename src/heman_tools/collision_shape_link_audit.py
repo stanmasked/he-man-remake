@@ -247,8 +247,12 @@ def _rect_scale(med: dict, large: dict) -> int:
     if a["header_ints"][0] <= 0 or b["header_ints"][0] % a["header_ints"][0]:
         raise ValueError("tileset header dimensions have no integer scale")
     scale = b["header_ints"][0] // a["header_ints"][0]
-    if scale < 1 or b["header_ints"][:4] != [v * scale for v in a["header_ints"][:4]]:
-        raise ValueError("tileset header dimensions do not share one scale")
+    if (
+        scale < 1
+        or b["header_ints"][:2] != [v * scale for v in a["header_ints"][:2]]
+        or b["header_ints"][2:4] != a["header_ints"][2:4]
+    ):
+        raise ValueError("atlas dimensions do not scale while logical tile dimensions remain stable")
     for left, right in zip(a["entries"], b["entries"]):
         if (right["atlas_x"], right["atlas_y"], right["width"], right["height"]) != (
             left["atlas_x"] * scale, left["atlas_y"] * scale,
