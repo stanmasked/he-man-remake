@@ -120,13 +120,26 @@ class MachOSymbolCensusTests(unittest.TestCase):
             summarize_macho_symbols(bytes(binary))
 
     def test_symbol_table_absent_rejected(self):
-        binary = fake_symbol_macho([
-            ("__ZN4helo7Shape2D10customLoadEv", 0x1E, 1)
-        ])
-        # Remove the LC_SYMTAB command and retain a valid single-command header.
-        commands = binary[28:28 + 16 + 124]
-        header = struct.pack("<IiiIIII", 0xfeedface, 12, 9, 2, 2, len(commands), 0)
-        without_symtab = header + commands + bytes(32)
+        version_command = struct.pack("<IIII", 0x25, 16, 0x00040300, 0x00060100)
+        segment_size = 56 + 68
+        text_offset = 28 + 16 + segment_size
+        text_bytes = bytes(16)
+        segment_header = struct.pack(
+            "<II16sIIIIIIII",
+            0x1, segment_size, b"__TEXT",
+            0x1000, 256, 0, text_offset + len(text_bytes), 7, 5, 1, 0,
+        )
+        section = struct.pack(
+            "<16s16sIIIIIIIII",
+            b"__text", b"__TEXT", 0x1000, len(text_bytes), text_offset,
+            2, 0, 0, 0, 0, 0,
+        )
+        segment_command = segment_header + section
+        commands = version_command + segment_command
+        header = struct.pack(
+            "<IiiIIII", 0xfeedface, 12, 9, 2, 2, len(commands), 0
+        )
+        without_symtab = header + commands + text_bytes
         with self.assertRaisesRegex(ValueError, "symbol table is absent"):
             summarize_macho_symbols(without_symtab)
 
