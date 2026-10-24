@@ -42,6 +42,24 @@ def _is_within(child: Path, parent: Path) -> bool:
         return False
 
 
+def _sd_capture_directory_chain_safe(root: Path) -> bool:
+    """Existing switch/heman-stage230 components must be real directories, not symlinks."""
+    if not root.is_absolute():
+        return False
+    current = root
+    for name in ("switch", "heman-stage230"):
+        current = current / name
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            return False
+    return True
+
+
 def _path_fingerprint(path: Path) -> str | None:
     """Hash a normalized path identity without exposing the absolute path."""
     if not path.is_absolute():
@@ -147,10 +165,16 @@ def preflight(
         checks["sd_root_existing_non_symlink_directory"]
         and os.access(sd_root, os.W_OK | os.X_OK)
     )
+    checks["sd_capture_directory_chain_safe"] = bool(
+        checks["sd_root_existing_non_symlink_directory"]
+        and _sd_capture_directory_chain_safe(sd_root)
+    )
     if not checks["sd_root_existing_non_symlink_directory"]:
         notes.append("The SD root must be an existing directory, not a symlink.")
     elif not checks["sd_root_writable"]:
         notes.append("The SD root is not writable/searchable by the current user.")
+    if not checks["sd_capture_directory_chain_safe"]:
+        notes.append("Existing switch/heman-stage230 path components must be real directories, not symlinks or files.")
     checks["sd_root_mapping_operator_confirmed"] = bool(sd_root_mapping_confirmed)
     if not sd_root_mapping_confirmed:
         notes.append("Confirm manually that this exact directory is the emulator's mapped sdmc root.")
