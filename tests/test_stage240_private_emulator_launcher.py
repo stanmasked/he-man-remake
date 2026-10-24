@@ -12,10 +12,14 @@ import stage240_private_emulator_launcher as m
 FAKE_RUNNER=r'''#!/usr/bin/env python3
 # Unit-test runner only; fabricates RGBA buffers, executes no GPU instructions.
 import pathlib
+import subprocess
 import sys
 root=pathlib.Path(sys.argv[1])/"switch"/"heman-stage230"
 nonce=(root/"run_nonce.txt").read_text(encoding="ascii").strip()
 mode=sys.argv[3]
+if mode=="orphan":
+    subprocess.Popen([sys.executable,"-c","import time; time.sleep(60)"])
+    sys.exit(0)
 if mode=="noisy":
     for _ in range(100):
         sys.stdout.write("X"*65536)
@@ -149,6 +153,20 @@ class Stage240Tests(unittest.TestCase):
         self.assertIn("truncated",report["stage231_collection_error"])
         self.assertFalse(report["stage236_bundle_consistent"])
         self.assertFalse(report["runtime_gpu_execution_attested"])
+
+
+    def test_parent_exit_with_descendant_holding_pipe_triggers_tree_cleanup(self):
+        report=m.launch(self.exe,self.nro,self.sd,self.session,
+                        self.args("orphan"),timeout=30,test_runner=True)
+        self.assertEqual(report["host_process_exit_code"],0)
+        self.assertTrue(report["process_tree_cleanup_attempted"])
+        self.assertTrue(report["process_tree_cleanup_success"])
+        self.assertFalse(report["runner_log_drain_incomplete"])
+        self.assertFalse(report["stage231_collected"])
+        self.assertFalse(report["stage236_bundle_consistent"])
+        self.assertFalse(report["runtime_gpu_execution_attested"])
+        self.assertEqual(report["process_tree_cleanup_method"],"posix_process_group"
+                         if os.name!="nt" else "windows_taskkill_tree")
 
     def test_no_reuse_of_prepared_session(self):
         m.launch(self.exe,self.nro,self.sd,self.session,
