@@ -204,8 +204,8 @@ def preflight(
             e != n
             and not _is_within(out, s)
             and not _is_within(s, out)
-            and not _is_within(out, e.parent)
-            and not _is_within(out, n.parent)
+            and not _is_within(e, out)
+            and not _is_within(n, out)
         )
     except OSError:
         separation_ok = False
