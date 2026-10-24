@@ -128,6 +128,13 @@ class BundleTests(unittest.TestCase):
         self.assertNotIn("upload",report["pixel_diagnostics"]["captures"])
         self.assertIn("render",report["pixel_diagnostics"]["captures"])
 
+    def test_oversized_phase_does_not_discard_capture_diagnostics(self):
+        with tempfile.TemporaryDirectory() as root:
+            report=self.collect(root,phase=b"x"*257)
+        self.assertEqual(report["phase"]["status"],"oversized")
+        self.assertIn("upload",report["pixel_diagnostics"]["captures"])
+        self.assertFalse(report["consistency_gate"]["synthetic_bundle_consistent"])
+
     def test_bad_session_schema_fails_closed(self):
         with tempfile.TemporaryDirectory() as root:
             with self.assertRaisesRegex(m.BundleError,"schema"):
@@ -137,7 +144,9 @@ class BundleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             nro,sd,session=self.prepare(root)
             report={"schema":"stage231-collected-synthetic-gpu-evidence-v1",
+                    "result":"submitted_capture_matches_challenge_and_pixels",
                     "nonce":NONCE,"nro_sha256":NRO_SHA,
+                    "rgba_sha256":hashlib.sha256(payload()).hexdigest(),
                     "runtime_provenance_attested":False}
             (session/"stage231_collected.json").write_text(json.dumps(report))
             result=m.collect_bundle(nro,sd,session)
