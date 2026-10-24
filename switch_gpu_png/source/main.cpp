@@ -106,6 +106,24 @@ static bool loadStage228Shader(dk::MemBlock codeMem, uint32_t offset,
     return shader.isValid() && shader.getStage()==stage;
 }
 
+// Invalidate any previous capture BEFORE starting GPU work, including failed
+// shader initialization or GPU hangs. Never let an old receipt look fresh.
+static bool prepareStage230Capture()
+{
+    if(::mkdir("sdmc:/switch",0777)!=0 && errno!=EEXIST) return false;
+    if(::mkdir("sdmc:/switch/heman-stage230",0777)!=0 && errno!=EEXIST)
+        return false;
+    for(const char* path : {
+        "sdmc:/switch/heman-stage230/readback.receipt",
+        "sdmc:/switch/heman-stage230/readback.rgba",
+        "sdmc:/switch/heman-stage230/readback.rgba.tmp",
+        "sdmc:/switch/heman-stage230/readback.receipt.tmp"
+    }) {
+        if(std::remove(path)!=0 && errno!=ENOENT) return false;
+    }
+    return true;
+}
+
 // Stage230: preserve *observed* bytes without relying on stdout routing.
 // The receipt is committed last; a missing receipt means an incomplete capture.
 // This is a synthetic fixture. Neither the SD card nor this file proves GPU
@@ -271,6 +289,7 @@ int main(int argc, char** argv)
 {
     (void)argc; (void)argv;
     if(!buildSyntheticSource()) return 2;
+    if(!prepareStage230Capture()) return 27; // no SD evidence path
     const Result romfsResult=romfsInit();
     if(R_FAILED(romfsResult)) return 11;
     const bool shadersReady=
