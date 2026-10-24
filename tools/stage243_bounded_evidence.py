@@ -36,11 +36,15 @@ def _read_fd(fd: int, max_bytes: int, label: str) -> bytes:
         raise EvidenceReadError(f"{label}: expected a regular file")
     if info.st_size > max_bytes:
         raise EvidenceReadError(f"{label}: oversized ({info.st_size} > {max_bytes})")
-    with os.fdopen(fd, "rb") as stream:
-        content = stream.read(max_bytes + 1)
+    content = bytearray()
+    while len(content) <= max_bytes:
+        chunk = os.read(fd, min(64 * 1024, max_bytes + 1 - len(content)))
+        if not chunk:
+            break
+        content.extend(chunk)
     if len(content) > max_bytes:
         raise EvidenceReadError(f"{label}: grew beyond {max_bytes} bytes")
-    return content
+    return bytes(content)
 
 
 def read_limited_at(directory_fd: int, name: str, max_bytes: int, label: str) -> bytes:
@@ -54,6 +58,7 @@ def read_limited_at(directory_fd: int, name: str, max_bytes: int, label: str) ->
     try:
         fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0), dir_fd=directory_fd)
         result = _read_fd(fd, max_bytes, label)
+        os.close(fd)
         fd = None
         return result
     except FileNotFoundError as exc:
@@ -76,6 +81,7 @@ def read_limited(path: Path, max_bytes: int, label: str) -> bytes:
     try:
         fd = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
         content = _read_fd(fd, max_bytes, label)
+        os.close(fd)
         fd = None
         return content
     except FileNotFoundError as exc:
