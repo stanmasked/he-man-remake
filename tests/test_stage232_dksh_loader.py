@@ -65,7 +65,8 @@ class Stage232Tests(unittest.TestCase):
         self.assert_bad(offsets=(0,256))
         self.assert_bad(offsets=(0,3841))
         self.assert_bad(offsets=(0,-256))
-        self.assert_bad(offsets=(0,12288))
+        # 0x3b00 + 512 exceeds 0x4000 - 0x400 unusable-tail limit.
+        self.assert_bad(offsets=(0,15104))
 
     def test_detect_garbage_header_in_control(self):
         self.assert_bad(vertex=shader(off=240))
