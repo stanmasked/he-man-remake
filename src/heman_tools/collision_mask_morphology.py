@@ -78,13 +78,16 @@ def mask_profile(image: Image.Image, entry: dict, atlas_index: int, cells: int) 
         )
 
     if occupied:
-        xs = []
-        ys = []
+        min_x, min_y = width, height
+        max_x = max_y = -1
         for pos, value in enumerate(mask):
             if value:
-                xs.append(pos % width)
-                ys.append(pos // width)
-        bbox = [min(xs), min(ys), max(xs) + 1, max(ys) + 1]
+                px, py = pos % width, pos // width
+                min_x = min(min_x, px)
+                min_y = min(min_y, py)
+                max_x = max(max_x, px)
+                max_y = max(max_y, py)
+        bbox = [min_x, min_y, max_x + 1, max_y + 1]
     else:
         bbox = None
 
