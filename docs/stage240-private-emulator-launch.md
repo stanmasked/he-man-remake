@@ -29,6 +29,7 @@ and mapped sdmc directory. Make an empty, private session folder:
       --nro /absolute/private/heman_deko_png_transfer.nro \
       --sd-root /absolute/path/to/real-emulator-sd-root \
       --session-dir /absolute/private/stage240-run-001 \
+      --preflight-report /absolute/private/stage252-preflight.json \
       --timeout 300 \
       -- --no-gui --root-data-dir /absolute/private/emulator-data "{nro}"
 
@@ -39,9 +40,14 @@ the flags to your installed emulator. A graphical emulator can use just
 within the timeout.
 
 The launcher uses \`shell=False\`, verifies executable and NRO paths,
-computes SHA-256 of both binaries, calls Stage231 PREPARE to create a fresh
-128-bit nonce, then starts the **actual supplied executable** with a bounded
-process timeout. It stores the process log and actual host exit status
+computes SHA-256 of both binaries, and requires a fresh Stage252
+preflight report for every non-test launch. Stage253 verifies the report
+schema, all required checks, exact path and argument fingerprints, current
+executable and NRO hashes, and a maximum 30-minute age before Stage231 PREPARE
+can create a fresh 128-bit nonce. Only then does it start the **actual supplied
+executable** with a bounded process timeout. The gate is a consistency check,
+not a signed attestation: it cannot independently verify the operator's SD
+mapping or GPU execution. It stores the process log and actual host exit status
 privately. It attempts Stage231 COLLECT if the host exit is 0, and always
 generates a Stage236 bundle report for partial or complete captures.
 

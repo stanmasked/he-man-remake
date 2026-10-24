@@ -42,6 +42,35 @@ def _is_within(child: Path, parent: Path) -> bool:
         return False
 
 
+def _sd_capture_directory_chain_safe(root: Path) -> bool:
+    """Existing switch/heman-stage230 components must be real directories, not symlinks."""
+    if not root.is_absolute():
+        return False
+    current = root
+    for name in ("switch", "heman-stage230"):
+        current = current / name
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            return False
+    return True
+
+
+def _path_fingerprint(path: Path) -> str | None:
+    """Hash a normalized path identity without exposing the absolute path."""
+    if not path.is_absolute():
+        return None
+    try:
+        normalized = os.path.normcase(str(path.resolve(strict=False)))
+    except OSError:
+        return None
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
 def preflight(
     emulator: Path,
     nro: Path,
@@ -136,10 +165,16 @@ def preflight(
         checks["sd_root_existing_non_symlink_directory"]
         and os.access(sd_root, os.W_OK | os.X_OK)
     )
+    checks["sd_capture_directory_chain_safe"] = bool(
+        checks["sd_root_existing_non_symlink_directory"]
+        and _sd_capture_directory_chain_safe(sd_root)
+    )
     if not checks["sd_root_existing_non_symlink_directory"]:
         notes.append("The SD root must be an existing directory, not a symlink.")
     elif not checks["sd_root_writable"]:
         notes.append("The SD root is not writable/searchable by the current user.")
+    if not checks["sd_capture_directory_chain_safe"]:
+        notes.append("Existing switch/heman-stage230 path components must be real directories, not symlinks or files.")
     checks["sd_root_mapping_operator_confirmed"] = bool(sd_root_mapping_confirmed)
     if not sd_root_mapping_confirmed:
         notes.append("Confirm manually that this exact directory is the emulator's mapped sdmc root.")
@@ -240,6 +275,15 @@ def preflight(
         "checks": checks,
         "input_metadata": metadata,
         "sha256": hashes,
+        "path_fingerprints": {
+            "emulator_path_sha256": _path_fingerprint(emulator),
+            "nro_path_sha256": _path_fingerprint(nro),
+            "sd_root_path_sha256": _path_fingerprint(sd_root),
+            "session_dir_path_sha256": _path_fingerprint(session_dir),
+            "launch_args_sha256": hashlib.sha256(
+                json.dumps(launch_args, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
+        },
         "sd_root_mapping_independently_verified": False,
         "emulator_was_launched": False,
         "runtime_gpu_execution_attested": False,

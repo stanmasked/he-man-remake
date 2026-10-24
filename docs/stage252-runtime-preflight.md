@@ -38,7 +38,9 @@ blocked.
 - NRO: absolute existing regular non-symlink file, 20 bytes to 16 MiB, NRO0
   magic at offset 16, SHA-256.
 - SD root: existing non-symlink directory, writable/searchable by the current
-  user, and explicit operator confirmation of the mapping.
+  user, explicit operator confirmation of the mapping, and any existing
+  switch/heman-stage230 path components must be real directories rather than
+  symlinks or files.
 - Session output: fresh empty directory or a new child of a writable owner-
   private parent; rejects symlinked paths and group/world POSIX permissions.
   Python's standard library does not independently audit Windows ACLs, so the
@@ -56,7 +58,10 @@ reports with mode 0600. On POSIX, the output parent must also be owner-private;
 the only bypass is an explicit synthetic-CI-only flag used by the public
 workflow. Windows ACLs are not audited by this standard-library tool, so an
 owner-host operator must choose a private destination. Only basenames and
-hashes are retained in the report, not absolute host paths.
+hashes are retained in the report, not absolute host paths. Stage252 also
+records SHA-256 fingerprints of normalized absolute paths and the launch
+argument template. Stage253 uses these fingerprints to bind a recent preflight
+to the exact Stage240 invocation without copying those paths into the report.
 
 ## Evidence boundary
 

@@ -78,6 +78,23 @@ class Stage240Tests(unittest.TestCase):
         with self.assertRaisesRegex(m.LaunchError,"entire argument"):
             m.build_command(self.exe,self.nro,["{nro}","--input={nro}"])
 
+    def test_real_launch_requires_stage252_preflight_before_prepare(self):
+        with self.assertRaisesRegex(m.LaunchError, "requires a Stage252"):
+            m.launch(self.exe,self.nro,self.sd,self.session,
+                     self.args("success"),timeout=30,test_runner=False)
+        self.assertFalse(self.session.exists())
+        self.assertFalse((self.sd/"switch").exists())
+
+    def test_test_only_bypass_rejects_unmarked_executable(self):
+        unmarked=self.root/"unmarked-runner.py"
+        unmarked.write_text("#!/usr/bin/env python3\\nraise SystemExit(0)\\n",encoding="utf-8")
+        unmarked.chmod(0o700)
+        with self.assertRaisesRegex(m.LaunchError,"requires the explicit synthetic runner marker"):
+            m.launch(unmarked,self.nro,self.sd,self.session,
+                     self.args("success"),timeout=30,test_runner=True)
+        self.assertFalse(self.session.exists())
+        self.assertFalse((self.sd/"switch").exists())
+
     def test_missing_emulator_and_invalid_paths_fail_closed(self):
         with self.assertRaisesRegex(m.LaunchError,"existing absolute"):
             m.build_command(self.root/"missing",self.nro,["{nro}"])
@@ -100,6 +117,8 @@ class Stage240Tests(unittest.TestCase):
         self.assertFalse(report["runtime_gpu_execution_attested"])
         self.assertFalse(report["guest_process_exit_independently_verified"])
         self.assertFalse(report["emulator_gpu_capability_independently_verified"])
+        self.assertEqual(report["stage252_preflight_gate_status"], "bypassed_test_only_runner")
+        self.assertIsNone(report["stage252_preflight_gate"])
         self.assertEqual(report["runtime_backend_log_audit_status"], "complete")
         self.assertEqual(
             report["runtime_backend_log_audit"]["classification"],
