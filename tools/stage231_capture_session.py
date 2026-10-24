@@ -226,8 +226,10 @@ def _write_file_at(
     flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0)
     flags |= os.O_EXCL if exclusive else os.O_TRUNC
     fd = None
+    created = False
     try:
         fd = os.open(name, flags, 0o600, dir_fd=directory_fd)
+        created = exclusive
         if not stat.S_ISREG(os.fstat(fd).st_mode):
             raise SessionError(f"refusing non-regular output entry: {name}")
         view = memoryview(data)
@@ -238,8 +240,18 @@ def _write_file_at(
                 raise SessionError(f"short write while creating output entry: {name}")
             offset += written
     except SessionError:
+        if created:
+            try:
+                os.unlink(name, dir_fd=directory_fd)
+            except OSError:
+                pass
         raise
     except OSError as exc:
+        if created:
+            try:
+                os.unlink(name, dir_fd=directory_fd)
+            except OSError:
+                pass
         raise SessionError(f"could not safely write output entry: {name}") from exc
     finally:
         if fd is not None:
@@ -480,14 +492,25 @@ def collect(nro: Path, sd_root: Path, output_dir: Path, *,
                 ("runtime.log", log_bytes),
                 ("exit-status.txt", (status_text + "\n").encode("ascii")),
             )
-            for name, data in outputs:
-                _write_file_at(output_fd, name, data, exclusive=True)
-            _write_file_at(
-                output_fd,
-                collected_name,
-                (json.dumps(result, indent=2, sort_keys=True) + "\n").encode("utf-8"),
-                exclusive=True,
-            )
+            created_outputs = []
+            try:
+                for name, data in outputs:
+                    _write_file_at(output_fd, name, data, exclusive=True)
+                    created_outputs.append(name)
+                _write_file_at(
+                    output_fd,
+                    collected_name,
+                    (json.dumps(result, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+                    exclusive=True,
+                )
+                created_outputs.append(collected_name)
+            except Exception:
+                for name in created_outputs:
+                    try:
+                        _unlink_at(output_fd, name)
+                    except SessionError:
+                        pass
+                raise
         else:
             (output_dir / "readback.rgba").write_bytes(rgba_bytes)
             (output_dir / "readback.receipt").write_bytes(receipt_bytes)
