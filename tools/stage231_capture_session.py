@@ -276,34 +276,6 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         challenge = secrets.token_hex(16)
     if not NONCE.fullmatch(challenge):
         raise SessionError("challenge must be 128-bit lowercase hex")
-    sd = _ensure_sd_capture_dir(sd_root)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    # Recheck the directory chain immediately before touching guest files.
-    # This closes the ordinary preflight-to-PREPARE symlink substitution gap;
-    # it is not a kernel-level lock against a hostile concurrent writer.
-    sd = _ensure_sd_capture_dir(sd_root)
-    # Stale artifacts must be removed before guest startup; never touch
-    # original commercial files or paths outside the synthetic test folder.
-    for name in (
-        "readback.rgba", "readback.receipt",
-        "readback.rgba.tmp", "readback.receipt.tmp",
-        "upload.rgba", "upload.rgba.tmp",
-        "gpu_phase.txt", "gpu_phase.tmp",
-        "guest_exit.txt", "guest_exit.tmp",
-        "run_nonce.txt.tmp",
-    ):
-        (sd / name).unlink(missing_ok=True)
-    sd = _ensure_sd_capture_dir(sd_root)
-    nonce_tmp = sd / "run_nonce.txt.tmp"
-    nonce_final = sd / "run_nonce.txt"
-    try:
-        nonce_tmp.write_text(challenge + "\n", encoding="ascii")
-        # os.replace replaces a pre-existing symlink itself rather than
-        # following it, and the reader sees either the old or full new file.
-        os.replace(nonce_tmp, nonce_final)
-    except OSError as exc:
-        nonce_tmp.unlink(missing_ok=True)
-        raise SessionError("could not atomically write SD session nonce") from exc
     request = {
         "schema": "stage231-capture-session-v1",
         "state": "prepared_not_executed",
@@ -314,8 +286,69 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         "runtime_provenance_attested": False,
         "note": "Preparation does not execute a GPU, Switch or emulator.",
     }
-    (output_dir / "stage231_session.json").write_text(
-        json.dumps(request, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    stale_names = (
+        "readback.rgba", "readback.receipt",
+        "readback.rgba.tmp", "readback.receipt.tmp",
+        "upload.rgba", "upload.rgba.tmp",
+        "gpu_phase.txt", "gpu_phase.tmp",
+        "guest_exit.txt", "guest_exit.tmp",
+        "run_nonce.txt.tmp",
+    )
+    manifest_bytes = (json.dumps(request, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+    if _supports_descriptor_io():
+        sd_fd = None
+        output_fd = None
+        try:
+            sd_fd = _open_sd_capture_dir_fd(sd_root, create=True)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            output_fd = _open_directory_path(output_dir, "session output")
+            if os.listdir(output_fd):
+                raise SessionError("session output directory is not empty")
+            # Directory descriptors pin the checked inodes; replacing a path
+            # with a symlink after open cannot redirect these operations.
+            for name in stale_names:
+                _unlink_at(sd_fd, name)
+            try:
+                _write_file_at(
+                    sd_fd, "run_nonce.txt.tmp",
+                    (challenge + "\n").encode("ascii"), exclusive=True,
+                )
+                os.rename(
+                    "run_nonce.txt.tmp", "run_nonce.txt",
+                    src_dir_fd=sd_fd, dst_dir_fd=sd_fd,
+                )
+            except OSError as exc:
+                try:
+                    _unlink_at(sd_fd, "run_nonce.txt.tmp")
+                except SessionError:
+                    pass
+                raise SessionError("could not atomically write SD session nonce") from exc
+            _write_file_at(output_fd, "stage231_session.json", manifest_bytes, exclusive=True)
+        finally:
+            if output_fd is not None:
+                os.close(output_fd)
+            if sd_fd is not None:
+                os.close(sd_fd)
+    else:
+        # Compatibility fallback for platforms without O_NOFOLLOW/dir_fd.
+        # Stage253 still gates real launches; this path retains Stage254's
+        # repeated lstat checks but cannot pin directories against a racing writer.
+        sd = _ensure_sd_capture_dir(sd_root)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        sd = _ensure_sd_capture_dir(sd_root)
+        for name in stale_names:
+            (sd / name).unlink(missing_ok=True)
+        sd = _ensure_sd_capture_dir(sd_root)
+        nonce_tmp = sd / "run_nonce.txt.tmp"
+        nonce_final = sd / "run_nonce.txt"
+        try:
+            nonce_tmp.write_text(challenge + "\n", encoding="ascii")
+            os.replace(nonce_tmp, nonce_final)
+        except OSError as exc:
+            nonce_tmp.unlink(missing_ok=True)
+            raise SessionError("could not atomically write SD session nonce") from exc
+        (output_dir / "stage231_session.json").write_bytes(manifest_bytes)
     return request
 
 
