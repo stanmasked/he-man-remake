@@ -49,6 +49,25 @@ class Stage231SessionTests(unittest.TestCase):
         self.assertFalse(self.session["runtime_provenance_attested"])
         self.assertEqual(self.session["nro_sha256"], hashlib.sha256(FAKE_NRO).hexdigest())
 
+    def test_fresh_prepare_clears_all_stage230_to_stage234_artifacts(self):
+        stale_names = (
+            "readback.rgba", "readback.receipt",
+            "readback.rgba.tmp", "readback.receipt.tmp",
+            "upload.rgba", "upload.rgba.tmp",
+            "gpu_phase.txt", "gpu_phase.tmp",
+        )
+        for name in stale_names:
+            self.capture.joinpath(name).write_bytes(b"stale-private-test-data")
+        fresh_out = self.out.parent / "fresh-owner-private"
+        session = m.prepare(self.nro, self.sd, fresh_out, challenge=CHALLENGE)
+        self.assertEqual(session["state"], "prepared_not_executed")
+        for name in stale_names:
+            with self.subTest(name=name):
+                self.assertFalse(self.capture.joinpath(name).exists())
+        self.assertEqual(
+            self.capture.joinpath("run_nonce.txt").read_text(encoding="ascii"),
+            CHALLENGE + "\n")
+
     def test_synthetic_collection_does_not_attest_gpu(self):
         report = self.run_collect()
         self.assertEqual(report["result"], "submitted_capture_matches_challenge_and_pixels")
