@@ -38,7 +38,9 @@ blocked.
 - NRO: absolute existing regular non-symlink file, 20 bytes to 16 MiB, NRO0
   magic at offset 16, SHA-256.
 - SD root: existing non-symlink directory, writable/searchable by the current
-  user, and explicit operator confirmation of the mapping.
+  user, explicit operator confirmation of the mapping, and any existing
+  switch/heman-stage230 path components must be real directories rather than
+  symlinks or files.
 - Session output: fresh empty directory or a new child of a writable owner-
   private parent; rejects symlinked paths and group/world POSIX permissions.
   Python's standard library does not independently audit Windows ACLs, so the
