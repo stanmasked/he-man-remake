@@ -33,7 +33,8 @@ PHASE = re.compile(
 KNOWN_PHASES = {
     "01_nonce_validated", "02_shaders_loaded",
     "03_texture_upload_queue_idle", "04_upload_pixels_match",
-    "05_render_queue_idle", "06_receipt_committed",
+    "05_render_commands_submitted", "06_render_queue_idle",
+    "07_receipt_committed",
 }
 BYTE_COUNT = 512
 
