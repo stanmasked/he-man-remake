@@ -149,6 +149,18 @@ class Stage253PreflightLaunchGateTests(unittest.TestCase):
                 inside, self.emulator, self.nro, self.sd_root, self.session, self.args
             )
 
+    def test_symlinked_stage230_path_added_after_preflight_is_rejected(self):
+        self.save_report(self.make_report())
+        external = self.root / "external"
+        external.mkdir()
+        link = self.sd_root / "switch"
+        try:
+            link.symlink_to(external, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.skipTest("symbolic links are unavailable")
+        with self.assertRaisesRegex(gate.PreflightGateError, "path components"):
+            self.validate()
+
     def test_session_that_became_nonempty_is_rejected(self):
         self.save_report(self.make_report())
         self.session.mkdir()
