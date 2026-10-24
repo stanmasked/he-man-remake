@@ -22,6 +22,7 @@ REQUIRED_CHECKS = {
     "nro0_header_valid",
     "sd_root_existing_non_symlink_directory",
     "sd_root_writable",
+    "sd_capture_directory_chain_safe",
     "sd_root_mapping_operator_confirmed",
     "session_target_fresh_and_private",
     "input_and_output_paths_separated",
@@ -49,6 +50,21 @@ def _path_fingerprint(path: Path) -> str:
     except OSError as exc:
         raise PreflightGateError("could not normalize a launch path") from exc
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _sd_capture_directory_chain_safe(root: Path) -> bool:
+    current = root
+    for name in ("switch", "heman-stage230"):
+        current = current / name
+        try:
+            info = current.lstat()
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode):
+            return False
+    return True
 
 
 def _sha256_file(path: Path) -> str:
@@ -191,6 +207,9 @@ def validate_preflight_report(
         raise PreflightGateError("SD root must be a non-symlink directory")
     if not os.access(sd_root, os.W_OK | os.X_OK):
         raise PreflightGateError("SD root is not writable/searchable by the current user")
+
+    if not _sd_capture_directory_chain_safe(sd_root):
+        raise PreflightGateError("existing switch/heman-stage230 path components must be non-symlink directories")
 
     # Recheck session freshness/privacy immediately before Stage240 PREPARE.
     try:
