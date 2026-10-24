@@ -1,4 +1,4 @@
-name: He-Man Stage233 GPU upload roundtrip cross-build
+name: He-Man Stage234 texture cache and GPU checkpoint cross-build
 on:
   pull_request:
     paths:
@@ -7,6 +7,7 @@ on:
       - 'native/include/heman_native_png_upload.h'
       - '.github/workflows/switch-deko-png-upload.yml'
       - 'tools/verify_stage232_dksh_loader.py'
+      - 'tools/verify_stage234_gpu_phase.py'
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +19,7 @@ permissions:
 
 jobs:
   deko3d-gpu-transfer:
-    name: Cross-build Stage233 two independent GPU readbacks
+    name: Cross-build Stage234 cache-synchronized GPU probe
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     container:
@@ -54,6 +55,10 @@ jobs:
           grep -aFq 'mismatches=%u nonce=%s' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'STAGE233_GPU_UPLOAD_ROUNDTRIP' switch_gpu_png/heman_deko_png_transfer.elf
           grep -aFq 'sdmc:/switch/heman-stage230/upload.rgba' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'STAGE234_GPU_PHASE nonce=' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq '06_receipt_committed' switch_gpu_png/heman_deko_png_transfer.elf
+          grep -aFq 'sdmc:/switch/heman-stage230/gpu_phase.txt' switch_gpu_png/heman_deko_png_transfer.elf
+          python3 -c "import pathlib,sys; sys.path.insert(0,'tools'); from verify_stage234_gpu_phase import audit_source; print(audit_source(pathlib.Path('switch_gpu_png/source/main.cpp').read_text()))"
           "$DEVKITA64/bin/aarch64-none-elf-readelf" -h switch_gpu_png/heman_deko_png_transfer.elf | grep -F AArch64
           test "$(dd if=switch_gpu_png/heman_deko_png_transfer.nro bs=1 skip=16 count=4 2>/dev/null)" = NRO0
           sha256sum switch_gpu_png/heman_deko_png_transfer.nro
@@ -73,10 +78,10 @@ jobs:
             switch_gpu_png/romfs/shaders/padded_texture_fsh.dksh \
             --nro switch_gpu_png/heman_deko_png_transfer.nro
           sha256sum switch_gpu_png/romfs/shaders/*.dksh
-      - name: Archive Stage233 upload plus render probe
+      - name: Archive Stage234 cache-synchronized GPU probe
         uses: actions/upload-artifact@v4
         with:
-          name: heman-stage233-synthetic-upload-render-readbacks
+          name: heman-stage234-synthetic-gpu-phase-nro
           path: |
             switch_gpu_png/heman_deko_png_transfer.nro
             switch_gpu_png/romfs/shaders/*.dksh
