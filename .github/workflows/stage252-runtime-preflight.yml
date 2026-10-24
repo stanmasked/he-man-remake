@@ -56,6 +56,7 @@ jobs:
             --sd-root "$work/sd" \
             --session-dir "$work/private/session" \
             --output "$PWD/build/stage252_runtime_preflight.json" \
+            --allow-public-output-for-synthetic-ci \
             -- --no-gui '{nro}'
           rc=$?
           set -e
