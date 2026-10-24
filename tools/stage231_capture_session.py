@@ -74,9 +74,19 @@ def prepare(nro: Path, sd_root: Path, output_dir: Path, *, challenge: str | None
         "readback.rgba.tmp", "readback.receipt.tmp",
         "upload.rgba", "upload.rgba.tmp",
         "gpu_phase.txt", "gpu_phase.tmp",
+        "run_nonce.txt.tmp",
     ):
         (sd / name).unlink(missing_ok=True)
-    (sd / "run_nonce.txt").write_text(challenge + "\n", encoding="ascii")
+    nonce_tmp = sd / "run_nonce.txt.tmp"
+    nonce_final = sd / "run_nonce.txt"
+    try:
+        nonce_tmp.write_text(challenge + "\n", encoding="ascii")
+        # os.replace replaces a pre-existing symlink itself rather than
+        # following it, and the reader sees either the old or full new file.
+        os.replace(nonce_tmp, nonce_final)
+    except OSError as exc:
+        nonce_tmp.unlink(missing_ok=True)
+        raise SessionError("could not atomically write SD session nonce") from exc
     request = {
         "schema": "stage231-capture-session-v1",
         "state": "prepared_not_executed",

@@ -54,7 +54,7 @@ class Stage231SessionTests(unittest.TestCase):
             "readback.rgba", "readback.receipt",
             "readback.rgba.tmp", "readback.receipt.tmp",
             "upload.rgba", "upload.rgba.tmp",
-            "gpu_phase.txt", "gpu_phase.tmp",
+            "gpu_phase.txt", "gpu_phase.tmp", "run_nonce.txt.tmp",
         )
         for name in stale_names:
             self.capture.joinpath(name).write_bytes(b"stale-private-test-data")
@@ -67,6 +67,19 @@ class Stage231SessionTests(unittest.TestCase):
         self.assertEqual(
             self.capture.joinpath("run_nonce.txt").read_text(encoding="ascii"),
             CHALLENGE + "\n")
+
+    def test_nonce_replacement_does_not_follow_preexisting_symlink(self):
+        target = Path(self.temp.name) / "outside-target.txt"
+        target.write_text("must remain unchanged", encoding="utf-8")
+        nonce_path = self.capture / "run_nonce.txt"
+        nonce_path.unlink(missing_ok=True)
+        nonce_path.symlink_to(target)
+        fresh_out = self.out.parent / "fresh-symlink-session"
+        m.prepare(self.nro, self.sd, fresh_out, challenge=CHALLENGE)
+        self.assertFalse(nonce_path.is_symlink())
+        self.assertEqual(nonce_path.read_text(encoding="ascii"), CHALLENGE + "\n")
+        self.assertEqual(target.read_text(encoding="utf-8"), "must remain unchanged")
+        self.assertFalse((self.capture / "run_nonce.txt.tmp").exists())
 
     def test_synthetic_collection_does_not_attest_gpu(self):
         report = self.run_collect()

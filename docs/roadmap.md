@@ -197,3 +197,5 @@ No original IPA or extracted copyrighted resource may be committed, uploaded as 
 - [ ] Stage236 joins the prepared NRO/session, SD nonce, Stage234 phase, Stage230 receipt, and Stage233 upload/render captures into a single private bundle report. Stage235 mismatch analysis is retained for incomplete or failing runs; `--require-complete` gates synthetic consistency only and never claims GPU provenance. See [Stage236](stage236-private-capture-bundle.md).
 
 - [ ] Stage237 extends Stage231 PREPARE to remove stale Stage233 `upload.rgba` and Stage234 `gpu_phase.txt` files and their temporary paths, alongside the existing render capture/receipt. Regression coverage seeds all eight stale files before PREPARE and confirms cleanup before a new nonce is used. See [Stage237](stage237-stale-capture-invalidation.md).
+
+- [ ] Stage238 makes Stage231 PREPARE write `run_nonce.txt` through a temporary file and atomic replacement, avoiding writes through an existing symlink or exposure of a partially written nonce. Adds regression coverage for symlink replacement, untouched target content and stale `run_nonce.txt.tmp` cleanup. See [Stage238](stage238-atomic-session-nonce.md).
