@@ -17,6 +17,10 @@ import re
 import secrets
 import shutil
 import sys
+from stage243_bounded_evidence import (
+    EvidenceReadError, read_limited, MAX_MANIFEST_BYTES, MAX_LOG_BYTES,
+    MAX_RGBA_BYTES, MAX_RECEIPT_BYTES, MAX_NONCE_BYTES, MAX_EXIT_BYTES,
+)
 
 BYTES = 512
 NONCE = re.compile(r"[0-9a-f]{32}")
@@ -161,33 +165,44 @@ def collect(nro: Path, sd_root: Path, output_dir: Path, *,
         raise SessionError("missing previously prepared session")
     if (output_dir / "stage231_collected.json").exists():
         raise SessionError("session was already collected; create a fresh session")
-    session = json.loads(manifest.read_text(encoding="utf-8"))
     sd = sd_dir(sd_root)
-    status_text = exit_status_path.read_text(encoding="ascii").strip()
-    if not re.fullmatch(r"[0-9]{1,3}", status_text):
-        raise SessionError("invalid independent exit status")
     rgba_file, receipt_file = sd/"readback.rgba", sd/"readback.receipt"
-    if not rgba_file.is_file() or rgba_file.stat().st_size != BYTES:
+    try:
+        session = json.loads(read_limited(manifest,MAX_MANIFEST_BYTES,
+                                          "prepared session manifest").decode("utf-8"))
+        status_text = read_limited(exit_status_path,MAX_EXIT_BYTES,
+                                   "exit status").decode("ascii").strip()
+        nonce_text = read_limited(sd/"run_nonce.txt",MAX_NONCE_BYTES,
+                                  "SD request nonce").decode("ascii")
+        rgba_bytes = read_limited(rgba_file,MAX_RGBA_BYTES,
+                                  "GPU readback file")
+        receipt_bytes = read_limited(receipt_file,MAX_RECEIPT_BYTES,
+                                     "completion receipt")
+        log_bytes = read_limited(runner_log_path,MAX_LOG_BYTES,
+                                 "runner log")
+    except (EvidenceReadError,UnicodeError,json.JSONDecodeError) as exc:
+        raise SessionError(str(exc)) from exc
+    if not re.fullmatch(r"[0-9]{1,3}",status_text):
+        raise SessionError("invalid independent exit status")
+    if len(rgba_bytes)!=BYTES:
         raise SessionError("missing or incorrectly sized GPU readback file")
-    if not receipt_file.is_file() or receipt_file.stat().st_size > 256:
-        raise SessionError("missing/oversized completion receipt")
-    if runner_log_path.stat().st_size > 4*1024*1024:
-        raise SessionError("runner log oversized")
     result = validate(
         session,
-        (sd/"run_nonce.txt").read_text(encoding="ascii"),
-        rgba_file.read_bytes(),
-        receipt_file.read_text(encoding="ascii"),
+        nonce_text,
+        rgba_bytes,
+        receipt_bytes.decode("ascii"),
         nro_sha256(nro),
         int(status_text),
-        runner_log_path.read_bytes(),
-        runtime, command)
+        log_bytes,
+        runtime,command)
     # Store raw evidence only in the PRIVATE session location; public GitHub
     # workflows must neither invoke COLLECT nor upload these files.
-    shutil.copyfile(rgba_file, output_dir / "readback.rgba")
-    shutil.copyfile(receipt_file, output_dir / "readback.receipt")
-    shutil.copyfile(runner_log_path, output_dir / "runtime.log")
-    shutil.copyfile(exit_status_path, output_dir / "exit-status.txt")
+    # Reuse the validated bounded snapshot, not a second unbounded copy
+    # whose source could have grown or changed after validation.
+    (output_dir/"readback.rgba").write_bytes(rgba_bytes)
+    (output_dir/"readback.receipt").write_bytes(receipt_bytes)
+    (output_dir/"runtime.log").write_bytes(log_bytes)
+    (output_dir/"exit-status.txt").write_text(status_text+"\n",encoding="ascii")
     (output_dir / "stage231_collected.json").write_text(
         json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return result
